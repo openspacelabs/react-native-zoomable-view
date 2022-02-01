@@ -13,7 +13,8 @@
       "web"
     ],
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.elliottkember.openspacelabs-react-native-zoomable-view-example"
     },
     "assetBundlePatterns": [
       "**/*"

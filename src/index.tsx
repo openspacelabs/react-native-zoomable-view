@@ -1,10 +1,7 @@
-import ReactNativeZoomableView from './ReactNativeZoomableView';
-import ReactNativeZoomableViewWithGestures from './ReactNativeZoomableViewWithGestures';
-import { ReactNativeZoomableViewProps, ZoomableViewEvent } from './typings';
+import { ReactNativeZoomableViewProps } from './typings';
+import { ReactNativeZoomableView } from './ReactNativeZoomableView';
+import { useSharedValue } from 'react-native-reanimated';
 
-export {
-  ReactNativeZoomableView,
-  ReactNativeZoomableViewWithGestures,
-  ReactNativeZoomableViewProps,
-  ZoomableViewEvent,
-};
+export default ReactNativeZoomableView;
+
+export { ReactNativeZoomableViewProps, useSharedValue };
