@@ -946,7 +946,9 @@ class ReactNativeZoomableView extends Component<
     )
       return false;
 
-    await this._zoomToLocation(0, 0, newZoomLevel);
+    const zoomCenterX = this.state.originalWidth / 2;
+    const zoomCenterY = this.state.originalHeight / 2;
+    await this._zoomToLocation(zoomCenterX, zoomCenterY, newZoomLevel);
     return true;
   }
 
