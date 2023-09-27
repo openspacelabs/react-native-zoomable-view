@@ -5,6 +5,7 @@ import {
   InteractionManager,
   PanResponder,
   PanResponderGestureState,
+  Platform,
   StyleSheet,
   View,
 } from 'react-native';
@@ -30,6 +31,7 @@ import {
   getPanMomentumDecayAnim,
   getZoomToAnimation,
 } from './animations';
+import { isNil } from 'lodash';
 
 const initialState = {
   originalWidth: null,
@@ -37,6 +39,8 @@ const initialState = {
   originalPageX: null,
   originalPageY: null,
 } as ReactNativeZoomableViewState;
+
+const MOUSE_RIGHT = 2;
 
 class ReactNativeZoomableView extends Component<
   ReactNativeZoomableViewProps,
@@ -99,6 +103,15 @@ class ReactNativeZoomableView extends Component<
   private doubleTapFirstTap: TouchPoint;
   private measureZoomSubjectInterval: NodeJS.Timer;
 
+  private mouseRightHeldDown: boolean = false;
+  private initialXPos: number | undefined;
+  private initialYPos: number | undefined;
+  private currentDx: number | undefined;
+  private currentDy: number | undefined;
+  private currentVy: number | undefined;
+  private currentVx: number | undefined;
+  private lastMouseMoveTs: number | undefined;
+
   constructor(props) {
     super(props);
 
@@ -158,6 +171,110 @@ class ReactNativeZoomableView extends Component<
     this.lastGestureTouchDistance = 150;
 
     this.gestureType = null;
+    this.setupWebRightClick();
+  }
+
+  private setupWebRightClick() {
+    if (Platform.OS !== 'web') {
+      return;
+    }
+
+    window.addEventListener('mousedown', (e: MouseEvent) => {
+      if (e.button !== MOUSE_RIGHT) {
+        return;
+      }
+
+      this.initialXPos = e.x;
+      this.initialYPos = e.y;
+      this.currentDx = 0;
+      this.currentDy = 0;
+      this.lastMouseMoveTs = performance.now();
+
+      const { panResponderEvent, gestureResponseEvent } = this.createFakeEvents(e);
+
+      this._handlePanResponderGrant(panResponderEvent, gestureResponseEvent);
+      this.mouseRightHeldDown = true;
+    });
+
+    window.addEventListener('mouseup', (e: MouseEvent) => {
+      if (e.button !== MOUSE_RIGHT) {
+        return;
+      }
+
+
+      const { panResponderEvent, gestureResponseEvent } = this.createFakeEvents(e);
+      this._handlePanResponderEnd(panResponderEvent, gestureResponseEvent);
+      this.mouseRightHeldDown = false;
+    });
+
+    window.addEventListener('mousemove', (e: MouseEvent) => {
+      if (
+        !this.mouseRightHeldDown ||
+        isNil(this.initialYPos) ||
+        isNil(this.initialXPos)
+      ) {
+        return;
+      }
+
+      const newDy = e.y - this.initialYPos;
+      const newDx = e.x - this.initialXPos;
+
+      const xDiff = newDx - this.currentDx;
+      const yDiff = newDy - this.currentDy;
+
+      const now = performance.now();
+      const dt =  now - this.lastMouseMoveTs;
+
+      this.currentVx = xDiff / dt;
+      this.currentVy = yDiff / dt;
+
+      const { panResponderEvent, gestureResponseEvent } = this.createFakeEvents(e);
+
+      this._handlePanResponderMove(
+        gestureResponseEvent as unknown as GestureResponderEvent,
+        panResponderEvent as unknown as PanResponderGestureState
+      );
+
+      this.lastMouseMoveTs = now;
+      this.currentDx = newDx;
+      this.currentDy = newDy;
+    });
+  }
+
+  private createFakeEvents(e: MouseEvent) {
+    const panResponderEvent = {
+      ...e,
+      vx: this.currentVx,
+      vy: this.currentVy,
+      dx: this.currentDx,
+      dy: this.currentDy,
+      moveX: e.x,
+      moveY: e.y,
+      numberActiveTouches: 1,
+      nativeEvent: {
+        // @ts-ignore
+        ...e.nativeEvent,
+        touches: [e],
+      },
+    };
+
+    const gestureResponseEvent = {
+      ...e,
+      vx: this.currentVx,
+      vy: this.currentVy,
+      dx: this.currentDx,
+      dy: this.currentDy,
+      moveX: e.x,
+      moveY: e.y,
+      numberActiveTouches: 1,
+      nativeEvent: {
+        // @ts-ignore
+        ...e.nativeEvent,
+        touches: [e],
+      },
+    };
+
+    return { panResponderEvent, gestureResponseEvent };
   }
 
   private set offsetX(x: number) {
@@ -420,13 +537,20 @@ class ReactNativeZoomableView extends Component<
         this.zoomLevel === this.props.initialZoom
       )
     ) {
-      if (!this.props.onShiftingBefore || !this.props.onShiftingBefore(e, gestureState, this._getZoomableViewEventObject())) {
+      if (
+        !this.props.onShiftingBefore ||
+        !this.props.onShiftingBefore(
+          e,
+          gestureState,
+          this._getZoomableViewEventObject()
+        )
+      ) {
         getPanMomentumDecayAnim(this.panAnim, {
           x: gestureState.vx / this.zoomLevel,
-          y: gestureState.vy / this.zoomLevel
+          y: gestureState.vy / this.zoomLevel,
         }).start();
       }
-   }
+    }
 
     if (this.longPressTimeout) {
       clearTimeout(this.longPressTimeout);
@@ -732,6 +856,7 @@ class ReactNativeZoomableView extends Component<
       x: gestureState.moveX,
       y: gestureState.moveY,
     });
+
     if (!shift) return;
 
     const offsetX = this.offsetX + shift.x;
