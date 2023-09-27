@@ -420,11 +420,13 @@ class ReactNativeZoomableView extends Component<
         this.zoomLevel === this.props.initialZoom
       )
     ) {
-      getPanMomentumDecayAnim(this.panAnim, {
-        x: gestureState.vx / this.zoomLevel,
-        y: gestureState.vy / this.zoomLevel,
-      }).start();
-    }
+      if (!this.props.onShiftingBefore || !this.props.onShiftingBefore(e, gestureState, this._getZoomableViewEventObject())) {
+        getPanMomentumDecayAnim(this.panAnim, {
+          x: gestureState.vx / this.zoomLevel,
+          y: gestureState.vy / this.zoomLevel
+        }).start();
+      }
+   }
 
     if (this.longPressTimeout) {
       clearTimeout(this.longPressTimeout);
