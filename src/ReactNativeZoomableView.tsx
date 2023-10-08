@@ -56,6 +56,7 @@ class ReactNativeZoomableView extends Component<
     initialOffsetX: 0,
     initialOffsetY: 0,
     maxZoom: 1.5,
+    maxZoomHeight: undefined,
     minZoom: 0.5,
     pinchToZoomInSensitivity: 1,
     pinchToZoomOutSensitivity: 1,
@@ -86,6 +87,13 @@ class ReactNativeZoomableView extends Component<
     },
   };
 
+  
+  /**
+   * This just keeps track of what the zoom level was set to. The `zoomLevel` variable
+   * is what the zoom level is currently, even while changing the zoom.
+   */
+  private zoomLevelWithoutMovement: number | undefined;
+  
   private zoomLevel = 1;
   private lastGestureCenterPosition: { x: number; y: number } = null;
   private lastGestureTouchDistance: number;
@@ -424,6 +432,11 @@ class ReactNativeZoomableView extends Component<
    * @private
    */
   _getZoomableViewEventObject(overwriteObj = {}): ZoomableViewEvent {
+    let isAtMinZoom = false;
+    if (!isNil(this.props.maxZoomHeight)) {
+      isAtMinZoom = this.props.maxZoomHeight <= this.state.originalHeight / this.zoomLevelWithoutMovement;
+    }
+
     return {
       zoomLevel: this.zoomLevel,
       offsetX: this.offsetX,
@@ -432,6 +445,7 @@ class ReactNativeZoomableView extends Component<
       originalWidth: this.state.originalWidth,
       originalPageX: this.state.originalPageX,
       originalPageY: this.state.originalPageY,
+      isAtMinZoom,
       ...overwriteObj,
     } as ZoomableViewEvent;
   }
@@ -1038,6 +1052,7 @@ class ReactNativeZoomableView extends Component<
   async _zoomToLocation(x: number, y: number, newZoomLevel: number) {
     if (!this.props.zoomEnabled) return;
 
+    this.zoomLevelWithoutMovement = newZoomLevel;
     this.props.onZoomBefore?.(null, null, this._getZoomableViewEventObject());
 
     // == Perform Zoom Animation ==
@@ -1090,6 +1105,12 @@ class ReactNativeZoomableView extends Component<
     )
       return false;
 
+    if (!isNil(this.props.maxZoomHeight)) {
+      const currentHeight = this.state.originalHeight / this.zoomLevelWithoutMovement;
+      if (currentHeight > this.props.maxZoomHeight && newZoomLevel < this.zoomLevelWithoutMovement) {
+        return false;
+      }
+    }
     await this._zoomToLocation(0, 0, newZoomLevel);
     return true;
   }

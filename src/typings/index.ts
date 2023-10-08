@@ -20,6 +20,7 @@ export interface ZoomableViewEvent {
   originalWidth: number;
   originalPageX: number;
   originalPageY: number;
+  isAtMinZoom: boolean;
 }
 
 export interface ReactNativeZoomableViewProps extends ViewProps {
@@ -32,6 +33,7 @@ export interface ReactNativeZoomableViewProps extends ViewProps {
   contentHeight?: number;
   panBoundaryPadding?: number;
   maxZoom?: number;
+  maxZoomHeight?: number;
   minZoom?: number;
   doubleTapDelay?: number;
   doubleTapZoomToCenter?: boolean;
