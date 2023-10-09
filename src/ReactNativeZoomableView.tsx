@@ -183,6 +183,7 @@ class ReactNativeZoomableView extends Component<
     this.mouseDownListener = this.mouseDownListener.bind(this);
     this.mouseUpListener = this.mouseUpListener.bind(this);
     this.mouseMoveListener = this.mouseMoveListener.bind(this);
+    this.wheelListener = this.wheelListener.bind(this);
 
     this.setupWebRightClick();
   }
@@ -250,11 +251,20 @@ class ReactNativeZoomableView extends Component<
     this.currentDy = newDy;
   }
 
+  private wheelListener(e: WheelEvent) {
+    if (e.deltaY > 0) {
+      this.zoomTo((this.zoomLevelWithoutMovement ?? this.zoomLevel) - this.props.zoomStep, e.pageX, e.pageY);
+    } else {
+      this.zoomTo((this.zoomLevelWithoutMovement ?? this.zoomLevel) + this.props.zoomStep, e.pageX, e.pageY);
+    }
+  }
+
   private setupWebRightClick() {
     if (Platform.OS !== 'web') {
       return;
     }
 
+    window.addEventListener('wheel', this.wheelListener);
     window.addEventListener('mousedown', this.mouseDownListener);
     window.addEventListener('mouseup', this.mouseUpListener);
     window.addEventListener('mousemove', this.mouseMoveListener);
@@ -402,11 +412,12 @@ class ReactNativeZoomableView extends Component<
 
   componentWillUnmount() {
     clearInterval(this.measureZoomSubjectInterval);
-    
+
     if (Platform.OS === 'web') {
       window.removeEventListener('mouseup', this.mouseUpListener);
       window.removeEventListener('mousedown', this.mouseDownListener);
       window.removeEventListener('mousemove', this.mouseMoveListener);
+      window.removeEventListener('wheel', this.wheelListener);
     }
   }
 
@@ -434,7 +445,9 @@ class ReactNativeZoomableView extends Component<
   _getZoomableViewEventObject(overwriteObj = {}): ZoomableViewEvent {
     let isAtMinZoom = false;
     if (!isNil(this.props.maxZoomHeight)) {
-      isAtMinZoom = this.props.maxZoomHeight <= this.state.originalHeight / this.zoomLevelWithoutMovement;
+      isAtMinZoom =
+        this.props.maxZoomHeight <=
+        this.state.originalHeight / this.zoomLevelWithoutMovement;
     }
 
     return {
@@ -1097,7 +1110,7 @@ class ReactNativeZoomableView extends Component<
    *
    * @return {Promise<bool>}
    */
-  async zoomTo(newZoomLevel: number): Promise<boolean> {
+  async zoomTo(newZoomLevel: number, x: number = 0, y: number = 0): Promise<boolean> {
     if (
       // if we would go out of our min/max limits -> abort
       newZoomLevel > this.props.maxZoom ||
@@ -1106,12 +1119,16 @@ class ReactNativeZoomableView extends Component<
       return false;
 
     if (!isNil(this.props.maxZoomHeight)) {
-      const currentHeight = this.state.originalHeight / this.zoomLevelWithoutMovement;
-      if (currentHeight > this.props.maxZoomHeight && newZoomLevel < this.zoomLevelWithoutMovement) {
+      const currentHeight =
+        this.state.originalHeight / this.zoomLevelWithoutMovement;
+      if (
+        currentHeight > this.props.maxZoomHeight &&
+        newZoomLevel < this.zoomLevelWithoutMovement
+      ) {
         return false;
       }
     }
-    await this._zoomToLocation(0, 0, newZoomLevel);
+    await this._zoomToLocation(x, y, newZoomLevel);
     return true;
   }
 
