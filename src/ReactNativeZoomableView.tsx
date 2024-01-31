@@ -252,10 +252,27 @@ class ReactNativeZoomableView extends Component<
   }
 
   private wheelListener(e: WheelEvent) {
+    const knownGoodDelta = 109;
+    let wheelDelta = e.deltaY;
+    if (wheelDelta < 0) {
+      wheelDelta *= -1;
+    }
+
+    const diff = wheelDelta / knownGoodDelta;
+    const zoomStepWithDelta = this.props.zoomStep * diff;
+
     if (e.deltaY > 0) {
-      this.zoomTo((this.zoomLevelWithoutMovement ?? this.zoomLevel) - this.props.zoomStep, e.pageX, e.pageY);
+      this.zoomTo(
+        (this.zoomLevelWithoutMovement ?? this.zoomLevel) - zoomStepWithDelta,
+        e.pageX,
+        e.pageY
+      );
     } else {
-      this.zoomTo((this.zoomLevelWithoutMovement ?? this.zoomLevel) + this.props.zoomStep, e.pageX, e.pageY);
+      this.zoomTo(
+        (this.zoomLevelWithoutMovement ?? this.zoomLevel) + zoomStepWithDelta,
+        e.pageX,
+        e.pageY
+      );
     }
   }
 
