@@ -259,7 +259,7 @@ class ReactNativeZoomableView extends Component<
     }
 
     const diff = wheelDelta / knownGoodDelta;
-    const zoomStepWithDelta = this.props.zoomStep * diff;
+    const zoomStepWithDelta = Math.max(this.props.zoomStep * diff, 0.015);
 
     if (e.deltaY > 0) {
       this.zoomTo(
