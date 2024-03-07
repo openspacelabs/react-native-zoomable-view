@@ -1,0 +1,1 @@
+{"version":3,"sources":["index.tsx"],"names":["AnimatedTouchFeedback"],"mappings":"AAAA,SAASA,qBAAT,QAAsC,yBAAtC","sourcesContent":["export { AnimatedTouchFeedback } from './AnimatedTouchFeedback';\n"]}
