@@ -16,6 +16,13 @@ class ReactNativeZoomableViewWithGestures extends React.Component<
   ReactNativeZoomableViewWithGesturesProps,
   ReactNativeZoomableViewState
 > {
+  zoomableViewRef: React.RefObject<ReactNativeZoomableView> | undefined;
+
+  constructor(props: ReactNativeZoomableViewWithGesturesProps) {
+    super(props);
+    this.zoomableViewRef = React.createRef<ReactNativeZoomableView>();
+  }
+
   _onShiftingEnd = (e, gestureState, zoomableViewState) => {
     if (this.props.onShiftingEnd) {
       this.props.onShiftingEnd(e, gestureState, zoomableViewState);
@@ -54,7 +61,7 @@ class ReactNativeZoomableViewWithGestures extends React.Component<
       return false;
     }
 
-    return onSwipe && onSwipeUp && onSwipeDown && onSwipeLeft && onSwipeRight;
+    return onSwipe || onSwipeUp || onSwipeDown || onSwipeLeft || onSwipeRight;
   }
 
   /**
@@ -207,6 +214,7 @@ class ReactNativeZoomableViewWithGestures extends React.Component<
     return (
       <ReactNativeZoomableView
         {...this.props}
+        ref={this.zoomableViewRef}
         onShiftingEnd={this._onShiftingEnd}
       />
     );

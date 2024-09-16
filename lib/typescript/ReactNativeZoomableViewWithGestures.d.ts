@@ -1,5 +1,6 @@
 import { ReactNativeZoomableViewState, ReactNativeZoomableViewWithGesturesProps } from './typings';
 import React from 'react';
+import ReactNativeZoomableView from './ReactNativeZoomableView';
 export declare const swipeDirections: {
     SWIPE_UP: string;
     SWIPE_DOWN: string;
@@ -7,6 +8,8 @@ export declare const swipeDirections: {
     SWIPE_RIGHT: string;
 };
 declare class ReactNativeZoomableViewWithGestures extends React.Component<ReactNativeZoomableViewWithGesturesProps, ReactNativeZoomableViewState> {
+    zoomableViewRef: React.RefObject<ReactNativeZoomableView> | undefined;
+    constructor(props: ReactNativeZoomableViewWithGesturesProps);
     _onShiftingEnd: (e: any, gestureState: any, zoomableViewState: any) => void;
     /**
      * Checks if current config options make it possible to process a swipe or if is not necessary
@@ -14,7 +17,7 @@ declare class ReactNativeZoomableViewWithGestures extends React.Component<ReactN
      * @returns {*}
      * @private
      */
-    _couldCallSwipeEvent(zoomableViewState: any): false | ((gestureState: import("react-native").PanResponderGestureState) => void);
+    _couldCallSwipeEvent(zoomableViewState: any): false | ((swipeDirection: import("./typings").SwipeDirection, gestureState: import("react-native").PanResponderGestureState) => void) | ((gestureState: import("react-native").PanResponderGestureState) => void);
     /**
      * Checks the swipe and validates whether we should process it or not
      *
