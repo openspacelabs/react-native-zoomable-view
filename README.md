@@ -170,6 +170,18 @@ These options can be used to limit and change the zoom behavior.
 | longPressDuration          | number  | Duration in ms until a press is considered a long press                                                                                                                                                                                                                                                                              | 700       |
 | visualTouchFeedbackEnabled | boolean | Whether to show a touch feedback circle on touch                                                                                                                                                                                                                                                                                     | true      |
 
+#### Static Pin Position
+
+These optional props can be used to keep a "static" pin in the centre of the screen and move the map underneath it. This is very useful for maps.
+
+| name                      | type                      | description                                               |
+| ------------------------- | ------------------------- | --------------------------------------------------------- |
+| staticPinPosition         | Vec2D                     | Where in the viewport to put the pin                      |
+| staticPinIcon             | Element                   | The pin icon itself                                       |
+| onStaticPinPositionChange | (position: Vec2D) => void | Callback every time the pin is at rest                    |
+| onStaticPinPositionMove   | (position: Vec2D) => void | Callback live while the pin is moving                     |
+| animatePin                | boolean                   | Whether to make the pin bounce up and down while dragging |
+
 #### Callbacks
 
 These events can be used to work with data after specific events.

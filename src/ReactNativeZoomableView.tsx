@@ -1,8 +1,8 @@
 import React, { Component, createRef, RefObject } from 'react';
 import {
   Animated,
+  Easing,
   GestureResponderEvent,
-  InteractionManager,
   PanResponder,
   PanResponderGestureState,
   StyleSheet,
@@ -15,6 +15,7 @@ import {
   ReactNativeZoomableViewState,
   TouchPoint,
   ZoomableViewEvent,
+  Size2D,
 } from './typings';
 
 import { AnimatedTouchFeedback } from './components';
@@ -25,6 +26,9 @@ import {
   calcNewScaledOffsetForZoomCentering,
 } from './helper';
 import { applyPanBoundariesToOffset } from './helper/applyPanBoundariesToOffset';
+import { viewportPositionToImagePosition } from './helper/coordinateConversion';
+import { StaticPin } from './components/StaticPin';
+import { debounce } from 'lodash';
 import {
   getBoundaryCrossedAnim,
   getPanMomentumDecayAnim,
@@ -36,6 +40,7 @@ const initialState = {
   originalHeight: null,
   originalPageX: null,
   originalPageY: null,
+  pinSize: { width: 0, height: 0 },
 } as ReactNativeZoomableViewState;
 
 class ReactNativeZoomableView extends Component<
@@ -66,11 +71,17 @@ class ReactNativeZoomableView extends Component<
     contentHeight: undefined,
     panBoundaryPadding: 0,
     visualTouchFeedbackEnabled: true,
+    staticPinPosition: undefined,
+    staticPinIcon: undefined,
+    onStaticPinPositionChange: undefined,
+    onStaticPinPositionMove: undefined,
+    animatePin: true,
     disablePanOnInitialZoom: false,
   };
 
   private panAnim = new Animated.ValueXY({ x: 0, y: 0 });
   private zoomAnim = new Animated.Value(1);
+  private pinAnim = new Animated.ValueXY({ x: 0, y: 0 });
 
   private __offsets = {
     x: {
@@ -171,6 +182,26 @@ class ReactNativeZoomableView extends Component<
     this.gestureType = null;
   }
 
+  private raisePin() {
+    if (!this.props.animatePin) return;
+    Animated.timing(this.pinAnim, {
+      toValue: { x: 0, y: -10 },
+      useNativeDriver: true,
+      easing: Easing.out(Easing.ease),
+      duration: 100,
+    }).start();
+  }
+
+  private dropPin() {
+    if (!this.props.animatePin) return;
+    Animated.timing(this.pinAnim, {
+      toValue: { x: 0, y: 0 },
+      useNativeDriver: true,
+      easing: Easing.out(Easing.ease),
+      duration: 100,
+    }).start();
+  }
+
   private set offsetX(x: number) {
     this.__setOffset('x', x);
   }
@@ -255,7 +286,14 @@ class ReactNativeZoomableView extends Component<
       currState.originalPageX !== prevState.originalPageX ||
       currState.originalPageY !== prevState.originalPageY;
 
-    if (this.onTransformInvocationInitialized && originalMeasurementsChanged) {
+    const staticPinPositionChanged =
+      prevProps.staticPinPosition?.x !== this.props.staticPinPosition?.x ||
+      prevProps.staticPinPosition?.y !== this.props.staticPinPosition?.y;
+
+    if (
+      this.onTransformInvocationInitialized &&
+      (originalMeasurementsChanged || staticPinPositionChanged)
+    ) {
       this._invokeOnTransform();
     }
   }
@@ -279,6 +317,10 @@ class ReactNativeZoomableView extends Component<
     clearInterval(this.measureZoomSubjectInterval);
   }
 
+  debouncedOnStaticPinPositionChange = this.props.onStaticPinPositionChange
+    ? debounce(this.props.onStaticPinPositionChange, 100)
+    : undefined;
+
   /**
    * try to invoke onTransform
    * @private
@@ -290,6 +332,10 @@ class ReactNativeZoomableView extends Component<
       return { successful: false };
 
     this.props.onTransform?.(zoomableViewEvent);
+
+    this.props.onStaticPinPositionMove?.(this._staticPinPosition());
+
+    this.debouncedOnStaticPinPositionChange?.(this._staticPinPosition());
 
     return { successful: true };
   }
@@ -321,7 +367,7 @@ class ReactNativeZoomableView extends Component<
    */
   private grabZoomSubjectOriginalMeasurements = () => {
     // make sure we measure after animations are complete
-    InteractionManager.runAfterInteractions(() => {
+    requestAnimationFrame(() => {
       // this setTimeout is here to fix a weird issue on iOS where the measurements are all `0`
       // when navigating back (react-navigation stack) from another view
       // while closing the keyboard at the same time
@@ -404,6 +450,8 @@ class ReactNativeZoomableView extends Component<
     this.panAnim.stopAnimation();
     this.zoomAnim.stopAnimation();
     this.gestureStarted = true;
+
+    this.raisePin();
   };
 
   /**
@@ -423,15 +471,16 @@ class ReactNativeZoomableView extends Component<
 
     this.lastGestureCenterPosition = null;
 
-    // Trigger final shift animation unless panEnabled is false or disablePanOnInitialZoom is true and we're on the initial zoom level
-    if (
-      this.props.panEnabled &&
-      !(
+    const disableMomentum =
+      this.props.disableMomentum ||
+      (this.props.panEnabled &&
         this.gestureType === 'shift' &&
         this.props.disablePanOnInitialZoom &&
-        this.zoomLevel === this.props.initialZoom
-      )
-    ) {
+        this.zoomLevel === this.props.initialZoom);
+
+    // Trigger final shift animation unless disablePanOnInitialZoom is set and we're on the initial zoom level
+    // or disableMomentum
+    if (!disableMomentum) {
       getPanMomentumDecayAnim(this.panAnim, {
         x: gestureState.vx / this.zoomLevel,
         y: gestureState.vy / this.zoomLevel,
@@ -462,6 +511,12 @@ class ReactNativeZoomableView extends Component<
         this._getZoomableViewEventObject()
       );
     }
+
+    if (this.props.staticPinPosition) {
+      this._updateStaticPin();
+    }
+
+    this.dropPin();
 
     this.gestureType = null;
     this.gestureStarted = false;
@@ -613,10 +668,19 @@ class ReactNativeZoomableView extends Component<
 
     if (!gestureCenterPoint) return;
 
-    const zoomCenter = {
+    let zoomCenter = {
       x: gestureCenterPoint.x - this.state.originalPageX,
       y: gestureCenterPoint.y - this.state.originalPageY,
     };
+
+    if (this.props.staticPinPosition) {
+      // When we use a static pin position, the zoom centre is the same as that position,
+      // otherwise the pin moves around way too much while zooming.
+      zoomCenter = {
+        x: this.props.staticPinPosition.x,
+        y: this.props.staticPinPosition.y,
+      };
+    }
 
     // Uncomment to debug
     this.props.debug && this._setPinchDebugPoints(e, zoomCenter);
@@ -755,6 +819,8 @@ class ReactNativeZoomableView extends Component<
     }
 
     this._setNewOffsetPosition(offsetX, offsetY);
+
+    this.raisePin();
   }
 
   /**
@@ -818,9 +884,67 @@ class ReactNativeZoomableView extends Component<
       this.singleTapTimeoutId = setTimeout(() => {
         delete this.doubleTapFirstTapReleaseTimestamp;
         delete this.singleTapTimeoutId;
+
+        // Pan to the tapped location
+        if (this.props.staticPinPosition && this.doubleTapFirstTap) {
+          const tapX =
+            this.props.staticPinPosition.x - this.doubleTapFirstTap.x;
+          const tapY =
+            this.props.staticPinPosition.y - this.doubleTapFirstTap.y;
+
+          Animated.timing(this.panAnim, {
+            toValue: {
+              x: this.offsetX + tapX / this.zoomLevel,
+              y: this.offsetY + tapY / this.zoomLevel,
+            },
+            useNativeDriver: true,
+            duration: 200,
+          }).start(() => {
+            this._updateStaticPin();
+          });
+        }
+
         this.props.onSingleTap?.(e, this._getZoomableViewEventObject());
       }, this.props.doubleTapDelay);
     }
+  };
+
+  _moveTimeout: NodeJS.Timeout;
+  moveStaticPinTo = (position: Vec2D) => {
+    const { originalWidth, originalHeight } = this.state;
+    const { staticPinPosition, contentWidth, contentHeight } = this.props;
+
+    // Offset for the static pin
+    const pinX = staticPinPosition.x - originalWidth / 2;
+    const pinY = staticPinPosition.y - originalHeight / 2;
+
+    this.offsetX = contentWidth / 2 - position.x + pinX / this.zoomLevel;
+    this.offsetY = contentHeight / 2 - position.y + pinY / this.zoomLevel;
+
+    this.panAnim.setValue({ x: this.offsetX, y: this.offsetY });
+  };
+
+  private _staticPinPosition = () => {
+    return viewportPositionToImagePosition({
+      viewportPosition: {
+        x: this.props.staticPinPosition.x,
+        y: this.props.staticPinPosition.y,
+      },
+      imageSize: {
+        height: this.props.contentHeight,
+        width: this.props.contentWidth,
+      },
+      zoomableEvent: {
+        ...this._getZoomableViewEventObject(),
+        offsetX: this.offsetX,
+        offsetY: this.offsetY,
+        zoomLevel: this.zoomLevel,
+      },
+    });
+  };
+
+  private _updateStaticPin = () => {
+    this.props.onStaticPinPositionChange?.(this._staticPinPosition());
   };
 
   private _addTouch(touch: TouchPoint) {
@@ -1021,6 +1145,18 @@ class ReactNativeZoomableView extends Component<
   }
 
   render() {
+    const {
+      staticPinIcon,
+      children,
+      visualTouchFeedbackEnabled,
+      doubleTapDelay,
+      staticPinPosition,
+      onStaticPinLongPress,
+      onStaticPinPress,
+      pinProps,
+    } = this.props;
+    const { pinSize, touches, debugPoints = [] } = this.state;
+
     return (
       <View
         style={styles.container}
@@ -1040,11 +1176,12 @@ class ReactNativeZoomableView extends Component<
             },
           ]}
         >
-          {this.props.children}
+          {children}
         </Animated.View>
-        {this.props.visualTouchFeedbackEnabled &&
-          this.state.touches?.map((touch) => {
-            const animationDuration = this.props.doubleTapDelay;
+
+        {visualTouchFeedbackEnabled &&
+          touches?.map((touch) => {
+            const animationDuration = doubleTapDelay;
             return (
               <AnimatedTouchFeedback
                 x={touch.x}
@@ -1055,10 +1192,25 @@ class ReactNativeZoomableView extends Component<
               />
             );
           })}
+
         {/* For Debugging Only */}
-        {(this.state.debugPoints || []).map(({ x, y }, index) => {
+        {debugPoints.map(({ x, y }, index) => {
           return <DebugTouchPoint key={index} x={x} y={y} />;
         })}
+
+        {staticPinPosition && (
+          <StaticPin
+            staticPinIcon={staticPinIcon}
+            staticPinPosition={staticPinPosition}
+            pinSize={pinSize}
+            onPress={onStaticPinPress}
+            onLongPress={onStaticPinLongPress}
+            onParentMove={this._handlePanResponderMove}
+            pinAnim={this.pinAnim}
+            setPinSize={(size: Size2D) => this.setState({ pinSize: size })}
+            pinProps={pinProps}
+          />
+        )}
       </View>
     );
   }
@@ -1081,3 +1233,5 @@ const styles = StyleSheet.create({
 });
 
 export default ReactNativeZoomableView;
+
+export { ReactNativeZoomableView };
