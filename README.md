@@ -211,6 +211,12 @@ The following methods allow you to control the ZoomableView zoom level & positio
 | moveTo | Shifts the zoomed part to a specific point (in px relative to x: 0, y: 0)                                            | newOffsetX: number, newOffsetY: number, bindToBorders = true | Promise<void>   |
 | moveBy | Shifts the zoomed part by a specific pixel number                                                                    | newOffsetX: number, newOffsetY: number, bindToBorders = true | Promise<void>   |
 
+#### Properties
+
+| name           | description                                     |
+| -------------- | ----------------------------------------------- |
+| gestureStarted | Indicates if a gesture is currently in progress |
+
 **Example:**
 
 ```TSX
