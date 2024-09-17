@@ -30,7 +30,7 @@ export const StaticPin = ({
   onParentMove: (
     evt: GestureResponderEvent,
     gestureState: PanResponderGestureState
-  ) => boolean;
+  ) => boolean | undefined;
   onPress?: (evt: GestureResponderEvent) => void;
   onLongPress?: (evt: GestureResponderEvent) => void;
   setPinSize: (size: Size2D) => void;
@@ -77,7 +77,7 @@ export const StaticPin = ({
   return (
     <Animated.View
       style={[
-        staticPinPosition && {
+        {
           left: staticPinPosition.x,
           top: staticPinPosition.y,
         },
@@ -87,10 +87,13 @@ export const StaticPin = ({
       {...pinProps}
     >
       <View
-        onLayout={({ nativeEvent: { layout } }) => setPinSize(layout)}
+        onLayout={({ nativeEvent: { layout } }) => {
+          setPinSize(layout);
+        }}
         {...panResponder.panHandlers}
       >
         {staticPinIcon || (
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
           <Image source={require('../assets/pin.png')} style={styles.pin} />
         )}
       </View>
@@ -99,11 +102,11 @@ export const StaticPin = ({
 };
 
 const styles = StyleSheet.create({
+  pin: {
+    height: 64,
+    width: 48,
+  },
   pinWrapper: {
     position: 'absolute',
-  },
-  pin: {
-    width: 48,
-    height: 64,
   },
 });
