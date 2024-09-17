@@ -77,7 +77,7 @@ export const StaticPin = ({
   return (
     <Animated.View
       style={[
-        staticPinPosition && {
+        {
           left: staticPinPosition.x,
           top: staticPinPosition.y,
         },
@@ -91,6 +91,7 @@ export const StaticPin = ({
         {...panResponder.panHandlers}
       >
         {staticPinIcon || (
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
           <Image source={require('../assets/pin.png')} style={styles.pin} />
         )}
       </View>
@@ -99,11 +100,11 @@ export const StaticPin = ({
 };
 
 const styles = StyleSheet.create({
+  pin: {
+    height: 64,
+    width: 48,
+  },
   pinWrapper: {
     position: 'absolute',
-  },
-  pin: {
-    width: 48,
-    height: 64,
   },
 });

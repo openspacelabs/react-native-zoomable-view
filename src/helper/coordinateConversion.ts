@@ -99,9 +99,9 @@ export function viewportPositionToImagePosition({
     applyContainResizeMode(imageSize, {
       width: zoomableEvent.originalWidth,
       height: zoomableEvent.originalHeight,
-    }) || {};
+    });
 
-  if (resizedImgScale == null || resizedImgSize == null) return null;
+  if (resizedImgScale == null) return null;
 
   const sheetOriginOnContainer = getImageOriginOnTransformSubject(
     resizedImgSize,

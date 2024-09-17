@@ -15,8 +15,8 @@ export const AnimatedTouchFeedback = ({
   onAnimationDone?(): void;
 }) => {
   const appearDisappearAnimRef = useRef<Animated.Value>(new Animated.Value(0));
-  const self = useRef<any>({});
-  self.current.onAnimationDone = onAnimationDone;
+  const onAnimationDoneRef = useRef(onAnimationDone);
+  onAnimationDoneRef.current = onAnimationDone;
 
   useEffect(() => {
     appearDisappearAnimRef.current.setValue(0);
@@ -36,7 +36,7 @@ export const AnimatedTouchFeedback = ({
         easing: Easing.out(Easing.ease),
         useNativeDriver: true,
       }),
-    ]).start(self.current.onAnimationDone);
+    ]).start(() => onAnimationDoneRef.current?.());
   }, [animationDelay, animationDuration]);
 
   return (
@@ -67,10 +67,10 @@ export const AnimatedTouchFeedback = ({
 
 const styles = StyleSheet.create({
   animatedTouchFeedback: {
-    width: 40,
-    height: 40,
-    borderRadius: 40,
     backgroundColor: 'lightgray',
+    borderRadius: 40,
+    height: 40,
     position: 'absolute',
+    width: 40,
   },
 });

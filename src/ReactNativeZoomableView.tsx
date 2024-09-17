@@ -6,6 +6,7 @@ import {
   PanResponder,
   PanResponderCallbacks,
   PanResponderGestureState,
+  PanResponderInstance,
   StyleSheet,
   View,
 } from 'react-native';
@@ -49,7 +50,7 @@ class ReactNativeZoomableView extends Component<
   ReactNativeZoomableViewState
 > {
   zoomSubjectWrapperRef: RefObject<View>;
-  gestureHandlers: any;
+  gestureHandlers: PanResponderInstance;
   doubleTapFirstTapReleaseTimestamp: number | undefined;
 
   static defaultProps = {
@@ -223,15 +224,14 @@ class ReactNativeZoomableView extends Component<
 
   private __setOffset(axis: 'x' | 'y', offset: number) {
     const offsetState = this.__offsets[axis];
-    const animValue = this.panAnim?.[axis];
 
     if (this.props.bindToBorders) {
       const containerSize =
-        axis === 'x' ? this.state?.originalWidth : this.state?.originalHeight;
+        axis === 'x' ? this.state.originalWidth : this.state.originalHeight;
       const contentSize =
         axis === 'x'
-          ? this.props.contentWidth || this.state?.originalWidth
-          : this.props.contentHeight || this.state?.originalHeight;
+          ? this.props.contentWidth || this.state.originalWidth
+          : this.props.contentHeight || this.state.originalHeight;
 
       const boundOffset =
         contentSize && containerSize && this.props.panBoundaryPadding != null
@@ -244,11 +244,7 @@ class ReactNativeZoomableView extends Component<
             )
           : offset;
 
-      if (
-        animValue &&
-        !this.gestureType &&
-        !offsetState.boundaryCrossedAnimInEffect
-      ) {
+      if (!this.gestureType && !offsetState.boundaryCrossedAnimInEffect) {
         const boundariesApplied =
           boundOffset !== offset &&
           boundOffset.toFixed(3) !== offset.toFixed(3);
@@ -1264,18 +1260,18 @@ class ReactNativeZoomableView extends Component<
 }
 
 const styles = StyleSheet.create({
-  zoomSubject: {
-    flex: 1,
-    width: '100%',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
   container: {
+    alignItems: 'center',
     flex: 1,
     justifyContent: 'center',
-    alignItems: 'center',
-    position: 'relative',
     overflow: 'hidden',
+    position: 'relative',
+  },
+  zoomSubject: {
+    alignItems: 'center',
+    flex: 1,
+    justifyContent: 'center',
+    width: '100%',
   },
 });
 

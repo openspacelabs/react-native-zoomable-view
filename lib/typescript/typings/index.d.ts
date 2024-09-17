@@ -36,7 +36,6 @@ export interface ReactNativeZoomableViewProps extends ViewProps {
     longPressDuration?: number;
     visualTouchFeedbackEnabled?: boolean;
     disablePanOnInitialZoom?: boolean;
-    style?: any;
     zoomAnimatedValue?: Animated.Value;
     panAnimatedValueXY?: Animated.ValueXY;
     debug?: boolean;

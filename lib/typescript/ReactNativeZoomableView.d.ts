@@ -1,10 +1,10 @@
 /// <reference types="lodash" />
 import { Component, RefObject } from 'react';
-import { GestureResponderEvent, PanResponderCallbacks, PanResponderGestureState, View } from 'react-native';
+import { GestureResponderEvent, PanResponderCallbacks, PanResponderGestureState, PanResponderInstance, View } from 'react-native';
 import { Vec2D, ReactNativeZoomableViewProps, ReactNativeZoomableViewState, ZoomableViewEvent } from './typings';
 declare class ReactNativeZoomableView extends Component<ReactNativeZoomableViewProps, ReactNativeZoomableViewState> {
     zoomSubjectWrapperRef: RefObject<View>;
-    gestureHandlers: any;
+    gestureHandlers: PanResponderInstance;
     doubleTapFirstTapReleaseTimestamp: number | undefined;
     static defaultProps: {
         zoomEnabled: boolean;

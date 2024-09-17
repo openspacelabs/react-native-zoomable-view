@@ -33,10 +33,7 @@ export default function App() {
     []
   )();
 
-  const staticPinPosition = size
-    ? { x: size.width / 2, y: size.height / 2 }
-    : undefined;
-
+  const staticPinPosition = { x: size.width / 2, y: size.height / 2 };
   const { size: contentSize } = applyContainResizeMode(imageSize, size);
 
   return (
