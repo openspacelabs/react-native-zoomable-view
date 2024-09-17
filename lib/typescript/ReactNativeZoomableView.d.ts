@@ -64,7 +64,7 @@ declare class ReactNativeZoomableView extends Component<ReactNativeZoomableViewP
     componentDidUpdate(prevProps: ReactNativeZoomableViewProps, prevState: ReactNativeZoomableViewState): void;
     componentDidMount(): void;
     componentWillUnmount(): void;
-    debouncedOnStaticPinPositionChange: import("lodash").DebouncedFunc<(position: Vec2D) => void> | undefined;
+    debouncedOnStaticPinPositionChange: import("lodash").DebouncedFunc<(position: Vec2D) => void | undefined>;
     /**
      * try to invoke onTransform
      * @private

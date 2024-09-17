@@ -326,9 +326,10 @@ class ReactNativeZoomableView extends Component<
       clearInterval(this.measureZoomSubjectInterval);
   }
 
-  debouncedOnStaticPinPositionChange = this.props.onStaticPinPositionChange
-    ? debounce(this.props.onStaticPinPositionChange, 100)
-    : undefined;
+  debouncedOnStaticPinPositionChange = debounce(
+    (position: Vec2D) => this.props.onStaticPinPositionChange?.(position),
+    100
+  );
 
   /**
    * try to invoke onTransform
@@ -345,7 +346,7 @@ class ReactNativeZoomableView extends Component<
 
     if (position) {
       this.props.onStaticPinPositionMove?.(position);
-      this.debouncedOnStaticPinPositionChange?.(position);
+      this.debouncedOnStaticPinPositionChange(position);
     }
 
     return { successful: true };
