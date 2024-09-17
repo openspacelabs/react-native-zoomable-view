@@ -12,7 +12,7 @@ export const AnimatedTouchFeedback = ({
   y: number;
   animationDuration: number;
   animationDelay?: number;
-  onAnimationDone?(): void;
+  onAnimationDone?: () => void;
 }) => {
   const appearDisappearAnimRef = useRef<Animated.Value>(new Animated.Value(0));
   const onAnimationDoneRef = useRef(onAnimationDone);

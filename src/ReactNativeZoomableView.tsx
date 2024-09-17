@@ -1026,12 +1026,12 @@ class ReactNativeZoomableView extends Component<
       zoomPositionCoordinates.x,
       zoomPositionCoordinates.y,
       nextZoomStep
-    ).then(() => {
-      onDoubleTapAfter?.(
-        e,
-        this._getZoomableViewEventObject({ zoomLevel: nextZoomStep })
-      );
-    });
+    );
+
+    onDoubleTapAfter?.(
+      e,
+      this._getZoomableViewEventObject({ zoomLevel: nextZoomStep })
+    );
   }
 
   /**
@@ -1069,7 +1069,7 @@ class ReactNativeZoomableView extends Component<
    *
    * @private
    */
-  async _zoomToLocation(x: number, y: number, newZoomLevel: number) {
+  _zoomToLocation(x: number, y: number, newZoomLevel: number) {
     if (!this.props.zoomEnabled) return;
     if (this.state.originalWidth == null) return;
     if (this.state.originalHeight == null) return;
@@ -1118,9 +1118,9 @@ class ReactNativeZoomableView extends Component<
    *
    * @param {number} newZoomLevel
    *
-   * @return {Promise<bool>}
+   * @return {bool}
    */
-  async zoomTo(newZoomLevel: number): Promise<boolean> {
+  zoomTo(newZoomLevel: number) {
     if (
       // if we would go out of our min/max limits -> abort
       (this.props.maxZoom && newZoomLevel > this.props.maxZoom) ||
@@ -1128,7 +1128,7 @@ class ReactNativeZoomableView extends Component<
     )
       return false;
 
-    await this._zoomToLocation(0, 0, newZoomLevel);
+    this._zoomToLocation(0, 0, newZoomLevel);
     return true;
   }
 
@@ -1141,9 +1141,9 @@ class ReactNativeZoomableView extends Component<
    *
    * @param {number | null} zoomLevelChange
    *
-   * @return {Promise<bool>}
+   * @return {bool}
    */
-  zoomBy(zoomLevelChange: number): Promise<boolean> {
+  zoomBy(zoomLevelChange: number) {
     // if no zoom level Change given -> just use zoom step
     zoomLevelChange ||= this.props.zoomStep || 0;
     return this.zoomTo(this.zoomLevel + zoomLevelChange);
@@ -1156,7 +1156,7 @@ class ReactNativeZoomableView extends Component<
    * @param {number} newOffsetX the new position we want to move it to (x-axis)
    * @param {number} newOffsetY the new position we want to move it to (y-axis)
    *
-   * @return {Promise<bool>}
+   * @return {bool}
    */
   moveTo(newOffsetX: number, newOffsetY: number) {
     const { originalWidth, originalHeight } = this.state;
@@ -1165,7 +1165,7 @@ class ReactNativeZoomableView extends Component<
     const offsetX = (newOffsetX - originalWidth / 2) / this.zoomLevel;
     const offsetY = (newOffsetY - originalHeight / 2) / this.zoomLevel;
 
-    return this._setNewOffsetPosition(-offsetX, -offsetY);
+    this._setNewOffsetPosition(-offsetX, -offsetY);
   }
 
   /**
@@ -1176,7 +1176,7 @@ class ReactNativeZoomableView extends Component<
    * @param {number} offsetChangeX the amount we want to move the offset by (x-axis)
    * @param {number} offsetChangeY the amount we want to move the offset by (y-axis)
    *
-   * @return {Promise<bool>}
+   * @return {bool}
    */
   moveBy(offsetChangeX: number, offsetChangeY: number) {
     const offsetX =
@@ -1184,7 +1184,7 @@ class ReactNativeZoomableView extends Component<
     const offsetY =
       (this.offsetY * this.zoomLevel - offsetChangeY) / this.zoomLevel;
 
-    return this._setNewOffsetPosition(offsetX, offsetY);
+    this._setNewOffsetPosition(offsetX, offsetY);
   }
 
   render() {
@@ -1231,7 +1231,9 @@ class ReactNativeZoomableView extends Component<
                   y={touch.y}
                   key={touch.id}
                   animationDuration={doubleTapDelay}
-                  onAnimationDone={() => this._removeTouch(touch)}
+                  onAnimationDone={() => {
+                    this._removeTouch(touch);
+                  }}
                 />
               )
           )}
@@ -1250,7 +1252,9 @@ class ReactNativeZoomableView extends Component<
             onLongPress={onStaticPinLongPress}
             onParentMove={this._handlePanResponderMove}
             pinAnim={this.pinAnim}
-            setPinSize={(size: Size2D) => this.setState({ pinSize: size })}
+            setPinSize={(size: Size2D) => {
+              this.setState({ pinSize: size });
+            }}
             pinProps={pinProps}
           />
         )}

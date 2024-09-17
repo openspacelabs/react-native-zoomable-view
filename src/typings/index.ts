@@ -85,7 +85,7 @@ export interface ReactNativeZoomableViewProps extends ViewProps {
     event: GestureResponderEvent | null,
     gestureState: PanResponderGestureState | null,
     zoomableViewEventObject: ZoomableViewEvent
-  ) => boolean | void;
+  ) => boolean | undefined;
   onZoomAfter?: (
     event: GestureResponderEvent | null,
     gestureState: PanResponderGestureState | null,

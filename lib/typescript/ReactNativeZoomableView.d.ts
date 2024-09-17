@@ -203,16 +203,16 @@ declare class ReactNativeZoomableView extends Component<ReactNativeZoomableViewP
      *
      * @private
      */
-    _zoomToLocation(x: number, y: number, newZoomLevel: number): Promise<void>;
+    _zoomToLocation(x: number, y: number, newZoomLevel: number): void;
     /**
      * Zooms to a specificied zoom level.
      * Returns a promise if everything was updated and a boolean, whether it could be updated or if it exceeded the min/max zoom limits.
      *
      * @param {number} newZoomLevel
      *
-     * @return {Promise<bool>}
+     * @return {bool}
      */
-    zoomTo(newZoomLevel: number): Promise<boolean>;
+    zoomTo(newZoomLevel: number): boolean;
     /**
      * Zooms in or out by a specified change level
      * Use a positive number for `zoomLevelChange` to zoom in
@@ -222,9 +222,9 @@ declare class ReactNativeZoomableView extends Component<ReactNativeZoomableViewP
      *
      * @param {number | null} zoomLevelChange
      *
-     * @return {Promise<bool>}
+     * @return {bool}
      */
-    zoomBy(zoomLevelChange: number): Promise<boolean>;
+    zoomBy(zoomLevelChange: number): boolean;
     /**
      * Moves the zoomed view to a specified position
      * Returns a promise when finished
@@ -232,7 +232,7 @@ declare class ReactNativeZoomableView extends Component<ReactNativeZoomableViewP
      * @param {number} newOffsetX the new position we want to move it to (x-axis)
      * @param {number} newOffsetY the new position we want to move it to (y-axis)
      *
-     * @return {Promise<bool>}
+     * @return {bool}
      */
     moveTo(newOffsetX: number, newOffsetY: number): void;
     /**
@@ -243,7 +243,7 @@ declare class ReactNativeZoomableView extends Component<ReactNativeZoomableViewP
      * @param {number} offsetChangeX the amount we want to move the offset by (x-axis)
      * @param {number} offsetChangeY the amount we want to move the offset by (y-axis)
      *
-     * @return {Promise<bool>}
+     * @return {bool}
      */
     moveBy(offsetChangeX: number, offsetChangeY: number): void;
     render(): JSX.Element;

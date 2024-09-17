@@ -87,7 +87,9 @@ export const StaticPin = ({
       {...pinProps}
     >
       <View
-        onLayout={({ nativeEvent: { layout } }) => setPinSize(layout)}
+        onLayout={({ nativeEvent: { layout } }) => {
+          setPinSize(layout);
+        }}
         {...panResponder.panHandlers}
       >
         {staticPinIcon || (
