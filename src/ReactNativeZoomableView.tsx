@@ -4,6 +4,7 @@ import {
   Easing,
   GestureResponderEvent,
   PanResponder,
+  PanResponderCallbacks,
   PanResponderGestureState,
   StyleSheet,
   View,
@@ -35,13 +36,13 @@ import {
   getZoomToAnimation,
 } from './animations';
 
-const initialState = {
+const initialState: ReactNativeZoomableViewState = {
   originalWidth: null,
   originalHeight: null,
   originalPageX: null,
   originalPageY: null,
   pinSize: { width: 0, height: 0 },
-} as ReactNativeZoomableViewState;
+};
 
 class ReactNativeZoomableView extends Component<
   ReactNativeZoomableViewProps,
@@ -49,7 +50,7 @@ class ReactNativeZoomableView extends Component<
 > {
   zoomSubjectWrapperRef: RefObject<View>;
   gestureHandlers: any;
-  doubleTapFirstTapReleaseTimestamp: number;
+  doubleTapFirstTapReleaseTimestamp: number | undefined;
 
   static defaultProps = {
     zoomEnabled: true,
@@ -95,23 +96,23 @@ class ReactNativeZoomableView extends Component<
   };
 
   private zoomLevel = 1;
-  private lastGestureCenterPosition: { x: number; y: number } = null;
-  private lastGestureTouchDistance: number;
-  private gestureType: 'pinch' | 'shift' | 'null';
+  private lastGestureCenterPosition: { x: number; y: number } | null = null;
+  private lastGestureTouchDistance: number | null = null;
+  private gestureType: 'pinch' | 'shift' | null;
   private gestureStarted = false;
 
   /**
    * Last press time (used to evaluate whether user double tapped)
    * @type {number}
    */
-  private longPressTimeout: NodeJS.Timeout = null;
-  private onTransformInvocationInitialized: boolean;
-  private singleTapTimeoutId: NodeJS.Timeout;
+  private longPressTimeout: NodeJS.Timeout | null = null;
+  private onTransformInvocationInitialized: boolean | undefined;
+  private singleTapTimeoutId: NodeJS.Timeout | undefined;
   private touches: TouchPoint[] = [];
-  private doubleTapFirstTap: TouchPoint;
-  private measureZoomSubjectInterval: NodeJS.Timer;
+  private doubleTapFirstTap: TouchPoint | undefined;
+  private measureZoomSubjectInterval: NodeJS.Timer | undefined;
 
-  constructor(props) {
+  constructor(props: ReactNativeZoomableViewProps) {
     super(props);
 
     this.gestureHandlers = PanResponder.create({
@@ -147,9 +148,9 @@ class ReactNativeZoomableView extends Component<
           this._getZoomableViewEventObject()
         ) ?? true,
       onStartShouldSetPanResponderCapture: (evt, gestureState) =>
-        this.props.onStartShouldSetPanResponderCapture?.(evt, gestureState),
+        !!this.props.onStartShouldSetPanResponderCapture?.(evt, gestureState),
       onMoveShouldSetPanResponderCapture: (evt, gestureState) =>
-        this.props.onMoveShouldSetPanResponderCapture?.(evt, gestureState),
+        !!this.props.onMoveShouldSetPanResponderCapture?.(evt, gestureState),
     });
 
     this.zoomSubjectWrapperRef = createRef<View>();
@@ -159,9 +160,11 @@ class ReactNativeZoomableView extends Component<
     if (this.props.panAnimatedValueXY)
       this.panAnim = this.props.panAnimatedValueXY;
 
-    this.zoomLevel = props.initialZoom;
-    this.offsetX = props.initialOffsetX;
-    this.offsetY = props.initialOffsetY;
+    if (this.props.initialZoom) this.zoomLevel = this.props.initialZoom;
+    if (this.props.initialOffsetX != null)
+      this.offsetX = this.props.initialOffsetX;
+    if (this.props.initialOffsetY != null)
+      this.offsetY = this.props.initialOffsetY;
 
     this.panAnim.setValue({ x: this.offsetX, y: this.offsetY });
     this.zoomAnim.setValue(this.zoomLevel);
@@ -205,16 +208,20 @@ class ReactNativeZoomableView extends Component<
   private set offsetX(x: number) {
     this.__setOffset('x', x);
   }
+
   private set offsetY(y: number) {
     this.__setOffset('y', y);
   }
+
   private get offsetX() {
     return this.__getOffset('x');
   }
+
   private get offsetY() {
     return this.__getOffset('y');
   }
-  private __setOffset(axis: 'x' | 'y', offset) {
+
+  private __setOffset(axis: 'x' | 'y', offset: number) {
     const offsetState = this.__offsets[axis];
     const animValue = this.panAnim?.[axis];
 
@@ -227,7 +234,7 @@ class ReactNativeZoomableView extends Component<
           : this.props.contentHeight || this.state?.originalHeight;
 
       const boundOffset =
-        contentSize && containerSize
+        contentSize && containerSize && this.props.panBoundaryPadding != null
           ? applyPanBoundariesToOffset(
               offset,
               containerSize,
@@ -257,6 +264,7 @@ class ReactNativeZoomableView extends Component<
 
     offsetState.value = offset;
   }
+
   private __getOffset(axis: 'x' | 'y') {
     return this.__offsets[axis].value;
   }
@@ -266,7 +274,7 @@ class ReactNativeZoomableView extends Component<
     prevState: ReactNativeZoomableViewState
   ) {
     const { zoomEnabled, initialZoom } = this.props;
-    if (prevProps.zoomEnabled && !zoomEnabled) {
+    if (prevProps.zoomEnabled && !zoomEnabled && initialZoom) {
       this.zoomLevel = initialZoom;
       this.zoomAnim.setValue(this.zoomLevel);
     }
@@ -314,7 +322,8 @@ class ReactNativeZoomableView extends Component<
   }
 
   componentWillUnmount() {
-    clearInterval(this.measureZoomSubjectInterval);
+    this.measureZoomSubjectInterval &&
+      clearInterval(this.measureZoomSubjectInterval);
   }
 
   debouncedOnStaticPinPositionChange = this.props.onStaticPinPositionChange
@@ -327,15 +336,17 @@ class ReactNativeZoomableView extends Component<
    */
   _invokeOnTransform() {
     const zoomableViewEvent = this._getZoomableViewEventObject();
+    const position = this._staticPinPosition();
 
     if (!zoomableViewEvent.originalWidth || !zoomableViewEvent.originalHeight)
       return { successful: false };
 
     this.props.onTransform?.(zoomableViewEvent);
 
-    this.props.onStaticPinPositionMove?.(this._staticPinPosition());
-
-    this.debouncedOnStaticPinPositionChange?.(this._staticPinPosition());
+    if (position) {
+      this.props.onStaticPinPositionMove?.(position);
+      this.debouncedOnStaticPinPositionChange?.(position);
+    }
 
     return { successful: true };
   }
@@ -429,7 +440,9 @@ class ReactNativeZoomableView extends Component<
    * @param gestureState
    * @private
    */
-  _handlePanResponderGrant = (e, gestureState) => {
+  _handlePanResponderGrant: NonNullable<
+    PanResponderCallbacks['onPanResponderGrant']
+  > = (e, gestureState) => {
     if (this.props.onLongPress) {
       this.longPressTimeout = setTimeout(() => {
         this.props.onLongPress?.(
@@ -462,7 +475,9 @@ class ReactNativeZoomableView extends Component<
    *
    * @private
    */
-  _handlePanResponderEnd = (e, gestureState) => {
+  _handlePanResponderEnd: NonNullable<
+    PanResponderCallbacks['onPanResponderEnd']
+  > = (e, gestureState) => {
     if (!this.gestureType) {
       this._resolveAndHandleTap(e);
     }
@@ -637,6 +652,9 @@ class ReactNativeZoomableView extends Component<
       return;
     }
 
+    if (!distance) return;
+    if (!this.lastGestureTouchDistance) return;
+
     // define the new zoom level and take zoom level sensitivity into consideration
     const zoomGrowthFromLastGestureState =
       distance / this.lastGestureTouchDistance;
@@ -647,6 +665,7 @@ class ReactNativeZoomableView extends Component<
         ? pinchToZoomOutSensitivity
         : pinchToZoomInSensitivity;
 
+    if (pinchToZoomSensitivity == null) return;
     const deltaGrowth = zoomGrowthFromLastGestureState - 1;
     // 0 - no resistance
     // 10 - 90% resistance
@@ -656,17 +675,18 @@ class ReactNativeZoomableView extends Component<
     let newZoomLevel = this.zoomLevel * (1 + deltaGrowthAdjustedBySensitivity);
 
     // make sure max and min zoom levels are respected
-    if (maxZoom !== null && newZoomLevel > maxZoom) {
+    if (maxZoom != null && newZoomLevel > maxZoom) {
       newZoomLevel = maxZoom;
     }
 
-    if (newZoomLevel < minZoom) {
+    if (minZoom != null && newZoomLevel < minZoom) {
       newZoomLevel = minZoom;
     }
 
     const gestureCenterPoint = calcGestureCenterPoint(e, gestureState);
 
     if (!gestureCenterPoint) return;
+    if (!this.state.originalPageX || !this.state.originalPageY) return;
 
     let zoomCenter = {
       x: gestureCenterPoint.x - this.state.originalPageX,
@@ -691,6 +711,8 @@ class ReactNativeZoomableView extends Component<
     const oldOffsetY = this.offsetY;
     const oldScale = this.zoomLevel;
     const newScale = newZoomLevel;
+
+    if (!originalHeight || !originalWidth) return;
 
     let offsetY = calcNewScaledOffsetForZoomCentering(
       oldOffsetY,
@@ -741,6 +763,7 @@ class ReactNativeZoomableView extends Component<
   ) {
     const { touches } = gestureResponderEvent.nativeEvent;
     const { originalPageY, originalPageX } = this.state;
+    if (!originalPageX || !originalPageY) return;
     this.setState({
       debugPoints: [
         {
@@ -769,7 +792,7 @@ class ReactNativeZoomableView extends Component<
 
     let shift = null;
 
-    if (this.lastGestureCenterPosition) {
+    if (this.lastGestureCenterPosition && movementSensibility) {
       const dx = gestureCenterPoint.x - this.lastGestureCenterPosition.x;
       const dy = gestureCenterPoint.y - this.lastGestureCenterPosition.y;
 
@@ -812,7 +835,11 @@ class ReactNativeZoomableView extends Component<
     const offsetX = this.offsetX + shift.x;
     const offsetY = this.offsetY + shift.y;
 
-    if (this.props.debug) {
+    if (
+      this.props.debug &&
+      this.state.originalPageX &&
+      this.state.originalPageY
+    ) {
       const x = gestureState.moveX - this.state.originalPageX;
       const y = gestureState.moveY - this.state.originalPageY;
       this.setState({ debugPoints: [{ x, y }] });
@@ -830,7 +857,7 @@ class ReactNativeZoomableView extends Component<
    * @param {number} newOffsetY
    * @returns
    */
-  async _setNewOffsetPosition(newOffsetX: number, newOffsetY: number) {
+  _setNewOffsetPosition(newOffsetX: number, newOffsetY: number) {
     const { onShiftingBefore, onShiftingAfter } = this.props;
 
     if (onShiftingBefore?.(null, null, this._getZoomableViewEventObject())) {
@@ -858,19 +885,21 @@ class ReactNativeZoomableView extends Component<
     const now = Date.now();
     if (
       this.doubleTapFirstTapReleaseTimestamp &&
+      this.props.doubleTapDelay &&
       now - this.doubleTapFirstTapReleaseTimestamp < this.props.doubleTapDelay
     ) {
-      this._addTouch({
-        ...this.doubleTapFirstTap,
-        id: now.toString(),
-        isSecondTap: true,
-      });
-      clearTimeout(this.singleTapTimeoutId);
+      this.doubleTapFirstTap &&
+        this._addTouch({
+          ...this.doubleTapFirstTap,
+          id: now.toString(),
+          isSecondTap: true,
+        });
+      this.singleTapTimeoutId && clearTimeout(this.singleTapTimeoutId);
       delete this.doubleTapFirstTapReleaseTimestamp;
       delete this.singleTapTimeoutId;
       delete this.doubleTapFirstTap;
       this._handleDoubleTap(e);
-    } else {
+    } else if (this.state.originalPageX && this.state.originalPageY) {
       this.doubleTapFirstTapReleaseTimestamp = now;
       this.doubleTapFirstTap = {
         id: now.toString(),
@@ -909,10 +938,13 @@ class ReactNativeZoomableView extends Component<
     }
   };
 
-  _moveTimeout: NodeJS.Timeout;
   moveStaticPinTo = (position: Vec2D) => {
     const { originalWidth, originalHeight } = this.state;
     const { staticPinPosition, contentWidth, contentHeight } = this.props;
+
+    if (!staticPinPosition) return;
+    if (!originalWidth || !originalHeight) return;
+    if (!contentWidth || !contentHeight) return;
 
     // Offset for the static pin
     const pinX = staticPinPosition.x - originalWidth / 2;
@@ -925,6 +957,9 @@ class ReactNativeZoomableView extends Component<
   };
 
   private _staticPinPosition = () => {
+    if (!this.props.staticPinPosition) return;
+    if (!this.props.contentWidth || !this.props.contentHeight) return;
+
     return viewportPositionToImagePosition({
       viewportPosition: {
         x: this.props.staticPinPosition.x,
@@ -944,7 +979,9 @@ class ReactNativeZoomableView extends Component<
   };
 
   private _updateStaticPin = () => {
-    this.props.onStaticPinPositionChange?.(this._staticPinPosition());
+    const position = this._staticPinPosition();
+    if (!position) return;
+    this.props.onStaticPinPositionChange?.(position);
   };
 
   private _addTouch(touch: TouchPoint) {
@@ -971,7 +1008,10 @@ class ReactNativeZoomableView extends Component<
     onDoubleTapBefore?.(e, this._getZoomableViewEventObject());
 
     const nextZoomStep = this._getNextZoomStep();
+    if (nextZoomStep == null) return;
+
     const { originalPageX, originalPageY } = this.state;
+    if (!originalPageX || !originalPageY) return;
 
     // define new zoom position coordinates
     const zoomPositionCoordinates = {
@@ -1007,9 +1047,13 @@ class ReactNativeZoomableView extends Component<
     const { zoomStep, maxZoom, initialZoom } = this.props;
     const { zoomLevel } = this;
 
+    if (maxZoom == null) return;
+
     if (zoomLevel.toFixed(2) === maxZoom.toFixed(2)) {
       return initialZoom;
     }
+
+    if (zoomStep == null) return;
 
     const nextZoomStep = zoomLevel * (1 + zoomStep);
     if (nextZoomStep > maxZoom) {
@@ -1030,6 +1074,8 @@ class ReactNativeZoomableView extends Component<
    */
   async _zoomToLocation(x: number, y: number, newZoomLevel: number) {
     if (!this.props.zoomEnabled) return;
+    if (this.state.originalWidth == null) return;
+    if (this.state.originalHeight == null) return;
 
     this.props.onZoomBefore?.(null, null, this._getZoomableViewEventObject());
 
@@ -1041,6 +1087,8 @@ class ReactNativeZoomableView extends Component<
     //  because here panAnim is being calculated in js.
     // However the jittering should mostly occur in simulator.
     const listenerId = this.zoomAnim.addListener(({ value: newScale }) => {
+      if (this.state.originalWidth == null) return;
+      if (this.state.originalHeight == null) return;
       this.panAnim.setValue({
         x: calcNewScaledOffsetForZoomCentering(
           this.offsetX,
@@ -1078,8 +1126,8 @@ class ReactNativeZoomableView extends Component<
   async zoomTo(newZoomLevel: number): Promise<boolean> {
     if (
       // if we would go out of our min/max limits -> abort
-      newZoomLevel > this.props.maxZoom ||
-      newZoomLevel < this.props.minZoom
+      (this.props.maxZoom && newZoomLevel > this.props.maxZoom) ||
+      (this.props.minZoom && newZoomLevel < this.props.minZoom)
     )
       return false;
 
@@ -1098,12 +1146,9 @@ class ReactNativeZoomableView extends Component<
    *
    * @return {Promise<bool>}
    */
-  zoomBy(zoomLevelChange: number = null): Promise<boolean> {
+  zoomBy(zoomLevelChange: number): Promise<boolean> {
     // if no zoom level Change given -> just use zoom step
-    if (!zoomLevelChange) {
-      zoomLevelChange = this.props.zoomStep;
-    }
-
+    zoomLevelChange ||= this.props.zoomStep || 0;
     return this.zoomTo(this.zoomLevel + zoomLevelChange);
   }
 
@@ -1116,8 +1161,9 @@ class ReactNativeZoomableView extends Component<
    *
    * @return {Promise<bool>}
    */
-  moveTo(newOffsetX: number, newOffsetY: number): Promise<void> {
+  moveTo(newOffsetX: number, newOffsetY: number) {
     const { originalWidth, originalHeight } = this.state;
+    if (!originalWidth || !originalHeight) return;
 
     const offsetX = (newOffsetX - originalWidth / 2) / this.zoomLevel;
     const offsetY = (newOffsetY - originalHeight / 2) / this.zoomLevel;
@@ -1135,7 +1181,7 @@ class ReactNativeZoomableView extends Component<
    *
    * @return {Promise<bool>}
    */
-  moveBy(offsetChangeX: number, offsetChangeY: number): Promise<void> {
+  moveBy(offsetChangeX: number, offsetChangeY: number) {
     const offsetX =
       (this.offsetX * this.zoomLevel - offsetChangeX) / this.zoomLevel;
     const offsetY =
@@ -1180,18 +1226,18 @@ class ReactNativeZoomableView extends Component<
         </Animated.View>
 
         {visualTouchFeedbackEnabled &&
-          touches?.map((touch) => {
-            const animationDuration = doubleTapDelay;
-            return (
-              <AnimatedTouchFeedback
-                x={touch.x}
-                y={touch.y}
-                key={touch.id}
-                animationDuration={animationDuration}
-                onAnimationDone={() => this._removeTouch(touch)}
-              />
-            );
-          })}
+          touches?.map(
+            (touch) =>
+              doubleTapDelay && (
+                <AnimatedTouchFeedback
+                  x={touch.x}
+                  y={touch.y}
+                  key={touch.id}
+                  animationDuration={doubleTapDelay}
+                  onAnimationDone={() => this._removeTouch(touch)}
+                />
+              )
+          )}
 
         {/* For Debugging Only */}
         {debugPoints.map(({ x, y }, index) => {

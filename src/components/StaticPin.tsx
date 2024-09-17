@@ -30,7 +30,7 @@ export const StaticPin = ({
   onParentMove: (
     evt: GestureResponderEvent,
     gestureState: PanResponderGestureState
-  ) => boolean;
+  ) => boolean | undefined;
   onPress?: (evt: GestureResponderEvent) => void;
   onLongPress?: (evt: GestureResponderEvent) => void;
   setPinSize: (size: Size2D) => void;

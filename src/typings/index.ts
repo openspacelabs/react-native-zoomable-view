@@ -68,13 +68,13 @@ export interface ReactNativeZoomableViewProps extends ViewProps {
     zoomableViewEventObject: ZoomableViewEvent
   ) => void;
   onShiftingBefore?: (
-    event: GestureResponderEvent,
-    gestureState: PanResponderGestureState,
+    event: GestureResponderEvent | null,
+    gestureState: PanResponderGestureState | null,
     zoomableViewEventObject: ZoomableViewEvent
   ) => boolean;
   onShiftingAfter?: (
-    event: GestureResponderEvent,
-    gestureState: PanResponderGestureState,
+    event: GestureResponderEvent | null,
+    gestureState: PanResponderGestureState | null,
     zoomableViewEventObject: ZoomableViewEvent
   ) => boolean;
   onShiftingEnd?: (
@@ -83,13 +83,13 @@ export interface ReactNativeZoomableViewProps extends ViewProps {
     zoomableViewEventObject: ZoomableViewEvent
   ) => void;
   onZoomBefore?: (
-    event: GestureResponderEvent,
-    gestureState: PanResponderGestureState,
+    event: GestureResponderEvent | null,
+    gestureState: PanResponderGestureState | null,
     zoomableViewEventObject: ZoomableViewEvent
   ) => boolean | void;
   onZoomAfter?: (
-    event: GestureResponderEvent,
-    gestureState: PanResponderGestureState,
+    event: GestureResponderEvent | null,
+    gestureState: PanResponderGestureState | null,
     zoomableViewEventObject: ZoomableViewEvent
   ) => void;
   onZoomEnd?: (
@@ -173,12 +173,12 @@ export interface TouchPoint extends Vec2D {
 }
 
 export interface ReactNativeZoomableViewState {
-  touches: TouchPoint[];
-  originalWidth: number;
-  originalHeight: number;
-  originalPageX: number;
-  originalPageY: number;
-  debugPoints: undefined | Vec2D[];
+  touches?: TouchPoint[];
+  originalWidth: number | null;
+  originalHeight: number | null;
+  originalPageX: number | null;
+  originalPageY: number | null;
+  debugPoints?: undefined | Vec2D[];
   pinSize: Size2D;
 }
 

@@ -2,6 +2,6 @@ export declare const AnimatedTouchFeedback: ({ x, y, animationDelay, animationDu
     x: number;
     y: number;
     animationDuration: number;
-    animationDelay?: number;
+    animationDelay?: number | undefined;
     onAnimationDone?(): void;
 }) => JSX.Element;
