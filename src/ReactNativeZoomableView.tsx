@@ -923,8 +923,8 @@ class ReactNativeZoomableView extends Component<
     const { staticPinPosition, contentWidth, contentHeight } = this.props;
 
     // Offset for the static pin
-    const pinX = staticPinPosition.x - originalWidth / 2;
-    const pinY = staticPinPosition.y - originalHeight / 2;
+    const pinX = staticPinPosition?.x - originalWidth / 2;
+    const pinY = staticPinPosition?.y - originalHeight / 2;
 
     this.offsetX = contentWidth / 2 - position.x + pinX / this.zoomLevel;
     this.offsetY = contentHeight / 2 - position.y + pinY / this.zoomLevel;
@@ -935,8 +935,8 @@ class ReactNativeZoomableView extends Component<
   private _staticPinPosition = () => {
     return viewportPositionToImagePosition({
       viewportPosition: {
-        x: this.props.staticPinPosition.x,
-        y: this.props.staticPinPosition.y,
+        x: this.props?.staticPinPosition?.x,
+        y: this.props?.staticPinPosition?.y,
       },
       imageSize: {
         height: this.props.contentHeight,
