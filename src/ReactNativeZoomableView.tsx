@@ -396,6 +396,10 @@ class ReactNativeZoomableView extends Component<
         // we don't wanna measure when zoomSubjectWrapperRef is not yet available or has been unmounted
         zoomSubjectWrapperRef.current?.measureInWindow(
           (x, y, width, height) => {
+            // When the component is off-screen, these become all 0s, so we don't set them
+            // to avoid messing up calculations, especially ones that are done right after
+            // the component transitions from hidden to visible.
+            if (!x && !y && !width && !height) return;
             this.setState({
               originalWidth: width,
               originalHeight: height,
