@@ -100,7 +100,14 @@ class ReactNativeZoomableView extends Component<
   private lastGestureCenterPosition: { x: number; y: number } | null = null;
   private lastGestureTouchDistance: number | null = null;
   private gestureType: 'pinch' | 'shift' | null;
-  private gestureStarted = false;
+
+  private _gestureStarted = false;
+  private set gestureStarted(v: boolean) {
+    this._gestureStarted = v;
+  }
+  public get gestureStarted() {
+    return this._gestureStarted;
+  }
 
   /**
    * Last press time (used to evaluate whether user double tapped)

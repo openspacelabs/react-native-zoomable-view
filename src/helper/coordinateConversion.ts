@@ -119,13 +119,5 @@ export function viewportPositionToImagePosition({
       resizedImgScale,
   };
 
-  if (
-    pointOnSheet.x < 0 ||
-    pointOnSheet.x > imageSize.width ||
-    pointOnSheet.y < 0 ||
-    pointOnSheet.y > imageSize.height
-  )
-    return null;
-
   return pointOnSheet;
 }

@@ -41,7 +41,9 @@ declare class ReactNativeZoomableView extends Component<ReactNativeZoomableViewP
     private lastGestureCenterPosition;
     private lastGestureTouchDistance;
     private gestureType;
-    private gestureStarted;
+    private _gestureStarted;
+    private set gestureStarted(value);
+    get gestureStarted(): boolean;
     /**
      * Last press time (used to evaluate whether user double tapped)
      * @type {number}
