@@ -1,37 +1,37 @@
 import { StyleSheet } from 'react-native';
 
 export const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 20,
-  },
-  contents: {
-    flex: 1,
-    alignSelf: 'stretch',
-  },
   box: {
     borderWidth: 5,
     flexShrink: 1,
     height: 600,
     width: 480,
   },
+  container: {
+    alignItems: 'center',
+    flex: 1,
+    justifyContent: 'center',
+    padding: 20,
+  },
+  contents: {
+    alignSelf: 'stretch',
+    flex: 1,
+  },
   img: {
-    width: '100%',
     height: '100%',
     resizeMode: 'contain',
+    width: '100%',
   },
   marker: {
-    position: 'absolute',
-    top: '50%',
-    left: '50%',
-    width: 20,
+    backgroundColor: 'white',
+    borderRadius: 10,
+    borderWidth: 2,
     height: 20,
+    left: '50%',
     marginLeft: -10,
     marginTop: -10,
-    borderRadius: 10,
-    backgroundColor: 'white',
-    borderWidth: 2,
+    position: 'absolute',
+    top: '50%',
+    width: 20,
   },
 });

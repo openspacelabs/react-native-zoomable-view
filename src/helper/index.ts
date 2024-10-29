@@ -18,7 +18,7 @@ export function calcGestureCenterPoint(
   e: GestureResponderEvent,
   gestureState: PanResponderGestureState
 ): Vec2D | null {
-  const touches = e?.nativeEvent?.touches;
+  const touches = e.nativeEvent.touches;
   if (!touches[0]) return null;
 
   if (gestureState.numberActiveTouches === 2) {
@@ -42,7 +42,7 @@ export function calcGestureTouchDistance(
   e: GestureResponderEvent,
   gestureState: PanResponderGestureState
 ): number | null {
-  const touches = e?.nativeEvent?.touches;
+  const touches = e.nativeEvent.touches;
   if (gestureState.numberActiveTouches !== 2 || !touches[0] || !touches[1])
     return null;
 

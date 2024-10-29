@@ -1,11 +1,11 @@
-/// <reference types="node" />
+/// <reference types="lodash" />
 import { Component, RefObject } from 'react';
-import { GestureResponderEvent, PanResponderGestureState, View } from 'react-native';
+import { GestureResponderEvent, PanResponderCallbacks, PanResponderGestureState, PanResponderInstance, View } from 'react-native';
 import { Vec2D, ReactNativeZoomableViewProps, ReactNativeZoomableViewState, ZoomableViewEvent } from './typings';
 declare class ReactNativeZoomableView extends Component<ReactNativeZoomableViewProps, ReactNativeZoomableViewState> {
     zoomSubjectWrapperRef: RefObject<View>;
-    gestureHandlers: any;
-    doubleTapFirstTapReleaseTimestamp: number;
+    gestureHandlers: PanResponderInstance;
+    doubleTapFirstTapReleaseTimestamp: number | undefined;
     static defaultProps: {
         zoomEnabled: boolean;
         panEnabled: boolean;
@@ -20,16 +20,16 @@ declare class ReactNativeZoomableView extends Component<ReactNativeZoomableViewP
         doubleTapDelay: number;
         bindToBorders: boolean;
         zoomStep: number;
-        onLongPress: any;
+        onLongPress: null;
         longPressDuration: number;
-        contentWidth: any;
-        contentHeight: any;
+        contentWidth: undefined;
+        contentHeight: undefined;
         panBoundaryPadding: number;
         visualTouchFeedbackEnabled: boolean;
-        staticPinPosition: any;
-        staticPinIcon: any;
-        onStaticPinPositionChange: any;
-        onStaticPinPositionMove: any;
+        staticPinPosition: undefined;
+        staticPinIcon: undefined;
+        onStaticPinPositionChange: undefined;
+        onStaticPinPositionMove: undefined;
         animatePin: boolean;
         disablePanOnInitialZoom: boolean;
     };
@@ -54,7 +54,7 @@ declare class ReactNativeZoomableView extends Component<ReactNativeZoomableViewP
     private touches;
     private doubleTapFirstTap;
     private measureZoomSubjectInterval;
-    constructor(props: any);
+    constructor(props: ReactNativeZoomableViewProps);
     private raisePin;
     private dropPin;
     private set offsetX(value);
@@ -66,7 +66,7 @@ declare class ReactNativeZoomableView extends Component<ReactNativeZoomableViewP
     componentDidUpdate(prevProps: ReactNativeZoomableViewProps, prevState: ReactNativeZoomableViewState): void;
     componentDidMount(): void;
     componentWillUnmount(): void;
-    debouncedOnStaticPinPositionChange: any;
+    debouncedOnStaticPinPositionChange: import("lodash").DebouncedFunc<(position: Vec2D) => void | undefined>;
     /**
      * try to invoke onTransform
      * @private
@@ -105,7 +105,7 @@ declare class ReactNativeZoomableView extends Component<ReactNativeZoomableViewP
      * @param gestureState
      * @private
      */
-    _handlePanResponderGrant: (e: any, gestureState: any) => void;
+    _handlePanResponderGrant: NonNullable<PanResponderCallbacks['onPanResponderGrant']>;
     /**
      * Handles the end of touch events
      *
@@ -114,7 +114,7 @@ declare class ReactNativeZoomableView extends Component<ReactNativeZoomableViewP
      *
      * @private
      */
-    _handlePanResponderEnd: (e: any, gestureState: any) => void;
+    _handlePanResponderEnd: NonNullable<PanResponderCallbacks['onPanResponderEnd']>;
     /**
      * Handles the actual movement of our pan responder
      *
@@ -123,7 +123,7 @@ declare class ReactNativeZoomableView extends Component<ReactNativeZoomableViewP
      *
      * @private
      */
-    _handlePanResponderMove: (e: GestureResponderEvent, gestureState: PanResponderGestureState) => boolean;
+    _handlePanResponderMove: (e: GestureResponderEvent, gestureState: PanResponderGestureState) => boolean | undefined;
     /**
      * Handles the pinch movement and zooming
      *
@@ -147,7 +147,10 @@ declare class ReactNativeZoomableView extends Component<ReactNativeZoomableViewP
      *
      * @private
      */
-    _calcOffsetShiftSinceLastGestureState(gestureCenterPoint: Vec2D): any;
+    _calcOffsetShiftSinceLastGestureState(gestureCenterPoint: Vec2D): {
+        x: number;
+        y: number;
+    } | null;
     /**
      * Handles movement by tap and move
      *
@@ -163,7 +166,7 @@ declare class ReactNativeZoomableView extends Component<ReactNativeZoomableViewP
      * @param {number} newOffsetY
      * @returns
      */
-    _setNewOffsetPosition(newOffsetX: number, newOffsetY: number): Promise<void>;
+    _setNewOffsetPosition(newOffsetX: number, newOffsetY: number): void;
     /**
      * Check whether the press event is double tap
      * or single tap and handle the event accordingly
@@ -173,7 +176,6 @@ declare class ReactNativeZoomableView extends Component<ReactNativeZoomableViewP
      * @private
      */
     private _resolveAndHandleTap;
-    _moveTimeout: NodeJS.Timeout;
     moveStaticPinTo: (position: Vec2D) => void;
     private _staticPinPosition;
     private _updateStaticPin;
@@ -193,7 +195,7 @@ declare class ReactNativeZoomableView extends Component<ReactNativeZoomableViewP
      *
      * @returns {*}
      */
-    _getNextZoomStep(): number;
+    _getNextZoomStep(): number | undefined;
     /**
      * Zooms to a specific location in our view
      *
@@ -203,16 +205,16 @@ declare class ReactNativeZoomableView extends Component<ReactNativeZoomableViewP
      *
      * @private
      */
-    _zoomToLocation(x: number, y: number, newZoomLevel: number): Promise<void>;
+    _zoomToLocation(x: number, y: number, newZoomLevel: number): void;
     /**
      * Zooms to a specificied zoom level.
      * Returns a promise if everything was updated and a boolean, whether it could be updated or if it exceeded the min/max zoom limits.
      *
      * @param {number} newZoomLevel
      *
-     * @return {Promise<bool>}
+     * @return {bool}
      */
-    zoomTo(newZoomLevel: number): Promise<boolean>;
+    zoomTo(newZoomLevel: number): boolean;
     /**
      * Zooms in or out by a specified change level
      * Use a positive number for `zoomLevelChange` to zoom in
@@ -222,9 +224,9 @@ declare class ReactNativeZoomableView extends Component<ReactNativeZoomableViewP
      *
      * @param {number | null} zoomLevelChange
      *
-     * @return {Promise<bool>}
+     * @return {bool}
      */
-    zoomBy(zoomLevelChange?: number): Promise<boolean>;
+    zoomBy(zoomLevelChange: number): boolean;
     /**
      * Moves the zoomed view to a specified position
      * Returns a promise when finished
@@ -232,9 +234,9 @@ declare class ReactNativeZoomableView extends Component<ReactNativeZoomableViewP
      * @param {number} newOffsetX the new position we want to move it to (x-axis)
      * @param {number} newOffsetY the new position we want to move it to (y-axis)
      *
-     * @return {Promise<bool>}
+     * @return {bool}
      */
-    moveTo(newOffsetX: number, newOffsetY: number): Promise<void>;
+    moveTo(newOffsetX: number, newOffsetY: number): void;
     /**
      * Moves the zoomed view by a certain amount.
      *
@@ -243,9 +245,9 @@ declare class ReactNativeZoomableView extends Component<ReactNativeZoomableViewP
      * @param {number} offsetChangeX the amount we want to move the offset by (x-axis)
      * @param {number} offsetChangeY the amount we want to move the offset by (y-axis)
      *
-     * @return {Promise<bool>}
+     * @return {bool}
      */
-    moveBy(offsetChangeX: number, offsetChangeY: number): Promise<void>;
+    moveBy(offsetChangeX: number, offsetChangeY: number): void;
     render(): JSX.Element;
 }
 export default ReactNativeZoomableView;

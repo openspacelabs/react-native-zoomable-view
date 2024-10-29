@@ -36,7 +36,6 @@ export interface ReactNativeZoomableViewProps extends ViewProps {
     longPressDuration?: number;
     visualTouchFeedbackEnabled?: boolean;
     disablePanOnInitialZoom?: boolean;
-    style?: any;
     zoomAnimatedValue?: Animated.Value;
     panAnimatedValueXY?: Animated.ValueXY;
     debug?: boolean;
@@ -44,11 +43,11 @@ export interface ReactNativeZoomableViewProps extends ViewProps {
     onSingleTap?: (event: GestureResponderEvent, zoomableViewEventObject: ZoomableViewEvent) => void;
     onDoubleTapBefore?: (event: GestureResponderEvent, zoomableViewEventObject: ZoomableViewEvent) => void;
     onDoubleTapAfter?: (event: GestureResponderEvent, zoomableViewEventObject: ZoomableViewEvent) => void;
-    onShiftingBefore?: (event: GestureResponderEvent, gestureState: PanResponderGestureState, zoomableViewEventObject: ZoomableViewEvent) => boolean;
-    onShiftingAfter?: (event: GestureResponderEvent, gestureState: PanResponderGestureState, zoomableViewEventObject: ZoomableViewEvent) => boolean;
+    onShiftingBefore?: (event: GestureResponderEvent | null, gestureState: PanResponderGestureState | null, zoomableViewEventObject: ZoomableViewEvent) => boolean;
+    onShiftingAfter?: (event: GestureResponderEvent | null, gestureState: PanResponderGestureState | null, zoomableViewEventObject: ZoomableViewEvent) => boolean;
     onShiftingEnd?: (event: GestureResponderEvent, gestureState: PanResponderGestureState, zoomableViewEventObject: ZoomableViewEvent) => void;
-    onZoomBefore?: (event: GestureResponderEvent, gestureState: PanResponderGestureState, zoomableViewEventObject: ZoomableViewEvent) => boolean | void;
-    onZoomAfter?: (event: GestureResponderEvent, gestureState: PanResponderGestureState, zoomableViewEventObject: ZoomableViewEvent) => void;
+    onZoomBefore?: (event: GestureResponderEvent | null, gestureState: PanResponderGestureState | null, zoomableViewEventObject: ZoomableViewEvent) => boolean | undefined;
+    onZoomAfter?: (event: GestureResponderEvent | null, gestureState: PanResponderGestureState | null, zoomableViewEventObject: ZoomableViewEvent) => void;
     onZoomEnd?: (event: GestureResponderEvent, gestureState: PanResponderGestureState, zoomableViewEventObject: ZoomableViewEvent) => void;
     onLongPress?: (event: GestureResponderEvent, gestureState: PanResponderGestureState, zoomableViewEventObject: ZoomableViewEvent) => void;
     onStartShouldSetPanResponder?: (event: GestureResponderEvent, gestureState: PanResponderGestureState, zoomableViewEventObject: ZoomableViewEvent, baseComponentResult: boolean) => boolean;
@@ -83,12 +82,12 @@ export interface TouchPoint extends Vec2D {
     isSecondTap?: boolean;
 }
 export interface ReactNativeZoomableViewState {
-    touches: TouchPoint[];
-    originalWidth: number;
-    originalHeight: number;
-    originalPageX: number;
-    originalPageY: number;
-    debugPoints: undefined | Vec2D[];
+    touches?: TouchPoint[];
+    originalWidth: number | null;
+    originalHeight: number | null;
+    originalPageX: number | null;
+    originalPageY: number | null;
+    debugPoints?: undefined | Vec2D[];
     pinSize: Size2D;
 }
 export interface ReactNativeZoomableViewWithGesturesProps extends ReactNativeZoomableViewProps {

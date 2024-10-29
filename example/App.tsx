@@ -1,6 +1,6 @@
 import React, { useCallback, useRef, useState } from 'react';
 import { View, Text, Image, Animated, Button } from 'react-native';
-// @ts-ignore
+
 import { ReactNativeZoomableView } from '@openspacelabs/react-native-zoomable-view';
 import { styles } from './style';
 import { debounce } from 'lodash';
@@ -33,16 +33,18 @@ export default function App() {
     []
   )();
 
-  const staticPinPosition = size
-    ? { x: size.width / 2, y: size.height / 2 }
-    : undefined;
-
+  const staticPinPosition = { x: size.width / 2, y: size.height / 2 };
   const { size: contentSize } = applyContainResizeMode(imageSize, size);
 
   return (
     <View style={styles.container}>
       <Text>ReactNativeZoomableView</Text>
-      <View style={styles.box} onLayout={(e) => setSize(e.nativeEvent.layout)}>
+      <View
+        style={styles.box}
+        onLayout={(e) => {
+          setSize(e.nativeEvent.layout);
+        }}
+      >
         <ReactNativeZoomableView
           disableMomentum
           // Where to put the pin in the content view
@@ -84,7 +86,9 @@ export default function App() {
       <Text>onStaticPinPositionMove: {stringifyPoint(movePin)}</Text>
       <Button
         title={`${showMarkers ? 'Hide' : 'Show'} markers`}
-        onPress={() => setShowMarkers((value) => !value)}
+        onPress={() => {
+          setShowMarkers((value) => !value);
+        }}
       />
     </View>
   );

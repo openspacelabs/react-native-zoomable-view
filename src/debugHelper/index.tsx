@@ -56,11 +56,11 @@ export const DebugRect = ({
 
 const styles = StyleSheet.create({
   debugPoint: {
-    position: 'absolute',
     opacity: 0.7,
+    position: 'absolute',
   },
   debugRect: {
-    position: 'absolute',
     opacity: 0.5,
+    position: 'absolute',
   },
 });
