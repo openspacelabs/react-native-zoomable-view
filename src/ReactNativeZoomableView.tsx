@@ -105,6 +105,7 @@ class ReactNativeZoomableView extends Component<
   private set gestureStarted(v: boolean) {
     this._gestureStarted = v;
   }
+
   public get gestureStarted() {
     return this._gestureStarted;
   }
@@ -694,7 +695,8 @@ class ReactNativeZoomableView extends Component<
     const gestureCenterPoint = calcGestureCenterPoint(e, gestureState);
 
     if (!gestureCenterPoint) return;
-    if (!this.state.originalPageX || !this.state.originalPageY) return;
+    if (this.state.originalPageX == null) return;
+    if (this.state.originalPageY == null) return;
 
     let zoomCenter = {
       x: gestureCenterPoint.x - this.state.originalPageX,
@@ -771,7 +773,9 @@ class ReactNativeZoomableView extends Component<
   ) {
     const { touches } = gestureResponderEvent.nativeEvent;
     const { originalPageY, originalPageX } = this.state;
-    if (!originalPageX || !originalPageY) return;
+    if (originalPageX == null) return;
+    if (originalPageY == null) return;
+
     this.setState({
       debugPoints: [
         {
