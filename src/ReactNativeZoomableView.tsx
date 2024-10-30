@@ -1023,7 +1023,8 @@ class ReactNativeZoomableView extends Component<
     if (nextZoomStep == null) return;
 
     const { originalPageX, originalPageY } = this.state;
-    if (!originalPageX || !originalPageY) return;
+    if (originalPageX == null) return;
+    if (originalPageY == null) return;
 
     // define new zoom position coordinates
     const zoomPositionCoordinates = {
