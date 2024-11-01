@@ -123,6 +123,10 @@ class ReactNativeZoomableView extends Component<
 
   constructor(props: ReactNativeZoomableViewProps) {
     super(props);
+    // This needs to be done before anything else to initialize the state.
+    // Otherwise, the logic below may reference the state when it's undefined,
+    // causing runtime errors.
+    this.state = { ...initialState };
 
     this.gestureHandlers = PanResponder.create({
       onStartShouldSetPanResponder: this._handleStartShouldSetPanResponder,
@@ -184,10 +188,6 @@ class ReactNativeZoomableView extends Component<
     this.zoomAnim.addListener(({ value }) => {
       this.zoomLevel = value;
     });
-
-    this.state = {
-      ...initialState,
-    };
 
     this.lastGestureTouchDistance = 150;
 
