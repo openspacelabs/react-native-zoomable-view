@@ -83,10 +83,10 @@ export interface TouchPoint extends Vec2D {
 }
 export interface ReactNativeZoomableViewState {
     touches?: TouchPoint[];
-    originalWidth: number | null;
-    originalHeight: number | null;
-    originalPageX: number | null;
-    originalPageY: number | null;
+    originalWidth: number;
+    originalHeight: number;
+    originalPageX: number;
+    originalPageY: number;
     debugPoints?: undefined | Vec2D[];
     pinSize: Size2D;
 }

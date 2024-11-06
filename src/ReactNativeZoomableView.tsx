@@ -38,10 +38,10 @@ import {
 } from './animations';
 
 const initialState: ReactNativeZoomableViewState = {
-  originalWidth: null,
-  originalHeight: null,
-  originalPageX: null,
-  originalPageY: null,
+  originalWidth: 0,
+  originalHeight: 0,
+  originalPageX: 0,
+  originalPageY: 0,
   pinSize: { width: 0, height: 0 },
 };
 
@@ -695,8 +695,6 @@ class ReactNativeZoomableView extends Component<
     const gestureCenterPoint = calcGestureCenterPoint(e, gestureState);
 
     if (!gestureCenterPoint) return;
-    if (this.state.originalPageX == null) return;
-    if (this.state.originalPageY == null) return;
 
     let zoomCenter = {
       x: gestureCenterPoint.x - this.state.originalPageX,
@@ -773,8 +771,6 @@ class ReactNativeZoomableView extends Component<
   ) {
     const { touches } = gestureResponderEvent.nativeEvent;
     const { originalPageY, originalPageX } = this.state;
-    if (originalPageX == null) return;
-    if (originalPageY == null) return;
 
     this.setState({
       debugPoints: [
@@ -911,7 +907,7 @@ class ReactNativeZoomableView extends Component<
       delete this.singleTapTimeoutId;
       delete this.doubleTapFirstTap;
       this._handleDoubleTap(e);
-    } else if (this.state.originalPageX && this.state.originalPageY) {
+    } else {
       this.doubleTapFirstTapReleaseTimestamp = now;
       this.doubleTapFirstTap = {
         id: now.toString(),
@@ -950,7 +946,7 @@ class ReactNativeZoomableView extends Component<
     }
   };
 
-  moveStaticPinTo = (position: Vec2D) => {
+  moveStaticPinTo = (position: Vec2D, duration?: number) => {
     const { originalWidth, originalHeight } = this.state;
     const { staticPinPosition, contentWidth, contentHeight } = this.props;
 
@@ -965,7 +961,15 @@ class ReactNativeZoomableView extends Component<
     this.offsetX = contentWidth / 2 - position.x + pinX / this.zoomLevel;
     this.offsetY = contentHeight / 2 - position.y + pinY / this.zoomLevel;
 
-    this.panAnim.setValue({ x: this.offsetX, y: this.offsetY });
+    if (duration) {
+      Animated.timing(this.panAnim, {
+        toValue: { x: this.offsetX, y: this.offsetY },
+        useNativeDriver: true,
+        duration,
+      }).start();
+    } else {
+      this.panAnim.setValue({ x: this.offsetX, y: this.offsetY });
+    }
   };
 
   private _staticPinPosition = () => {
@@ -1023,8 +1027,6 @@ class ReactNativeZoomableView extends Component<
     if (nextZoomStep == null) return;
 
     const { originalPageX, originalPageY } = this.state;
-    if (originalPageX == null) return;
-    if (originalPageY == null) return;
 
     // define new zoom position coordinates
     const zoomPositionCoordinates = {
@@ -1087,8 +1089,6 @@ class ReactNativeZoomableView extends Component<
    */
   _zoomToLocation(x: number, y: number, newZoomLevel: number) {
     if (!this.props.zoomEnabled) return;
-    if (this.state.originalWidth == null) return;
-    if (this.state.originalHeight == null) return;
 
     this.props.onZoomBefore?.(null, null, this._getZoomableViewEventObject());
 
@@ -1100,8 +1100,6 @@ class ReactNativeZoomableView extends Component<
     //  because here panAnim is being calculated in js.
     // However the jittering should mostly occur in simulator.
     const listenerId = this.zoomAnim.addListener(({ value: newScale }) => {
-      if (this.state.originalWidth == null) return;
-      if (this.state.originalHeight == null) return;
       this.panAnim.setValue({
         x: calcNewScaledOffsetForZoomCentering(
           this.offsetX,

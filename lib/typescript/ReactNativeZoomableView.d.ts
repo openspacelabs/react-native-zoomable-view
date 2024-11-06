@@ -176,7 +176,7 @@ declare class ReactNativeZoomableView extends Component<ReactNativeZoomableViewP
      * @private
      */
     private _resolveAndHandleTap;
-    moveStaticPinTo: (position: Vec2D) => void;
+    moveStaticPinTo: (position: Vec2D, duration?: number) => void;
     private _staticPinPosition;
     private _updateStaticPin;
     private _addTouch;
