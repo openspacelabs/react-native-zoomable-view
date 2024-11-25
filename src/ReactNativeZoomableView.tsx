@@ -401,6 +401,18 @@ class ReactNativeZoomableView extends Component<
             // to avoid messing up calculations, especially ones that are done right after
             // the component transitions from hidden to visible.
             if (!x && !y && !width && !height) return;
+
+            // If these values are all the same, don't re-set them in state
+            // this way we don't re-render
+            if (
+              this.state.originalWidth === width &&
+              this.state.originalHeight === height &&
+              this.state.originalPageX === x &&
+              this.state.originalPageY === y
+            ) {
+              return;
+            }
+
             this.setState({
               originalWidth: width,
               originalHeight: height,
