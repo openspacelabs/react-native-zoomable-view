@@ -216,10 +216,9 @@ declare class ReactNativeZoomableView extends Component<ReactNativeZoomableViewP
      */
     zoomTo(newZoomLevel: number): boolean;
     /**
-     * Sets zoom relative to a "zoom subject" which is the relative coordinates
-     * of the view
+     * Sets zoom relative to the zoomableview
      */
-    zoomToZoomSubject(x: number, y: number, newZoomLevel: number): false | undefined;
+    zoomToRelCoords(x: number, y: number, newZoomLevel: number): false | undefined;
     /**
      * Zooms in or out by a specified change level
      * Use a positive number for `zoomLevelChange` to zoom in

@@ -1147,10 +1147,9 @@ class ReactNativeZoomableView extends Component<
   }
 
   /**
-   * Sets zoom relative to a "zoom subject" which is the relative coordinates
-   * of the view
+   * Sets zoom relative to the zoomableview
    */
-  zoomToZoomSubject(x: number, y: number, newZoomLevel: number) {
+  zoomToRelCoords(x: number, y: number, newZoomLevel: number) {
     if (
       // if we would go out of our min/max limits -> abort
       (this.props.maxZoom && newZoomLevel > this.props.maxZoom) ||
