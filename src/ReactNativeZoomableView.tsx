@@ -1158,6 +1158,7 @@ class ReactNativeZoomableView extends Component<
       return false;
     // Just exposing _zoomToLocation
     this._zoomToLocation(x, y, newZoomLevel);
+    return true;
   }
 
   /**
