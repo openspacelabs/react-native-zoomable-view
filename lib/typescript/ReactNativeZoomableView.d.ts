@@ -197,28 +197,15 @@ declare class ReactNativeZoomableView extends Component<ReactNativeZoomableViewP
      */
     _getNextZoomStep(): number | undefined;
     /**
-     * Zooms to a specific location in our view
+     * Zooms to a specific level and/or location in our view
      *
-     * @param x
-     * @param y
      * @param newZoomLevel
-     *
-     * @private
+     * @param coords relative coords compared to the zoom subject
      */
-    _zoomToLocation(x: number, y: number, newZoomLevel: number): void;
-    /**
-     * Zooms to a specificied zoom level.
-     * Returns a promise if everything was updated and a boolean, whether it could be updated or if it exceeded the min/max zoom limits.
-     *
-     * @param {number} newZoomLevel
-     *
-     * @return {bool}
-     */
-    zoomTo(newZoomLevel: number): boolean;
-    /**
-     * Sets zoom relative to the zoomableview
-     */
-    zoomToRelCoords(x: number, y: number, newZoomLevel: number): boolean;
+    zoomTo(newZoomLevel: number, coords?: {
+        x: number;
+        y: number;
+    }): true | undefined;
     /**
      * Zooms in or out by a specified change level
      * Use a positive number for `zoomLevelChange` to zoom in
@@ -230,7 +217,7 @@ declare class ReactNativeZoomableView extends Component<ReactNativeZoomableViewP
      *
      * @return {bool}
      */
-    zoomBy(zoomLevelChange: number): boolean;
+    zoomBy(zoomLevelChange: number): true | undefined;
     /**
      * Moves the zoomed view to a specified position
      * Returns a promise when finished
