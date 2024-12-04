@@ -1084,9 +1084,9 @@ class ReactNativeZoomableView extends Component<
    * @param zoomCenter relative coords compared to the zoom subject. Default to the center.
    */
   zoomTo(newZoomLevel: number, zoomCenter = { x: 0, y: 0 }) {
-    if (!this.props.zoomEnabled) return;
-    if (this.props.maxZoom && newZoomLevel > this.props.maxZoom) return;
-    if (this.props.minZoom && newZoomLevel < this.props.minZoom) return;
+    if (!this.props.zoomEnabled) return false;
+    if (this.props.maxZoom && newZoomLevel > this.props.maxZoom) return false;
+    if (this.props.minZoom && newZoomLevel < this.props.minZoom) return false;
 
     this.props.onZoomBefore?.(null, null, this._getZoomableViewEventObject());
 

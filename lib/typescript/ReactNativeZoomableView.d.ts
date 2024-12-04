@@ -208,7 +208,7 @@ declare class ReactNativeZoomableView extends Component<ReactNativeZoomableViewP
     zoomTo(newZoomLevel: number, zoomCenter?: {
         x: number;
         y: number;
-    }): true | undefined;
+    }): boolean;
     /**
      * Zooms in or out by a specified change level
      * Use a positive number for `zoomLevelChange` to zoom in
@@ -220,7 +220,7 @@ declare class ReactNativeZoomableView extends Component<ReactNativeZoomableViewP
      *
      * @return {bool}
      */
-    zoomBy(zoomLevelChange: number): true | undefined;
+    zoomBy(zoomLevelChange: number): boolean;
     /**
      * Moves the zoomed view to a specified position
      * Returns a promise when finished
