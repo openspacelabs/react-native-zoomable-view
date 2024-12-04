@@ -197,10 +197,11 @@ declare class ReactNativeZoomableView extends Component<ReactNativeZoomableViewP
      */
     _getNextZoomStep(): number | undefined;
     /**
-     * Zooms to a specific level and/or location in our view
+     * Zooms to a specific level. A specific location to zoom to can be specified.
+     * The location provided is relative to the zoom subject where center is 0,0.
      *
      * @param newZoomLevel
-     * @param coords relative coords compared to the zoom subject
+     * @param coords relative coords compared to the zoom subject. Default to the center.
      */
     zoomTo(newZoomLevel: number, coords?: {
         x: number;
