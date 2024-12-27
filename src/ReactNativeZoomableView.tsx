@@ -1052,11 +1052,7 @@ class ReactNativeZoomableView extends Component<
       zoomPositionCoordinates.y = 0;
     }
 
-    this._zoomToLocation(
-      zoomPositionCoordinates.x,
-      zoomPositionCoordinates.y,
-      nextZoomStep
-    );
+    this.zoomTo(nextZoomStep, zoomPositionCoordinates);
 
     onDoubleTapAfter?.(
       e,
@@ -1091,16 +1087,18 @@ class ReactNativeZoomableView extends Component<
   }
 
   /**
-   * Zooms to a specific location in our view
+   * Zooms to a specific level. A "zoom center" can be provided, which specifies
+   * the point that will remain in the same position on the screen after the zoom.
+   * The coordinates of the zoom center is relative to the zoom subject.
+   * { x: 0, y: 0 } is the very center of the zoom subject.
    *
-   * @param x
-   * @param y
    * @param newZoomLevel
-   *
-   * @private
+   * @param zoomCenter relative coords compared to the zoom subject. Default to the center.
    */
-  _zoomToLocation(x: number, y: number, newZoomLevel: number) {
-    if (!this.props.zoomEnabled) return;
+  zoomTo(newZoomLevel: number, zoomCenter = { x: 0, y: 0 }) {
+    if (!this.props.zoomEnabled) return false;
+    if (this.props.maxZoom && newZoomLevel > this.props.maxZoom) return false;
+    if (this.props.minZoom && newZoomLevel < this.props.minZoom) return false;
 
     this.props.onZoomBefore?.(null, null, this._getZoomableViewEventObject());
 
@@ -1118,14 +1116,14 @@ class ReactNativeZoomableView extends Component<
           this.state.originalWidth,
           prevScale,
           newScale,
-          x
+          zoomCenter.x
         ),
         y: calcNewScaledOffsetForZoomCentering(
           this.offsetY,
           this.state.originalHeight,
           prevScale,
           newScale,
-          y
+          zoomCenter.y
         ),
       });
       prevScale = newScale;
@@ -1136,25 +1134,6 @@ class ReactNativeZoomableView extends Component<
     // == Zoom Animation Ends ==
 
     this.props.onZoomAfter?.(null, null, this._getZoomableViewEventObject());
-  }
-
-  /**
-   * Zooms to a specificied zoom level.
-   * Returns a promise if everything was updated and a boolean, whether it could be updated or if it exceeded the min/max zoom limits.
-   *
-   * @param {number} newZoomLevel
-   *
-   * @return {bool}
-   */
-  zoomTo(newZoomLevel: number) {
-    if (
-      // if we would go out of our min/max limits -> abort
-      (this.props.maxZoom && newZoomLevel > this.props.maxZoom) ||
-      (this.props.minZoom && newZoomLevel < this.props.minZoom)
-    )
-      return false;
-
-    this._zoomToLocation(0, 0, newZoomLevel);
     return true;
   }
 
