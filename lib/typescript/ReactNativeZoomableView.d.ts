@@ -203,12 +203,9 @@ declare class ReactNativeZoomableView extends Component<ReactNativeZoomableViewP
      * { x: 0, y: 0 } is the very center of the zoom subject.
      *
      * @param newZoomLevel
-     * @param zoomCenter relative coords compared to the zoom subject. Default to the center.
+     * @param zoomCenter - If not supplied, the container's center is the zoom center
      */
-    zoomTo(newZoomLevel: number, zoomCenter?: {
-        x: number;
-        y: number;
-    }): boolean;
+    zoomTo(newZoomLevel: number, zoomCenter?: Vec2D): boolean;
     /**
      * Zooms in or out by a specified change level
      * Use a positive number for `zoomLevelChange` to zoom in

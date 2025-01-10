@@ -1093,41 +1093,46 @@ class ReactNativeZoomableView extends Component<
    * { x: 0, y: 0 } is the very center of the zoom subject.
    *
    * @param newZoomLevel
-   * @param zoomCenter relative coords compared to the zoom subject. Default to the center.
+   * @param zoomCenter - If not supplied, the container's center is the zoom center
    */
-  zoomTo(newZoomLevel: number, zoomCenter = { x: 0, y: 0 }) {
+  zoomTo(newZoomLevel: number, zoomCenter?: Vec2D) {
     if (!this.props.zoomEnabled) return false;
     if (this.props.maxZoom && newZoomLevel > this.props.maxZoom) return false;
     if (this.props.minZoom && newZoomLevel < this.props.minZoom) return false;
 
     this.props.onZoomBefore?.(null, null, this._getZoomableViewEventObject());
 
-    // == Perform Zoom Animation ==
-    // Calculates panAnim values based on changes in zoomAnim.
-    let prevScale = this.zoomLevel;
-    // Since zoomAnim is calculated in native driver,
-    //  it will jitter panAnim once in a while,
-    //  because here panAnim is being calculated in js.
-    // However the jittering should mostly occur in simulator.
-    const listenerId = this.zoomAnim.addListener(({ value: newScale }) => {
-      this.panAnim.setValue({
-        x: calcNewScaledOffsetForZoomCentering(
-          this.offsetX,
-          this.state.originalWidth,
-          prevScale,
-          newScale,
-          zoomCenter.x
-        ),
-        y: calcNewScaledOffsetForZoomCentering(
-          this.offsetY,
-          this.state.originalHeight,
-          prevScale,
-          newScale,
-          zoomCenter.y
-        ),
+    // == Perform Pan Animation to preserve the zoom center while zooming ==
+    let listenerId = '';
+    if (zoomCenter) {
+      // Calculates panAnim values based on changes in zoomAnim.
+      let prevScale = this.zoomLevel;
+      // Since zoomAnim is calculated in native driver,
+      //  it will jitter panAnim once in a while,
+      //  because here panAnim is being calculated in js.
+      // However the jittering should mostly occur in simulator.
+      listenerId = this.zoomAnim.addListener(({ value: newScale }) => {
+        this.panAnim.setValue({
+          x: calcNewScaledOffsetForZoomCentering(
+            this.offsetX,
+            this.state.originalWidth,
+            prevScale,
+            newScale,
+            zoomCenter.x
+          ),
+          y: calcNewScaledOffsetForZoomCentering(
+            this.offsetY,
+            this.state.originalHeight,
+            prevScale,
+            newScale,
+            zoomCenter.y
+          ),
+        });
+        prevScale = newScale;
       });
-      prevScale = newScale;
-    });
+    }
+
+    // == Perform Zoom Animation ==
     getZoomToAnimation(this.zoomAnim, newZoomLevel).start(() => {
       this.zoomAnim.removeListener(listenerId);
     });
