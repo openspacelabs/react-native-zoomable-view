@@ -1103,7 +1103,7 @@ class ReactNativeZoomableView extends Component<
     this.props.onZoomBefore?.(null, null, this._getZoomableViewEventObject());
 
     // == Perform Pan Animation to preserve the zoom center while zooming ==
-    let listenerId: string | undefined;
+    let listenerId = '';
     if (zoomCenter) {
       // Calculates panAnim values based on changes in zoomAnim.
       let prevScale = this.zoomLevel;
@@ -1134,7 +1134,6 @@ class ReactNativeZoomableView extends Component<
 
     // == Perform Zoom Animation ==
     getZoomToAnimation(this.zoomAnim, newZoomLevel).start(() => {
-      if (!listenerId) return;
       this.zoomAnim.removeListener(listenerId);
     });
     // == Zoom Animation Ends ==
