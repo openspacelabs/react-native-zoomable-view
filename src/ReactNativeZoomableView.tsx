@@ -303,7 +303,7 @@ class ReactNativeZoomableView extends Component<
       prevProps.staticPinPosition?.y !== this.props.staticPinPosition?.y;
 
     // We use a custom `onLayout` event because:
-    // a) the View's onLayout sometimes doesn't get called
+    // a) View's `onLayout` sometimes doesn't get called
     // b) we use `measureInWindow` internally to keep track of layout changes
     // When the client uses this, they can stay in-sync with the internal measurements,
     // thus applying transformations at more accurate timings
