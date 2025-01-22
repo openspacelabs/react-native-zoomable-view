@@ -22,8 +22,9 @@ export interface ZoomableViewEvent {
   originalPageY: number;
 }
 
-export interface ReactNativeZoomableViewProps extends ViewProps {
+export interface ReactNativeZoomableViewProps {
   // options
+  style?: ViewProps['style'];
   zoomEnabled?: boolean;
   panEnabled?: boolean;
   initialZoom?: number;
@@ -53,6 +54,7 @@ export interface ReactNativeZoomableViewProps extends ViewProps {
   debug?: boolean;
 
   // callbacks
+  onLayout?: (size: Size2D & Vec2D) => void;
   onTransform?: (zoomableViewEventObject: ZoomableViewEvent) => void;
   onSingleTap?: (
     event: GestureResponderEvent,

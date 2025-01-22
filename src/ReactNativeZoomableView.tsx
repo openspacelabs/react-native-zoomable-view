@@ -302,6 +302,20 @@ class ReactNativeZoomableView extends Component<
       prevProps.staticPinPosition?.x !== this.props.staticPinPosition?.x ||
       prevProps.staticPinPosition?.y !== this.props.staticPinPosition?.y;
 
+    // We use a custom `onLayout` event because:
+    // a) the View's onLayout sometimes doesn't get called
+    // b) we use `measureInWindow` internally to keep track of layout changes
+    // When the client uses this, they can stay in-sync with the internal measurements,
+    // thus applying transformations at more accurate timings
+    if (originalMeasurementsChanged) {
+      this.props.onLayout?.({
+        width: currState.originalWidth,
+        height: currState.originalHeight,
+        x: currState.originalPageX,
+        y: currState.originalPageY,
+      });
+    }
+
     if (
       this.onTransformInvocationInitialized &&
       (originalMeasurementsChanged || staticPinPositionChanged)
@@ -311,7 +325,7 @@ class ReactNativeZoomableView extends Component<
   }
 
   componentDidMount() {
-    this.grabZoomSubjectOriginalMeasurements();
+    this.measureZoomSubject();
     // We've already run `grabZoomSubjectOriginalMeasurements` at various events
     // to make sure the measurements are promptly updated.
     // However, there might be cases we haven't accounted for, especially when
@@ -319,10 +333,7 @@ class ReactNativeZoomableView extends Component<
     // we'll use an interval here to ensure we're always up-to-date.
     // The `setState` in `grabZoomSubjectOriginalMeasurements` won't trigger a rerender
     // if the values given haven't changed, so we're not running performance risk here.
-    this.measureZoomSubjectInterval = setInterval(
-      this.grabZoomSubjectOriginalMeasurements,
-      1e3
-    );
+    this.measureZoomSubjectInterval = setInterval(this.measureZoomSubject, 1e3);
   }
 
   componentWillUnmount() {
@@ -381,7 +392,7 @@ class ReactNativeZoomableView extends Component<
    *
    * @private
    */
-  private grabZoomSubjectOriginalMeasurements = () => {
+  private measureZoomSubject = () => {
     // make sure we measure after animations are complete
     requestAnimationFrame(() => {
       // this setTimeout is here to fix a weird issue on iOS where the measurements are all `0`
@@ -1215,10 +1226,7 @@ class ReactNativeZoomableView extends Component<
         style={styles.container}
         {...this.gestureHandlers.panHandlers}
         ref={this.zoomSubjectWrapperRef}
-        onLayout={(event) => {
-          this.props.onLayout?.(event);
-          this.grabZoomSubjectOriginalMeasurements();
-        }}
+        onLayout={this.measureZoomSubject}
       >
         <Animated.View
           style={[
