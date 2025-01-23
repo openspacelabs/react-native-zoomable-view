@@ -1226,9 +1226,7 @@ class ReactNativeZoomableView extends Component<
         style={styles.container}
         {...this.gestureHandlers.panHandlers}
         ref={this.zoomSubjectWrapperRef}
-        onLayout={() => {
-          this.measureZoomSubject();
-        }}
+        onLayout={this.measureZoomSubject}
       >
         <Animated.View
           style={[
