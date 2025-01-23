@@ -41,7 +41,7 @@ export interface ReactNativeZoomableViewProps {
     zoomAnimatedValue?: Animated.Value;
     panAnimatedValueXY?: Animated.ValueXY;
     debug?: boolean;
-    onLayout?: (size: Size2D & Vec2D) => void;
+    onLayoutMeasured?: (size: Size2D & Vec2D) => void;
     onTransform?: (zoomableViewEventObject: ZoomableViewEvent) => void;
     onSingleTap?: (event: GestureResponderEvent, zoomableViewEventObject: ZoomableViewEvent) => void;
     onDoubleTapBefore?: (event: GestureResponderEvent, zoomableViewEventObject: ZoomableViewEvent) => void;

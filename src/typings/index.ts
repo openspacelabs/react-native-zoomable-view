@@ -56,7 +56,7 @@ export interface ReactNativeZoomableViewProps {
   debug?: boolean;
 
   // callbacks
-  onLayout?: (size: Size2D & Vec2D) => void;
+  onLayoutMeasured?: (size: Size2D & Vec2D) => void;
   onTransform?: (zoomableViewEventObject: ZoomableViewEvent) => void;
   onSingleTap?: (
     event: GestureResponderEvent,

@@ -308,7 +308,7 @@ class ReactNativeZoomableView extends Component<
     // When the client uses this, they can stay in-sync with the internal measurements,
     // thus applying transformations at more accurate timings
     if (originalMeasurementsChanged) {
-      this.props.onLayout?.({
+      this.props.onLayoutMeasured?.({
         width: currState.originalWidth,
         height: currState.originalHeight,
         x: currState.originalPageX,
@@ -1226,7 +1226,9 @@ class ReactNativeZoomableView extends Component<
         style={styles.container}
         {...this.gestureHandlers.panHandlers}
         ref={this.zoomSubjectWrapperRef}
-        onLayout={this.measureZoomSubject}
+        onLayout={() => {
+          this.measureZoomSubject();
+        }}
       >
         <Animated.View
           style={[
