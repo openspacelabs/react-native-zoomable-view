@@ -87,7 +87,7 @@ declare class ReactNativeZoomableView extends Component<ReactNativeZoomableViewP
      *
      * @private
      */
-    private grabZoomSubjectOriginalMeasurements;
+    private measureZoomSubject;
     /**
      * Handles the start of touch events and checks for taps
      *

@@ -1,5 +1,5 @@
-/// <reference types="react" />
 import { Animated, GestureResponderEvent, PanResponderGestureState, ViewProps } from 'react-native';
+import { ReactNode } from 'react';
 export declare enum SwipeDirection {
     SWIPE_UP = "SWIPE_UP",
     SWIPE_DOWN = "SWIPE_DOWN",
@@ -15,7 +15,9 @@ export interface ZoomableViewEvent {
     originalPageX: number;
     originalPageY: number;
 }
-export interface ReactNativeZoomableViewProps extends ViewProps {
+export interface ReactNativeZoomableViewProps {
+    style?: ViewProps['style'];
+    children?: ReactNode;
     zoomEnabled?: boolean;
     panEnabled?: boolean;
     initialZoom?: number;
@@ -39,6 +41,7 @@ export interface ReactNativeZoomableViewProps extends ViewProps {
     zoomAnimatedValue?: Animated.Value;
     panAnimatedValueXY?: Animated.ValueXY;
     debug?: boolean;
+    onLayoutMeasured?: (size: Size2D & Vec2D) => void;
     onTransform?: (zoomableViewEventObject: ZoomableViewEvent) => void;
     onSingleTap?: (event: GestureResponderEvent, zoomableViewEventObject: ZoomableViewEvent) => void;
     onDoubleTapBefore?: (event: GestureResponderEvent, zoomableViewEventObject: ZoomableViewEvent) => void;
