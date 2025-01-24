@@ -1,6 +1,7 @@
 import {
   Animated,
   GestureResponderEvent,
+  LayoutChangeEvent,
   PanResponderGestureState,
   ViewProps,
 } from 'react-native';
@@ -56,7 +57,7 @@ export interface ReactNativeZoomableViewProps {
   debug?: boolean;
 
   // callbacks
-  onLayout?: (size: Size2D & Vec2D) => void;
+  onLayout?: (event: Pick<LayoutChangeEvent, 'nativeEvent'>) => void;
   onTransform?: (zoomableViewEventObject: ZoomableViewEvent) => void;
   onSingleTap?: (
     event: GestureResponderEvent,

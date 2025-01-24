@@ -310,12 +310,13 @@ class ReactNativeZoomableView extends Component<
     // with when the internal measurements are actually saved to the state,
     // thus helping them apply transformations at more accurate timings
     if (originalMeasurementsChanged) {
-      this.props.onLayout?.({
+      const layout = {
         width: currState.originalWidth,
         height: currState.originalHeight,
         x: currState.originalX,
         y: currState.originalY,
-      });
+      };
+      this.props.onLayout?.({ nativeEvent: { layout } });
     }
 
     if (
