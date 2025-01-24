@@ -42,6 +42,8 @@ const initialState: ReactNativeZoomableViewState = {
   originalHeight: 0,
   originalPageX: 0,
   originalPageY: 0,
+  originalX: 0,
+  originalY: 0,
   pinSize: { width: 0, height: 0 },
 };
 
@@ -296,23 +298,23 @@ class ReactNativeZoomableView extends Component<
       currState.originalHeight !== prevState.originalHeight ||
       currState.originalWidth !== prevState.originalWidth ||
       currState.originalPageX !== prevState.originalPageX ||
-      currState.originalPageY !== prevState.originalPageY;
+      currState.originalPageY !== prevState.originalPageY ||
+      currState.originalX !== prevState.originalX ||
+      currState.originalY !== prevState.originalY;
 
     const staticPinPositionChanged =
       prevProps.staticPinPosition?.x !== this.props.staticPinPosition?.x ||
       prevProps.staticPinPosition?.y !== this.props.staticPinPosition?.y;
 
-    // We use a custom `onLayout` event because:
-    // a) View's `onLayout` sometimes doesn't get called
-    // b) we use `measureInWindow` internally to keep track of layout changes
-    // When the client uses this, they can stay in-sync with the internal measurements,
-    // thus applying transformations at more accurate timings
+    // We use a custom `onLayout` event, so the clients can stay in-sync
+    // with when the internal measurements are actually saved to the state,
+    // thus helping them apply transformations at more accurate timings
     if (originalMeasurementsChanged) {
-      this.props.onLayoutMeasured?.({
+      this.props.onLayout?.({
         width: currState.originalWidth,
         height: currState.originalHeight,
-        x: currState.originalPageX,
-        y: currState.originalPageY,
+        x: currState.originalX,
+        y: currState.originalY,
       });
     }
 
@@ -404,31 +406,33 @@ class ReactNativeZoomableView extends Component<
         // in which case these measurements will not represent the true "original" measurements.
         // We just need to make sure the zoomSubjectWrapper perfectly aligns with the zoomSubject
         // (no border, space, or anything between them)
-        const zoomSubjectWrapperRef = this.zoomSubjectWrapperRef;
-        // we don't wanna measure when zoomSubjectWrapperRef is not yet available or has been unmounted
-        zoomSubjectWrapperRef.current?.measureInWindow(
-          (x, y, width, height) => {
+        this.zoomSubjectWrapperRef.current?.measure(
+          (x, y, width, height, pageX, pageY) => {
             // When the component is off-screen, these become all 0s, so we don't set them
             // to avoid messing up calculations, especially ones that are done right after
             // the component transitions from hidden to visible.
-            if (!x && !y && !width && !height) return;
+            if (!pageX && !pageY && !width && !height) return;
 
             // If these values are all the same, don't re-set them in state
             // this way we don't re-render
             if (
+              this.state.originalX === x &&
+              this.state.originalY === y &&
               this.state.originalWidth === width &&
               this.state.originalHeight === height &&
-              this.state.originalPageX === x &&
-              this.state.originalPageY === y
+              this.state.originalPageX === pageX &&
+              this.state.originalPageY === pageY
             ) {
               return;
             }
 
             this.setState({
+              originalX: x,
+              originalY: y,
               originalWidth: width,
               originalHeight: height,
-              originalPageX: x,
-              originalPageY: y,
+              originalPageX: pageX,
+              originalPageY: pageY,
             });
           }
         );
@@ -1219,6 +1223,7 @@ class ReactNativeZoomableView extends Component<
       onStaticPinPress,
       pinProps,
     } = this.props;
+
     const { pinSize, touches, debugPoints = [] } = this.state;
 
     return (
