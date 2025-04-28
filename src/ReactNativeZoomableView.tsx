@@ -481,6 +481,7 @@ class ReactNativeZoomableView extends Component<
     PanResponderCallbacks['onPanResponderGrant']
   > = (e, gestureState) => {
     if (this.props.onLongPress) {
+      e.persist();
       this.longPressTimeout = setTimeout(() => {
         this.props.onLongPress?.(
           e,
