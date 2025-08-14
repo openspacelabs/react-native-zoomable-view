@@ -40,6 +40,7 @@ const initialState = {
   originalPageY: null,
 } as ReactNativeZoomableViewState;
 
+const MOUSE_LEFT = 0;
 const MOUSE_RIGHT = 2;
 
 class ReactNativeZoomableView extends Component<
@@ -111,7 +112,9 @@ class ReactNativeZoomableView extends Component<
   private doubleTapFirstTap: TouchPoint;
   private measureZoomSubjectInterval: NodeJS.Timer;
 
-  private mouseRightHeldDown: boolean = false;
+  public mouseRightHeldDown: boolean = false;
+  public mouseLeftHeldDown: boolean = false;
+
   private initialXPos: number | undefined;
   private initialYPos: number | undefined;
   private currentDx: number | undefined;
@@ -189,8 +192,10 @@ class ReactNativeZoomableView extends Component<
   }
 
   private mouseDownListener(e: MouseEvent) {
-    if (e.button !== MOUSE_RIGHT) {
-      return;
+if(e.button === MOUSE_RIGHT) {
+     this.mouseRightHeldDown = true;
+    } else if(e.button === MOUSE_LEFT) {
+      this.mouseLeftHeldDown = true;
     }
 
     this.initialXPos = e.x;
@@ -203,28 +208,31 @@ class ReactNativeZoomableView extends Component<
       this.createFakeEvents(e);
 
     this._handlePanResponderGrant(panResponderEvent, gestureResponseEvent);
-    this.mouseRightHeldDown = true;
+ 
   }
 
   private mouseUpListener(e: MouseEvent) {
-    if (e.button !== MOUSE_RIGHT) {
-      return;
+    if (e.button === MOUSE_RIGHT) {
+          this.mouseRightHeldDown = false;
+    } else if (e.button === MOUSE_LEFT) {
+      this.mouseLeftHeldDown = false;
     }
 
     const { panResponderEvent, gestureResponseEvent } =
       this.createFakeEvents(e);
     this._handlePanResponderEnd(panResponderEvent, gestureResponseEvent);
-    this.mouseRightHeldDown = false;
   }
 
   private mouseMoveListener(e: MouseEvent) {
     if (
-      !this.mouseRightHeldDown ||
+ 
       isNil(this.initialYPos) ||
       isNil(this.initialXPos)
     ) {
       return;
     }
+
+    if (this.mouseRightHeldDown || this.mouseLeftHeldDown) {
 
     const newDy = e.y - this.initialYPos;
     const newDx = e.x - this.initialXPos;
@@ -249,6 +257,7 @@ class ReactNativeZoomableView extends Component<
     this.lastMouseMoveTs = now;
     this.currentDx = newDx;
     this.currentDy = newDy;
+  }
   }
 
   private wheelListener(e: WheelEvent) {
