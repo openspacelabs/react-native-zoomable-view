@@ -40,7 +40,6 @@ const initialState = {
   originalPageY: null,
 } as ReactNativeZoomableViewState;
 
-const MOUSE_LEFT = 0;
 const MOUSE_RIGHT = 2;
 
 class ReactNativeZoomableView extends Component<
@@ -88,13 +87,12 @@ class ReactNativeZoomableView extends Component<
     },
   };
 
-  
   /**
    * This just keeps track of what the zoom level was set to. The `zoomLevel` variable
    * is what the zoom level is currently, even while changing the zoom.
    */
   private zoomLevelWithoutMovement: number | undefined;
-  
+
   private zoomLevel = 1;
   private lastGestureCenterPosition: { x: number; y: number } = null;
   private lastGestureTouchDistance: number;
@@ -112,9 +110,7 @@ class ReactNativeZoomableView extends Component<
   private doubleTapFirstTap: TouchPoint;
   private measureZoomSubjectInterval: NodeJS.Timer;
 
-  public mouseRightHeldDown: boolean = false;
-  public mouseLeftHeldDown: boolean = false;
-
+  private mouseRightHeldDown: boolean = false;
   private initialXPos: number | undefined;
   private initialYPos: number | undefined;
   private currentDx: number | undefined;
@@ -192,10 +188,8 @@ class ReactNativeZoomableView extends Component<
   }
 
   private mouseDownListener(e: MouseEvent) {
-if(e.button === MOUSE_RIGHT) {
-     this.mouseRightHeldDown = true;
-    } else if(e.button === MOUSE_LEFT) {
-      this.mouseLeftHeldDown = true;
+    if (e.button !== MOUSE_RIGHT) {
+      return;
     }
 
     this.initialXPos = e.x;
@@ -208,31 +202,28 @@ if(e.button === MOUSE_RIGHT) {
       this.createFakeEvents(e);
 
     this._handlePanResponderGrant(panResponderEvent, gestureResponseEvent);
- 
+    this.mouseRightHeldDown = true;
   }
 
   private mouseUpListener(e: MouseEvent) {
-    if (e.button === MOUSE_RIGHT) {
-          this.mouseRightHeldDown = false;
-    } else if (e.button === MOUSE_LEFT) {
-      this.mouseLeftHeldDown = false;
+    if (e.button !== MOUSE_RIGHT) {
+      return;
     }
 
     const { panResponderEvent, gestureResponseEvent } =
       this.createFakeEvents(e);
     this._handlePanResponderEnd(panResponderEvent, gestureResponseEvent);
+    this.mouseRightHeldDown = false;
   }
 
   private mouseMoveListener(e: MouseEvent) {
     if (
- 
+      !this.mouseRightHeldDown ||
       isNil(this.initialYPos) ||
       isNil(this.initialXPos)
     ) {
       return;
     }
-
-    if (this.mouseRightHeldDown || this.mouseLeftHeldDown) {
 
     const newDy = e.y - this.initialYPos;
     const newDx = e.x - this.initialXPos;
@@ -257,7 +248,6 @@ if(e.button === MOUSE_RIGHT) {
     this.lastMouseMoveTs = now;
     this.currentDx = newDx;
     this.currentDy = newDy;
-  }
   }
 
   private wheelListener(e: WheelEvent) {
@@ -1136,7 +1126,11 @@ if(e.button === MOUSE_RIGHT) {
    *
    * @return {Promise<bool>}
    */
-  async zoomTo(newZoomLevel: number, x: number = 0, y: number = 0): Promise<boolean> {
+  async zoomTo(
+    newZoomLevel: number,
+    x: number = 0,
+    y: number = 0
+  ): Promise<boolean> {
     if (
       // if we would go out of our min/max limits -> abort
       newZoomLevel > this.props.maxZoom ||
