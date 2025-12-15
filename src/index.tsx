@@ -10,11 +10,11 @@ import type {
 } from './typings';
 
 export {
-  ReactNativeZoomableView,
-  ReactNativeZoomableViewProps,
-  ZoomableViewEvent,
   // Helper functions for coordinate conversion
   applyContainResizeMode,
   getImageOriginOnTransformSubject,
+  ReactNativeZoomableView,
+  ReactNativeZoomableViewProps,
   viewportPositionToImagePosition,
+  ZoomableViewEvent,
 };

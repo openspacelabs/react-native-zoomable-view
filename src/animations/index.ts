@@ -1,4 +1,5 @@
 import { Animated, Easing } from 'react-native';
+
 import { Vec2D } from '../typings';
 
 export function getBoundaryCrossedAnim(
