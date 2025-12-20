@@ -1,5 +1,5 @@
-import { Animated, GestureResponderEvent, LayoutChangeEvent, PanResponderGestureState, ViewProps } from 'react-native';
 import { ReactNode } from 'react';
+import { Animated, GestureResponderEvent, LayoutChangeEvent, PanResponderGestureState, ViewProps } from 'react-native';
 export declare enum SwipeDirection {
     SWIPE_UP = "SWIPE_UP",
     SWIPE_DOWN = "SWIPE_DOWN",

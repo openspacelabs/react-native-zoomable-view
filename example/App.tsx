@@ -66,8 +66,8 @@ export default function App() {
             <Image style={styles.img} source={{ uri }} />
 
             {showMarkers &&
-              ['20%', '40%', '60%', '80%'].map((left) =>
-                ['20%', '40%', '60%', '80%'].map((top) => (
+              (['20%', '40%', '60%', '80%'] as const).map((left) =>
+                (['20%', '40%', '60%', '80%'] as const).map((top) => (
                   <Animated.View
                     key={`${left}x${top}`}
                     // These markers will move and zoom with the image, but will retain their size
