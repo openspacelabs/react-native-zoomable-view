@@ -1240,7 +1240,10 @@ class ReactNativeZoomableView extends Component<
             this.props.style,
             {
               transform: [
-                { scale: this.zoomAnim },
+                // In RN79, we need to split the scale into X and Y to avoid
+                // the content getting pixelated when zooming in
+                { scaleX: this.zoomAnim },
+                { scaleY: this.zoomAnim },
                 ...this.panAnim.getTranslateTransform(),
               ],
             },
