@@ -14,3 +14,4 @@ export { calcNewScaledOffsetForZoomCentering } from './calcNewScaledOffsetForZoo
  */
 export declare function calcGestureCenterPoint(e: GestureResponderEvent, gestureState: PanResponderGestureState): Vec2D | null;
 export declare function calcGestureTouchDistance(e: GestureResponderEvent, gestureState: PanResponderGestureState): number | null;
+//# sourceMappingURL=index.d.ts.map
