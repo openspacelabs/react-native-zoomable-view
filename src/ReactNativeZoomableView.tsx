@@ -1,3 +1,4 @@
+import { debounce } from 'lodash';
 import React, { Component, createRef, RefObject } from 'react';
 import {
   Animated,
@@ -12,15 +13,12 @@ import {
 } from 'react-native';
 
 import {
-  Vec2D,
-  ReactNativeZoomableViewProps,
-  ReactNativeZoomableViewState,
-  TouchPoint,
-  ZoomableViewEvent,
-  Size2D,
-} from './typings';
-
+  getBoundaryCrossedAnim,
+  getPanMomentumDecayAnim,
+  getZoomToAnimation,
+} from './animations';
 import { AnimatedTouchFeedback } from './components';
+import { StaticPin } from './components/StaticPin';
 import { DebugTouchPoint } from './debugHelper';
 import {
   calcGestureCenterPoint,
@@ -29,13 +27,14 @@ import {
 } from './helper';
 import { applyPanBoundariesToOffset } from './helper/applyPanBoundariesToOffset';
 import { viewportPositionToImagePosition } from './helper/coordinateConversion';
-import { StaticPin } from './components/StaticPin';
-import { debounce } from 'lodash';
 import {
-  getBoundaryCrossedAnim,
-  getPanMomentumDecayAnim,
-  getZoomToAnimation,
-} from './animations';
+  ReactNativeZoomableViewProps,
+  ReactNativeZoomableViewState,
+  Size2D,
+  TouchPoint,
+  Vec2D,
+  ZoomableViewEvent,
+} from './typings';
 
 const initialState: ReactNativeZoomableViewState = {
   originalWidth: 0,

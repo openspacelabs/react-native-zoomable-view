@@ -1,12 +1,12 @@
 import React from 'react';
 import {
   Animated,
-  View,
-  Image,
-  StyleSheet,
   GestureResponderEvent,
-  PanResponderGestureState,
+  Image,
   PanResponder,
+  PanResponderGestureState,
+  StyleSheet,
+  View,
   ViewProps,
 } from 'react-native';
 import { Size2D } from 'src/typings';
