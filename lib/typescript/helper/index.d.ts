@@ -12,6 +12,6 @@ export { calcNewScaledOffsetForZoomCentering } from './calcNewScaledOffsetForZoo
  * because gestureState.moveX/Y is messed up on real device
  * (Sometimes it's the center point, but sometimes it randomly takes the position of one of the touches)
  */
-export declare function calcGestureCenterPoint(e: GestureResponderEvent, gestureState: PanResponderGestureState): Vec2D | undefined;
-export declare function calcGestureTouchDistance(e: GestureResponderEvent, gestureState: PanResponderGestureState): number | undefined;
+export declare function calcGestureCenterPoint(e: GestureResponderEvent, gestureState: PanResponderGestureState): Vec2D | null;
+export declare function calcGestureTouchDistance(e: GestureResponderEvent, gestureState: PanResponderGestureState): number | null;
 //# sourceMappingURL=index.d.ts.map

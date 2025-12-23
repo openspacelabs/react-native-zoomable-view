@@ -96,8 +96,10 @@ const ReactNativeZoomableView: ForwardRefRenderFunction<
   const offsetY = useRef(0);
 
   const zoomLevel = useRef(1);
-  const lastGestureCenterPosition = useRef<{ x: number; y: number }>();
-  const lastGestureTouchDistance = useRef<number | undefined>(150);
+  const lastGestureCenterPosition = useRef<{ x: number; y: number } | null>(
+    null
+  );
+  const lastGestureTouchDistance = useRef<number | null>(150);
   const gestureType = useRef<'pinch' | 'shift'>();
 
   const gestureStarted = useRef(false);
@@ -396,7 +398,7 @@ const ReactNativeZoomableView: ForwardRefRenderFunction<
 
     setDebugPoints([]);
 
-    lastGestureCenterPosition.current = undefined;
+    lastGestureCenterPosition.current = null;
 
     if (longPressTimeout.current) {
       clearTimeout(longPressTimeout.current);
