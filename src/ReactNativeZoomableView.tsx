@@ -282,10 +282,10 @@ const ReactNativeZoomableView: ForwardRefRenderFunction<
         zoomLevel: zoomLevel.current,
         offsetX: offsetX.current,
         offsetY: offsetY.current,
-        originalHeight: originalHeight,
-        originalWidth: originalWidth,
-        originalPageX: originalPageX,
-        originalPageY: originalPageY,
+        originalHeight,
+        originalWidth,
+        originalPageX,
+        originalPageY,
         ...overwriteObj,
       };
     }
