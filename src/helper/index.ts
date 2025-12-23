@@ -18,12 +18,12 @@ export { calcNewScaledOffsetForZoomCentering } from './calcNewScaledOffsetForZoo
 export function calcGestureCenterPoint(
   e: GestureResponderEvent,
   gestureState: PanResponderGestureState
-): Vec2D | null {
+): Vec2D | undefined {
   const touches = e.nativeEvent.touches;
-  if (!touches[0]) return null;
+  if (!touches[0]) return undefined;
 
   if (gestureState.numberActiveTouches === 2) {
-    if (!touches[1]) return null;
+    if (!touches[1]) return undefined;
     return {
       x: (touches[0].pageX + touches[1].pageX) / 2,
       y: (touches[0].pageY + touches[1].pageY) / 2,
@@ -36,16 +36,16 @@ export function calcGestureCenterPoint(
     };
   }
 
-  return null;
+  return undefined;
 }
 
 export function calcGestureTouchDistance(
   e: GestureResponderEvent,
   gestureState: PanResponderGestureState
-): number | null {
+): number | undefined {
   const touches = e.nativeEvent.touches;
   if (gestureState.numberActiveTouches !== 2 || !touches[0] || !touches[1])
-    return null;
+    return undefined;
 
   const dx = Math.abs(touches[0].pageX - touches[1].pageX);
   const dy = Math.abs(touches[0].pageY - touches[1].pageY);
