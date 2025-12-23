@@ -179,7 +179,7 @@ const ReactNativeZoomableView: ForwardRefRenderFunction<
       zoomLevel.current = initialZoom.current;
       zoomAnim.current.setValue(zoomLevel.current);
     }
-  }, [zoomEnabled, initialZoom]);
+  }, [zoomEnabled]);
 
   useLayoutEffect(() => {
     if (
