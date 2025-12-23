@@ -1,9 +1,10 @@
-import { defaults } from 'lodash';
+import { debounce, defaults } from 'lodash';
 import React, {
   ForwardRefRenderFunction,
   useEffect,
   useImperativeHandle,
   useLayoutEffect,
+  useMemo,
   useRef,
   useState,
 } from 'react';
@@ -28,7 +29,6 @@ import {
   calcNewScaledOffsetForZoomCentering,
 } from './helper';
 import { viewportPositionToImagePosition } from './helper/coordinateConversion';
-import { useDebounceCallback } from './hooks/useDebounceCallback';
 import { useLatestCallback } from './hooks/useLatestCallback';
 import {
   ReactNativeZoomableViewProps,
@@ -238,9 +238,13 @@ const ReactNativeZoomableView: ForwardRefRenderFunction<
     };
   }, []);
 
-  const debouncedOnStaticPinPositionChange = useDebounceCallback(
-    (position: Vec2D) => props.onStaticPinPositionChange?.(position),
-    100
+  const onStaticPinPositionChange = useLatestCallback(
+    props.onStaticPinPositionChange || (() => undefined)
+  );
+
+  const debouncedOnStaticPinPositionChange = useMemo(
+    () => debounce(onStaticPinPositionChange, 100),
+    []
   );
 
   /**

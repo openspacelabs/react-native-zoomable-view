@@ -1,1 +1,0 @@
-{"version":3,"sources":["hooks/useUnmount.ts"],"names":["useUnmount","callback","latestCallback"],"mappings":";;;;;;;AAAA;;AAEA;;AAEO,MAAMA,UAAU,GAAIC,QAAD,IAA0B;AAClD,QAAMC,cAAc,GAAG,0CAAkBD,QAAlB,CAAvB;AAEA,wBAAU,MAAM;AACd,WAAO,MAAM;AACXC,MAAAA,cAAc;AACf,KAFD;AAGD,GAJD,EAIG,CAACA,cAAD,CAJH;AAKD,CARM","sourceRoot":"../../../src"}

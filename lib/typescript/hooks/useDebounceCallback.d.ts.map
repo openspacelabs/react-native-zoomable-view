@@ -1,1 +1,0 @@
-{"version":3,"file":"useDebounceCallback.d.ts","sourceRoot":"","sources":["../../../src/hooks/useDebounceCallback.tsx"],"names":[],"mappings":"AAMA,KAAK,eAAe,GAAG;IACrB,OAAO,CAAC,EAAE,MAAM,CAAC;IACjB,OAAO,CAAC,EAAE,OAAO,CAAC;IAClB,QAAQ,CAAC,EAAE,OAAO,CAAC;CACpB,CAAC;AAEF,eAAO,MAAM,mBAAmB,kGAGpB,eAAe;;;;CAsC1B,CAAC"}
