@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { GestureTouchEvent } from 'react-native-gesture-handler';
+import { SharedValue } from 'react-native-reanimated';
 
 import { Vec2D } from '../typings';
 import { useLatestCallback } from './useLatestCallback';
@@ -8,8 +9,8 @@ export const useDebugPoints = ({
   originalPageX,
   originalPageY,
 }: {
-  originalPageX: number;
-  originalPageY: number;
+  originalPageX: SharedValue<number>;
+  originalPageY: SharedValue<number>;
 }) => {
   const [debugPoints, setDebugPoints] = useState<Vec2D[]>([]);
 
@@ -23,12 +24,12 @@ export const useDebugPoints = ({
     (e: GestureTouchEvent, zoomCenter: Vec2D, ...points: Vec2D[]) => {
       setDebugPoints([
         {
-          x: e.allTouches[0].absoluteX - originalPageX,
-          y: e.allTouches[0].absoluteY - originalPageY,
+          x: e.allTouches[0].absoluteX - originalPageX.value,
+          y: e.allTouches[0].absoluteY - originalPageY.value,
         },
         {
-          x: e.allTouches[1].absoluteX - originalPageX,
-          y: e.allTouches[1].absoluteY - originalPageY,
+          x: e.allTouches[1].absoluteX - originalPageX.value,
+          y: e.allTouches[1].absoluteY - originalPageY.value,
         },
         zoomCenter,
         ...points,

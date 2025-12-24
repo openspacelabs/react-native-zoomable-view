@@ -1,7 +1,12 @@
 import { ReactNativeZoomableView } from '@openspacelabs/react-native-zoomable-view';
 import { debounce } from 'lodash';
 import React, { useCallback, useRef, useState } from 'react';
-import { Animated, Button, Image, Text, View } from 'react-native';
+import { Button, Image, Modal, Text, View } from 'react-native';
+import Animated, {
+  runOnJS,
+  useAnimatedStyle,
+  useSharedValue,
+} from 'react-native-reanimated';
 
 import { applyContainResizeMode } from '../src/helper/coordinateConversion';
 import { styles } from './style';
@@ -14,8 +19,7 @@ const stringifyPoint = (point?: { x: number; y: number }) =>
   point ? `${Math.round(point.x)}, ${Math.round(point.y)}` : 'Off map';
 
 export default function App() {
-  const zoomAnimatedValue = useRef(new Animated.Value(1)).current;
-  const scale = Animated.divide(1, zoomAnimatedValue);
+  const scale = useSharedValue(1);
   const [showMarkers, setShowMarkers] = useState(true);
   const [size, setSize] = useState<{ width: number; height: number }>({
     width: 0,
@@ -36,8 +40,14 @@ export default function App() {
   const staticPinPosition = { x: size.width / 2, y: size.height / 2 };
   const { size: contentSize } = applyContainResizeMode(imageSize, size);
 
+  const markerScaleStyle = useAnimatedStyle(() => {
+    return {
+      transform: [{ scale: scale.value }],
+    };
+  });
+
   return (
-    <View style={styles.container}>
+    <Modal presentationStyle={'pageSheet'} style={styles.container}>
       <Text>ReactNativeZoomableView</Text>
       <View
         style={styles.box}
@@ -46,19 +56,26 @@ export default function App() {
         }}
       >
         <ReactNativeZoomableView
+          debug
           // Where to put the pin in the content view
           staticPinPosition={staticPinPosition}
           // Callback that returns the position of the pin
           // on the actual source image
           onStaticPinPositionChange={debouncedUpdatePin}
-          onStaticPinPositionMove={debouncedUpdateMovePin}
+          onStaticPinPositionMoveWorklet={(position) => {
+            'worklet';
+            runOnJS(debouncedUpdateMovePin)(position);
+          }}
+          onTransformWorklet={({ zoomLevel }) => {
+            'worklet';
+            scale.value = 1 / zoomLevel;
+          }}
           maxZoom={30}
           // Give these to the zoomable view so it can apply the boundaries around the actual content.
           // Need to make sure the content is actually centered and the width and height are
           // measured when it's rendered naturally. Not the intrinsic sizes.
           contentWidth={contentSize?.width ?? 0}
           contentHeight={contentSize?.height ?? 0}
-          zoomAnimatedValue={zoomAnimatedValue}
         >
           <View style={styles.contents}>
             <Image style={styles.img} source={{ uri }} />
@@ -70,10 +87,7 @@ export default function App() {
                     key={`${left}x${top}`}
                     // These markers will move and zoom with the image, but will retain their size
                     // because of the scale transformation.
-                    style={[
-                      styles.marker,
-                      { left, top, transform: [{ scale }] },
-                    ]}
+                    style={[styles.marker, { left, top }, markerScaleStyle]}
                   />
                 ))
               )}
@@ -88,6 +102,6 @@ export default function App() {
           setShowMarkers((value) => !value);
         }}
       />
-    </View>
+    </Modal>
   );
 }

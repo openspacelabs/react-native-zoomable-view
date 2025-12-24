@@ -128,7 +128,7 @@ export interface ReactNativeZoomableViewProps {
   staticPinPosition?: Vec2D;
   staticPinIcon?: React.ReactElement;
   onStaticPinPositionChange?: (position: Vec2D) => void;
-  onStaticPinPositionMove?: (position: Vec2D) => void;
+  onStaticPinPositionMoveWorklet?: (position: Vec2D) => void;
   pinProps?: ViewProps;
 }
 
