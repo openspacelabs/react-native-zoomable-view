@@ -16,6 +16,7 @@ import {
 } from 'react-native-gesture-handler';
 import Animated, {
   cancelAnimation,
+  makeMutable,
   runOnJS,
   useAnimatedReaction,
   useAnimatedRef,
@@ -688,17 +689,14 @@ const ReactNativeZoomableView: ForwardRefRenderFunction<
           const toX = offsetX.value + tapX / zoom.value;
           const toY = offsetY.value + tapY / zoom.value;
 
-          let xAnimationFinished = false;
-          let yAnimationFinished = false;
+          const animationsDone = makeMutable(0);
+          const done = () => {
+            'worklet';
+            if (++animationsDone.value >= 2) runOnJS(_updateStaticPin)();
+          };
 
-          offsetX.value = withTiming(toX, { duration: 200 }, () => {
-            xAnimationFinished = true;
-            if (yAnimationFinished) runOnJS(_updateStaticPin)();
-          });
-          offsetY.value = withTiming(toY, { duration: 200 }, () => {
-            yAnimationFinished = true;
-            if (xAnimationFinished) runOnJS(_updateStaticPin)();
-          });
+          offsetX.value = withTiming(toX, { duration: 200 }, done);
+          offsetY.value = withTiming(toY, { duration: 200 }, done);
         }
 
         props.onSingleTap?.(e, _getZoomableViewEventObject());
@@ -812,7 +810,7 @@ const ReactNativeZoomableView: ForwardRefRenderFunction<
     'worklet';
 
     if (!gestureType.value) {
-      _resolveAndHandleTap(e);
+      runOnJS(_resolveAndHandleTap)(e);
     }
 
     runOnJS(setDebugPoints)([]);
@@ -863,16 +861,6 @@ const ReactNativeZoomableView: ForwardRefRenderFunction<
       }
       return true;
     }
-    const newGestureCenterPosition = calcGestureCenterPoint(e);
-    let dx = 0;
-    let dy = 0;
-
-    if (newGestureCenterPosition && lastGestureCenterPosition.value) {
-      dx = newGestureCenterPosition.x - lastGestureCenterPosition.value.x;
-      dy = newGestureCenterPosition.y - lastGestureCenterPosition.value.y;
-    }
-
-    lastGestureCenterPosition.value = newGestureCenterPosition;
 
     if (e.numberOfTouches === 2) {
       runOnJS(clearLongPressTimeout);
@@ -884,15 +872,21 @@ const ReactNativeZoomableView: ForwardRefRenderFunction<
       gestureType.value = 'pinch';
       _handlePinching(e);
     } else if (e.numberOfTouches === 1) {
-      if (longPressTimeout.current && (Math.abs(dx) > 5 || Math.abs(dy) > 5)) {
-        runOnJS(clearLongPressTimeout)();
+      //TODO
+      // if (longPressTimeout.current && (Math.abs(dx) > 5 || Math.abs(dy) > 5)) {
+      runOnJS(clearLongPressTimeout)();
+      // }
+
+      // change some measurement states when switching gesture to ensure a smooth transition
+      if (gestureType.value !== 'shift') {
+        lastGestureCenterPosition.value = calcGestureCenterPoint(e);
       }
 
-      const isShiftGesture = Math.abs(dx) > 2 || Math.abs(dy) > 2;
-      if (isShiftGesture) {
-        gestureType.value = 'shift';
-        _handleShifting(e);
-      }
+      // const isShiftGesture = Math.abs(dx) > 2 || Math.abs(dy) > 2;
+      // if (isShiftGesture) {
+      gestureType.value = 'shift';
+      _handleShifting(e);
+      // }
     }
   };
 
@@ -907,7 +901,8 @@ const ReactNativeZoomableView: ForwardRefRenderFunction<
     })
     .onTouchesUp((e) => {
       console.log('up', e);
-      _handlePanResponderEnd(e);
+      // only end if this is the last touch being lifted
+      if (e.numberOfTouches === 0) _handlePanResponderEnd(e);
     })
     .onTouchesCancelled((e) => {
       console.log('cancel', e);
