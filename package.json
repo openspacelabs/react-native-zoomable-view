@@ -155,6 +155,7 @@
         }
       ],
       "react-native/no-color-literals": "off",
+      "react-native/no-inline-styles": "off",
       "simple-import-sort/imports": "error",
       "simple-import-sort/exports": "error"
     },
@@ -181,6 +182,16 @@
             "error",
             {
               "allowNumber": true
+            }
+          ],
+          "@typescript-eslint/no-use-before-define": [
+            "error",
+            {
+              "functions": true,
+              "variables": true,
+              "enums": false,
+              "classes": false,
+              "typedefs": false
             }
           ]
         }
