@@ -67,7 +67,7 @@
     "@react-native/eslint-config": "^0.73.0",
     "@release-it/conventional-changelog": "^2.0.0",
     "@types/lodash": "^4.17.7",
-    "@types/react": "^16.9.19",
+    "@types/react": "18.3.12",
     "@types/react-native": "^0.65.4",
     "@typescript-eslint/eslint-plugin": "^7.18.0",
     "@typescript-eslint/parser": "^7.18.0",
@@ -75,21 +75,27 @@
     "eslint": "^8.57.1",
     "eslint-config-prettier": "^7.0.0",
     "eslint-plugin-prettier": "^3.1.3",
+    "eslint-plugin-reanimated": "^2.0.1",
     "eslint-plugin-simple-import-sort": "^12.1.1",
     "husky": "^4.2.5",
     "lodash": "^4.17.21",
     "pod-install": "^0.1.0",
     "prettier": "^2.0.5",
-    "react": "17.0.2",
+    "react": "^18.3.1",
     "react-native": "0.79.7",
     "react-native-builder-bob": "^0.30.0",
+    "react-native-gesture-handler": "~2.20.2",
+    "react-native-reanimated": "~3.16.1",
     "release-it": "^14.2.2",
     "typescript": "^4.9.5"
   },
   "peerDependencies": {
     "lodash": "^4.17.21",
-    "react": ">=16.8.0",
-    "react-native": ">=0.79.0"
+    "react": ">=18.0.0",
+    "react-native": ">=0.79.0",
+    "react-native-gesture-handler": "^2.20.2",
+    "react-native-reanimated": "^3.16.1",
+    "react-native-worklets": "~0.7.1"
   },
   "jest": {
     "preset": "react-native",
@@ -141,7 +147,8 @@
       "prettier",
       "react",
       "react-native",
-      "simple-import-sort"
+      "simple-import-sort",
+      "reanimated"
     ],
     "rules": {
       "prettier/prettier": [
@@ -156,7 +163,11 @@
       ],
       "react-native/no-color-literals": "off",
       "simple-import-sort/imports": "error",
-      "simple-import-sort/exports": "error"
+      "simple-import-sort/exports": "error",
+      "reanimated/js-function-in-worklet": "error",
+      "reanimated/unsupported-syntax": "error",
+      "reanimated/no-multiple-animated-style-usages": "error",
+      "no-use-before-define": "warn"
     },
     "overrides": [
       {

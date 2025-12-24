@@ -1,4 +1,8 @@
-import { GestureResponderEvent, PanResponderGestureState } from 'react-native';
+import {
+  GestureTouchEvent,
+  GestureUpdateEvent,
+  PanGestureHandlerEventPayload,
+} from 'react-native-gesture-handler';
 
 import { Vec2D } from '../typings';
 
@@ -15,39 +19,36 @@ export { calcNewScaledOffsetForZoomCentering } from './calcNewScaledOffsetForZoo
  * because gestureState.moveX/Y is messed up on real device
  * (Sometimes it's the center point, but sometimes it randomly takes the position of one of the touches)
  */
-export function calcGestureCenterPoint(
-  e: GestureResponderEvent,
-  gestureState: PanResponderGestureState
-): Vec2D | null {
-  const touches = e.nativeEvent.touches;
+export function calcGestureCenterPoint(e: GestureTouchEvent): Vec2D | null {
+  'worklet';
+
+  const touches = e.allTouches;
   if (!touches[0]) return null;
 
-  if (gestureState.numberActiveTouches === 2) {
+  if (e.numberOfTouches === 2) {
     if (!touches[1]) return null;
     return {
-      x: (touches[0].pageX + touches[1].pageX) / 2,
-      y: (touches[0].pageY + touches[1].pageY) / 2,
+      x: (touches[0].absoluteX + touches[1].absoluteX) / 2,
+      y: (touches[0].absoluteY + touches[1].absoluteY) / 2,
     };
   }
-  if (gestureState.numberActiveTouches === 1) {
+  if (e.numberOfTouches === 1) {
     return {
-      x: touches[0].pageX,
-      y: touches[0].pageY,
+      x: touches[0].absoluteX,
+      y: touches[0].absoluteY,
     };
   }
 
   return null;
 }
 
-export function calcGestureTouchDistance(
-  e: GestureResponderEvent,
-  gestureState: PanResponderGestureState
-): number | null {
-  const touches = e.nativeEvent.touches;
-  if (gestureState.numberActiveTouches !== 2 || !touches[0] || !touches[1])
-    return null;
+export function calcGestureTouchDistance(e: GestureTouchEvent): number | null {
+  'worklet';
 
-  const dx = Math.abs(touches[0].pageX - touches[1].pageX);
-  const dy = Math.abs(touches[0].pageY - touches[1].pageY);
+  const touches = e.allTouches;
+  if (e.numberOfTouches !== 2 || !touches[0] || !touches[1]) return null;
+
+  const dx = Math.abs(touches[0].absoluteX - touches[1].absoluteX);
+  const dy = Math.abs(touches[0].absoluteY - touches[1].absoluteY);
   return Math.sqrt(dx * dx + dy * dy);
 }

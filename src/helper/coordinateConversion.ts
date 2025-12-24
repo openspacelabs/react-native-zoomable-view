@@ -25,6 +25,8 @@ export function applyContainResizeMode(
   imgSize: Size2D,
   containerSize: Size2D
 ): { size: Size2D; scale: number } | { size: null; scale: null } {
+  'worklet';
+
   const { width: imageWidth, height: imageHeight } = imgSize;
   const { width: areaWidth, height: areaHeight } = containerSize;
   const imageAspect = imageWidth / imageHeight;
@@ -63,6 +65,8 @@ export function getImageOriginOnTransformSubject(
   resizedImageSize: Size2D,
   transformSubject: ZoomableViewEvent
 ) {
+  'worklet';
+
   const { offsetX, offsetY, zoomLevel, originalWidth, originalHeight } =
     transformSubject;
   return {
@@ -95,6 +99,8 @@ export function viewportPositionToImagePosition({
   imageSize: Size2D;
   zoomableEvent: ZoomableViewEvent;
 }): Vec2D | null {
+  'worklet';
+
   const { size: resizedImgSize, scale: resizedImgScale } =
     applyContainResizeMode(imageSize, {
       width: zoomableEvent.originalWidth,
