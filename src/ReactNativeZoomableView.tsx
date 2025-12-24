@@ -181,16 +181,20 @@ const ReactNativeZoomableView: ForwardRefRenderFunction<
     }
   }, [zoomEnabled]);
 
-  useLayoutEffect(() => {
-    if (
-      !onTransformInvocationInitialized.current &&
-      _invokeOnTransform().successful
-    ) {
-      panAnim.current.addListener(() => _invokeOnTransform());
-      zoomAnim.current.addListener(() => _invokeOnTransform());
-      onTransformInvocationInitialized.current = true;
-    }
-  }, []);
+  useLayoutEffect(
+    () => {
+      if (
+        !onTransformInvocationInitialized.current &&
+        _invokeOnTransform().successful
+      ) {
+        panAnim.current.addListener(() => _invokeOnTransform());
+        zoomAnim.current.addListener(() => _invokeOnTransform());
+        onTransformInvocationInitialized.current = true;
+      }
+    },
+    // FIXME: deps has implicit coupling with internal _invokeOnTransform logic
+    [originalWidth, originalHeight]
+  );
 
   const onLayout = useRef(props.onLayout);
   onLayout.current = props.onLayout;
