@@ -35,6 +35,7 @@ import {
   calcNewScaledOffsetForZoomCentering,
 } from './helper';
 import { viewportPositionToImagePosition } from './helper/coordinateConversion';
+import { useGesture } from './hooks/useGesture';
 import { useLatestCallback } from './hooks/useLatestCallback';
 import {
   ReactNativeZoomableViewProps,
@@ -100,6 +101,7 @@ const ReactNativeZoomableView: ForwardRefRenderFunction<
   const offsetY = useSharedValue(0);
 
   const zoom = useSharedValue(1);
+
   const lastGestureCenterPosition = useSharedValue<Vec2D | null>(null);
   const lastGestureTouchDistance = useSharedValue<number | null>(150);
   const gestureStarted = useSharedValue(false);
@@ -861,7 +863,7 @@ const ReactNativeZoomableView: ForwardRefRenderFunction<
     }
   );
 
-  const prevZoom = useSharedValue(zoom.value);
+  const prevZoom = useSharedValue<number>(1);
   const zoomToDestination = useSharedValue<Vec2D | undefined>(undefined);
 
   // Zoom Animation Support:
@@ -972,22 +974,17 @@ const ReactNativeZoomableView: ForwardRefRenderFunction<
     () => [zoom.value, offsetX.value, offsetY.value],
     () => {
       if (onTransformInvocationInitialized.value) _invokeOnTransform();
-    }
+    },
+    // prevents _invokeOnTransform from causing a re-render,
+    // which would call the evaluation again, causing an infinite loop
+    []
   );
 
-  const gesture = Gesture.Manual()
-    .onTouchesDown((e) => {
-      console.log('start', e);
-      _handlePanResponderGrant(e);
-    })
-    .onTouchesMove((e) => {
-      console.log('move', e);
-      _handlePanResponderMove(e);
-    })
-    .onFinalize((e) => {
-      console.log('end', e);
-      _handlePanResponderEnd(e);
-    });
+  const gesture = useGesture({
+    touchesDownWorklet: _handlePanResponderGrant,
+    touchesMoveWorklet: _handlePanResponderMove,
+    finalizeWorklet: _handlePanResponderEnd,
+  });
 
   return (
     <GestureHandlerRootView>

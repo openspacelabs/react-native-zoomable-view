@@ -1,4 +1,4 @@
-import { Size2D, Vec2D, ZoomableViewEvent } from 'src/typings';
+import { Size2D, Vec2D, ZoomableViewEvent } from '../typings';
 
 export const defaultTransformSubjectData: ZoomableViewEvent = {
   offsetX: 0,

@@ -9,7 +9,8 @@ import {
   View,
   ViewProps,
 } from 'react-native';
-import { Size2D } from 'src/typings';
+
+import { Size2D } from '../typings';
 
 export const StaticPin = ({
   staticPinPosition,
