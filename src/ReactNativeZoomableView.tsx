@@ -267,8 +267,9 @@ const ReactNativeZoomableView: ForwardRefRenderFunction<
     () => {
       if (onTransformInvocationInitialized.value) _invokeOnTransform();
     },
-    // prevents _invokeOnTransform from causing a re-render,
-    // which would call the evaluation again, causing an infinite loop
+    // _invokeOnTransform may cause a re-render, which would call the evaluation again,
+    // causing an infinite loop. This deps array prevents the re-evaluation caused
+    // by the re-render, thus breaking the infinite loop.
     []
   );
 
