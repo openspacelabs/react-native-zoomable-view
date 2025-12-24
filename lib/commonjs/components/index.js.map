@@ -1,1 +1,1 @@
-{"version":3,"sources":["index.tsx"],"names":[],"mappings":";;;;;;;;;;;;AAAA","sourcesContent":["export { AnimatedTouchFeedback } from './AnimatedTouchFeedback';\n"]}
+{"version":3,"sources":["components/index.tsx"],"names":[],"mappings":";;;;;;;;;;;;AAAA","sourceRoot":"../../../src"}

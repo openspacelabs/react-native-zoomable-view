@@ -2,3 +2,4 @@ import { applyContainResizeMode, getImageOriginOnTransformSubject, viewportPosit
 import ReactNativeZoomableView from './ReactNativeZoomableView';
 import type { ReactNativeZoomableViewProps, ZoomableViewEvent } from './typings';
 export { applyContainResizeMode, getImageOriginOnTransformSubject, ReactNativeZoomableView, ReactNativeZoomableViewProps, viewportPositionToImagePosition, ZoomableViewEvent, };
+//# sourceMappingURL=index.d.ts.map

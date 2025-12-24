@@ -40,7 +40,6 @@ export interface ReactNativeZoomableViewProps {
   minZoom?: number;
   doubleTapDelay?: number;
   doubleTapZoomToCenter?: boolean;
-  bindToBorders?: boolean;
   zoomStep?: number;
   pinchToZoomInSensitivity?: number;
   pinchToZoomOutSensitivity?: number;
@@ -156,9 +155,7 @@ export interface ReactNativeZoomableViewProps {
   staticPinIcon?: React.ReactElement;
   onStaticPinPositionChange?: (position: Vec2D) => void;
   onStaticPinPositionMove?: (position: Vec2D) => void;
-  animatePin: boolean;
   pinProps?: ViewProps;
-  disableMomentum?: boolean;
 }
 
 export interface Vec2D {

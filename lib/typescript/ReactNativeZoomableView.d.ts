@@ -18,25 +18,22 @@ declare class ReactNativeZoomableView extends Component<ReactNativeZoomableViewP
         pinchToZoomOutSensitivity: number;
         movementSensibility: number;
         doubleTapDelay: number;
-        bindToBorders: boolean;
         zoomStep: number;
         onLongPress: null;
         longPressDuration: number;
         contentWidth: undefined;
         contentHeight: undefined;
-        panBoundaryPadding: number;
         visualTouchFeedbackEnabled: boolean;
         staticPinPosition: undefined;
         staticPinIcon: undefined;
         onStaticPinPositionChange: undefined;
         onStaticPinPositionMove: undefined;
-        animatePin: boolean;
         disablePanOnInitialZoom: boolean;
     };
     private panAnim;
-    private zoomAnim;
-    private pinAnim;
-    private __offsets;
+    private readonly zoomAnim;
+    private offsetX;
+    private offsetY;
     private zoomLevel;
     private lastGestureCenterPosition;
     private lastGestureTouchDistance;
@@ -55,14 +52,6 @@ declare class ReactNativeZoomableView extends Component<ReactNativeZoomableViewP
     private doubleTapFirstTap;
     private measureZoomSubjectInterval;
     constructor(props: ReactNativeZoomableViewProps);
-    private raisePin;
-    private dropPin;
-    private set offsetX(value);
-    private set offsetY(value);
-    private get offsetX();
-    private get offsetY();
-    private __setOffset;
-    private __getOffset;
     componentDidUpdate(prevProps: ReactNativeZoomableViewProps, prevState: ReactNativeZoomableViewState): void;
     componentDidMount(): void;
     componentWillUnmount(): void;
@@ -243,3 +232,4 @@ declare class ReactNativeZoomableView extends Component<ReactNativeZoomableViewP
 }
 export default ReactNativeZoomableView;
 export { ReactNativeZoomableView };
+//# sourceMappingURL=ReactNativeZoomableView.d.ts.map

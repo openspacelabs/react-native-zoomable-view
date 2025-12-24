@@ -5,3 +5,4 @@ export declare const AnimatedTouchFeedback: ({ x, y, animationDelay, animationDu
     animationDelay?: number | undefined;
     onAnimationDone?: (() => void) | undefined;
 }) => JSX.Element;
+//# sourceMappingURL=AnimatedTouchFeedback.d.ts.map

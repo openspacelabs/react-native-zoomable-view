@@ -2,7 +2,6 @@ import { debounce } from 'lodash';
 import React, { Component, createRef, RefObject } from 'react';
 import {
   Animated,
-  Easing,
   GestureResponderEvent,
   PanResponder,
   PanResponderCallbacks,
@@ -12,11 +11,7 @@ import {
   View,
 } from 'react-native';
 
-import {
-  getBoundaryCrossedAnim,
-  getPanMomentumDecayAnim,
-  getZoomToAnimation,
-} from './animations';
+import { getZoomToAnimation } from './animations';
 import { AnimatedTouchFeedback } from './components';
 import { StaticPin } from './components/StaticPin';
 import { DebugTouchPoint } from './debugHelper';
@@ -25,7 +20,6 @@ import {
   calcGestureTouchDistance,
   calcNewScaledOffsetForZoomCentering,
 } from './helper';
-import { applyPanBoundariesToOffset } from './helper/applyPanBoundariesToOffset';
 import { viewportPositionToImagePosition } from './helper/coordinateConversion';
 import {
   ReactNativeZoomableViewProps,
@@ -66,36 +60,24 @@ class ReactNativeZoomableView extends Component<
     pinchToZoomOutSensitivity: 1,
     movementSensibility: 1,
     doubleTapDelay: 300,
-    bindToBorders: true,
     zoomStep: 0.5,
     onLongPress: null,
     longPressDuration: 700,
     contentWidth: undefined,
     contentHeight: undefined,
-    panBoundaryPadding: 0,
     visualTouchFeedbackEnabled: true,
     staticPinPosition: undefined,
     staticPinIcon: undefined,
     onStaticPinPositionChange: undefined,
     onStaticPinPositionMove: undefined,
-    animatePin: true,
     disablePanOnInitialZoom: false,
   };
 
   private panAnim = new Animated.ValueXY({ x: 0, y: 0 });
-  private zoomAnim = new Animated.Value(1);
-  private pinAnim = new Animated.ValueXY({ x: 0, y: 0 });
+  private readonly zoomAnim = new Animated.Value(1);
 
-  private __offsets = {
-    x: {
-      value: 0,
-      boundaryCrossedAnimInEffect: false,
-    },
-    y: {
-      value: 0,
-      boundaryCrossedAnimInEffect: false,
-    },
-  };
+  private offsetX = 0;
+  private offsetY = 0;
 
   private zoomLevel = 1;
   private lastGestureCenterPosition: { x: number; y: number } | null = null;
@@ -193,85 +175,6 @@ class ReactNativeZoomableView extends Component<
     this.lastGestureTouchDistance = 150;
 
     this.gestureType = null;
-  }
-
-  private raisePin() {
-    if (!this.props.animatePin) return;
-    Animated.timing(this.pinAnim, {
-      toValue: { x: 0, y: -10 },
-      useNativeDriver: true,
-      easing: Easing.out(Easing.ease),
-      duration: 100,
-    }).start();
-  }
-
-  private dropPin() {
-    if (!this.props.animatePin) return;
-    Animated.timing(this.pinAnim, {
-      toValue: { x: 0, y: 0 },
-      useNativeDriver: true,
-      easing: Easing.out(Easing.ease),
-      duration: 100,
-    }).start();
-  }
-
-  private set offsetX(x: number) {
-    this.__setOffset('x', x);
-  }
-
-  private set offsetY(y: number) {
-    this.__setOffset('y', y);
-  }
-
-  private get offsetX() {
-    return this.__getOffset('x');
-  }
-
-  private get offsetY() {
-    return this.__getOffset('y');
-  }
-
-  private __setOffset(axis: 'x' | 'y', offset: number) {
-    const offsetState = this.__offsets[axis];
-
-    if (this.props.bindToBorders) {
-      const containerSize =
-        axis === 'x' ? this.state.originalWidth : this.state.originalHeight;
-      const contentSize =
-        axis === 'x'
-          ? this.props.contentWidth || this.state.originalWidth
-          : this.props.contentHeight || this.state.originalHeight;
-
-      const boundOffset =
-        contentSize && containerSize && this.props.panBoundaryPadding != null
-          ? applyPanBoundariesToOffset(
-              offset,
-              containerSize,
-              contentSize,
-              this.zoomLevel,
-              this.props.panBoundaryPadding
-            )
-          : offset;
-
-      if (!this.gestureType && !offsetState.boundaryCrossedAnimInEffect) {
-        const boundariesApplied =
-          boundOffset !== offset &&
-          boundOffset.toFixed(3) !== offset.toFixed(3);
-        if (boundariesApplied) {
-          offsetState.boundaryCrossedAnimInEffect = true;
-          getBoundaryCrossedAnim(this.panAnim[axis], boundOffset).start(() => {
-            offsetState.boundaryCrossedAnimInEffect = false;
-          });
-          return;
-        }
-      }
-    }
-
-    offsetState.value = offset;
-  }
-
-  private __getOffset(axis: 'x' | 'y') {
-    return this.__offsets[axis].value;
   }
 
   componentDidUpdate(
@@ -500,8 +403,6 @@ class ReactNativeZoomableView extends Component<
     this.panAnim.stopAnimation();
     this.zoomAnim.stopAnimation();
     this.gestureStarted = true;
-
-    this.raisePin();
   };
 
   /**
@@ -522,22 +423,6 @@ class ReactNativeZoomableView extends Component<
     this.setState({ debugPoints: [] });
 
     this.lastGestureCenterPosition = null;
-
-    const disableMomentum =
-      this.props.disableMomentum ||
-      (this.props.panEnabled &&
-        this.gestureType === 'shift' &&
-        this.props.disablePanOnInitialZoom &&
-        this.zoomLevel === this.props.initialZoom);
-
-    // Trigger final shift animation unless disablePanOnInitialZoom is set and we're on the initial zoom level
-    // or disableMomentum
-    if (!disableMomentum) {
-      getPanMomentumDecayAnim(this.panAnim, {
-        x: gestureState.vx / this.zoomLevel,
-        y: gestureState.vy / this.zoomLevel,
-      }).start();
-    }
 
     if (this.longPressTimeout) {
       clearTimeout(this.longPressTimeout);
@@ -567,8 +452,6 @@ class ReactNativeZoomableView extends Component<
     if (this.props.staticPinPosition) {
       this._updateStaticPin();
     }
-
-    this.dropPin();
 
     this.gestureType = null;
     this.gestureStarted = false;
@@ -882,8 +765,6 @@ class ReactNativeZoomableView extends Component<
     }
 
     this._setNewOffsetPosition(offsetX, offsetY);
-
-    this.raisePin();
   }
 
   /**
@@ -1281,7 +1162,6 @@ class ReactNativeZoomableView extends Component<
             onPress={onStaticPinPress}
             onLongPress={onStaticPinLongPress}
             onParentMove={this._handlePanResponderMove}
-            pinAnim={this.pinAnim}
             setPinSize={(size: Size2D) => {
               this.setState({ pinSize: size });
             }}

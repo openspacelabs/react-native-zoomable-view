@@ -13,7 +13,6 @@ import { Size2D } from 'src/typings';
 
 export const StaticPin = ({
   staticPinPosition,
-  pinAnim,
   staticPinIcon,
   pinSize,
   onParentMove,
@@ -23,7 +22,6 @@ export const StaticPin = ({
   pinProps = {},
 }: {
   staticPinPosition: { x: number; y: number };
-  pinAnim: Animated.ValueXY;
   staticPinIcon: React.ReactNode;
   pinSize: Size2D;
   /** Internal handler for passing move event to parent */
@@ -40,7 +38,6 @@ export const StaticPin = ({
   const transform = [
     { translateY: -pinSize.height },
     { translateX: -pinSize.width / 2 },
-    ...pinAnim.getTranslateTransform(),
   ];
 
   const opacity = pinSize.width && pinSize.height ? 1 : 0;
