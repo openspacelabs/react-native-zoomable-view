@@ -1,1 +1,1 @@
-{"version":3,"sources":["components/index.tsx"],"names":["AnimatedTouchFeedback"],"mappings":";;AAAA,SAASA,qBAAT,QAAsC,yBAAtC","sourceRoot":"../../../src"}
+{"version":3,"names":["AnimatedTouchFeedback"],"sourceRoot":"../../../src","sources":["components/index.tsx"],"mappings":";;AAAA,SAASA,qBAAqB,QAAQ,yBAAyB","ignoreList":[]}

@@ -79,6 +79,7 @@ export const StaticPin = ({
           left: staticPinPosition.x,
           top: staticPinPosition.y,
         },
+        // eslint-disable-next-line @typescript-eslint/no-use-before-define
         styles.pinWrapper,
         { opacity, transform },
       ]}
@@ -91,7 +92,7 @@ export const StaticPin = ({
         {...panResponder.panHandlers}
       >
         {staticPinIcon || (
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment,@typescript-eslint/no-use-before-define
           <Image source={require('../assets/pin.png')} style={styles.pin} />
         )}
       </View>
