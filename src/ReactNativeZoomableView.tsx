@@ -122,8 +122,6 @@ const ReactNativeZoomableView: ForwardRefRenderFunction<
     panEnabled: propPanEnabled,
     disablePanOnInitialZoom: propDisablePanOnInitialZoom,
     initialZoom: propsInitialZoom,
-    onStaticPinLongPress,
-    onStaticPinPress,
     pinProps,
   } = props;
 
@@ -963,19 +961,15 @@ const ReactNativeZoomableView: ForwardRefRenderFunction<
             return <DebugTouchPoint key={index} x={x} y={y} />;
           })}
 
-          {/* TODO */}
-          {/*{staticPinPosition && false && (*/}
-          {/*  <StaticPin*/}
-          {/*    staticPinIcon={staticPinIcon}*/}
-          {/*    staticPinPosition={staticPinPosition}*/}
-          {/*    pinSize={pinSize}*/}
-          {/*    onPress={onStaticPinPress}*/}
-          {/*    onLongPress={onStaticPinLongPress}*/}
-          {/*    onParentMove={_handlePanResponderMove}*/}
-          {/*    setPinSize={setPinSize}*/}
-          {/*    pinProps={pinProps}*/}
-          {/*  />*/}
-          {/*)}*/}
+          {propStaticPinPosition && (
+            <StaticPin
+              staticPinIcon={staticPinIcon}
+              staticPinPosition={propStaticPinPosition}
+              pinSize={pinSize}
+              setPinSize={setPinSize}
+              pinProps={pinProps}
+            />
+          )}
         </View>
       </GestureDetector>
     </GestureHandlerRootView>

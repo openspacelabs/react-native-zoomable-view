@@ -1,7 +1,7 @@
 import { ReactNativeZoomableView } from '@openspacelabs/react-native-zoomable-view';
 import { debounce } from 'lodash';
-import React, { useCallback, useRef, useState } from 'react';
-import { Button, Image, Modal, Text, View } from 'react-native';
+import React, { useCallback, useState } from 'react';
+import { Alert, Button, Image, Modal, Text, View } from 'react-native';
 import Animated, {
   runOnJS,
   useAnimatedStyle,
@@ -57,6 +57,9 @@ export default function App() {
       >
         <ReactNativeZoomableView
           debug
+          onLongPress={() => {
+            Alert.alert('Long press detected');
+          }}
           // Where to put the pin in the content view
           staticPinPosition={staticPinPosition}
           // Callback that returns the position of the pin

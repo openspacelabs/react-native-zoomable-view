@@ -1,8 +1,4 @@
-import {
-  GestureTouchEvent,
-  GestureUpdateEvent,
-  PanGestureHandlerEventPayload,
-} from 'react-native-gesture-handler';
+import { GestureTouchEvent } from 'react-native-gesture-handler';
 
 import { Vec2D } from '../typings';
 

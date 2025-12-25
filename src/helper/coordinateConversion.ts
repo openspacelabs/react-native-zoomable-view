@@ -1,15 +1,5 @@
 import { Size2D, Vec2D, ZoomableViewEvent } from '../typings';
 
-export const defaultTransformSubjectData: ZoomableViewEvent = {
-  offsetX: 0,
-  offsetY: 0,
-  zoomLevel: 0,
-  originalWidth: 0,
-  originalHeight: 0,
-  originalPageX: 0,
-  originalPageY: 0,
-};
-
 /**
  * Assuming you have an image that's being resized to fit into a container
  * using the "contain" resize mode. You can use this function to calculate the

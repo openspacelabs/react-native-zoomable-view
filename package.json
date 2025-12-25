@@ -166,8 +166,7 @@
       "simple-import-sort/exports": "error",
       "reanimated/js-function-in-worklet": "error",
       "reanimated/unsupported-syntax": "error",
-      "reanimated/no-multiple-animated-style-usages": "error",
-      "no-use-before-define": "error"
+      "reanimated/no-multiple-animated-style-usages": "error"
     },
     "overrides": [
       {
