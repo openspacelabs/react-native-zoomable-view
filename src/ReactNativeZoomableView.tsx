@@ -63,8 +63,6 @@ const ReactNativeZoomableView: ForwardRefRenderFunction<
     measure: measureZoomSubject,
     originalWidth,
     originalHeight,
-    originalPageX,
-    originalPageY,
     originalX,
     originalY,
   } = useZoomSubject();
@@ -72,10 +70,7 @@ const ReactNativeZoomableView: ForwardRefRenderFunction<
   const [pinSize, setPinSize] = useState({ width: 0, height: 0 });
   const [stateTouches, setStateTouches] = useState<TouchPoint[]>([]);
 
-  const { debugPoints, setDebugPoints, setPinchDebugPoints } = useDebugPoints({
-    originalPageX,
-    originalPageY,
-  });
+  const { debugPoints, setDebugPoints, setPinchDebugPoints } = useDebugPoints();
 
   const doubleTapFirstTapReleaseTimestamp = useSharedValue<number | undefined>(
     undefined
@@ -154,8 +149,6 @@ const ReactNativeZoomableView: ForwardRefRenderFunction<
         offsetY: offsetY.value,
         originalHeight: originalHeight.value,
         originalWidth: originalWidth.value,
-        originalPageX: originalPageX.value,
-        originalPageY: originalPageY.value,
       },
       overwriteObj
     );
@@ -273,8 +266,6 @@ const ReactNativeZoomableView: ForwardRefRenderFunction<
     () => [
       originalHeight.value,
       originalWidth.value,
-      originalPageX.value,
-      originalPageY.value,
       originalX.value,
       originalY.value,
     ],
@@ -419,8 +410,8 @@ const ReactNativeZoomableView: ForwardRefRenderFunction<
     if (!gestureCenterPoint) return;
 
     let zoomCenter = {
-      x: gestureCenterPoint.x - originalPageX.value,
-      y: gestureCenterPoint.y - originalPageY.value,
+      x: gestureCenterPoint.x,
+      y: gestureCenterPoint.y,
     };
 
     if (props.staticPinPosition) {
@@ -514,17 +505,17 @@ const ReactNativeZoomableView: ForwardRefRenderFunction<
       return;
     }
     const shift = _calcOffsetShiftSinceLastGestureState({
-      x: e.allTouches[0].absoluteX,
-      y: e.allTouches[0].absoluteY,
+      x: e.allTouches[0].x,
+      y: e.allTouches[0].y,
     });
     if (!shift) return;
 
     const newOffsetX = offsetX.value + shift.x;
     const newOffsetY = offsetY.value + shift.y;
 
-    if (props.debug && originalPageX.value && originalPageY.value) {
-      const x = e.allTouches[0].absoluteX - originalPageX.value;
-      const y = e.allTouches[0].absoluteY - originalPageY.value;
+    if (props.debug) {
+      const x = e.allTouches[0].x;
+      const y = e.allTouches[0].y;
       runOnJS(setDebugPoints)([{ x, y }]);
     }
 
@@ -616,8 +607,8 @@ const ReactNativeZoomableView: ForwardRefRenderFunction<
 
     // define new zoom position coordinates
     const zoomPositionCoordinates = {
-      x: e.allTouches[0].absoluteX - originalPageX.value,
-      y: e.allTouches[0].absoluteY - originalPageY.value,
+      x: e.allTouches[0].x,
+      y: e.allTouches[0].y,
     };
 
     // if doubleTapZoomToCenter enabled -> always zoom to center instead
@@ -664,8 +655,8 @@ const ReactNativeZoomableView: ForwardRefRenderFunction<
       doubleTapFirstTapReleaseTimestamp.value = now;
       doubleTapFirstTap.value = {
         id: now.toString(),
-        x: e.allTouches[0].absoluteX - originalPageX.value,
-        y: e.allTouches[0].absoluteY - originalPageY.value,
+        x: e.allTouches[0].x,
+        y: e.allTouches[0].y,
       };
       _addTouch(doubleTapFirstTap.value);
 

@@ -48,7 +48,7 @@ export default function App() {
 
   return (
     <Modal presentationStyle={'pageSheet'} style={styles.container}>
-      <Text>ReactNativeZoomableView</Text>
+      {/*<Text>ReactNativeZoomableView</Text>*/}
       <View
         style={styles.box}
         onLayout={(e) => {

@@ -28,15 +28,12 @@ export function calcGestureCenterPoint(e: GestureTouchEvent): Vec2D | null {
   if (e.numberOfTouches === 2) {
     if (!touches[1]) return null;
     return {
-      x: (touches[0].absoluteX + touches[1].absoluteX) / 2,
-      y: (touches[0].absoluteY + touches[1].absoluteY) / 2,
+      x: (touches[0].x + touches[1].x) / 2,
+      y: (touches[0].y + touches[1].y) / 2,
     };
   }
   if (e.numberOfTouches === 1) {
-    return {
-      x: touches[0].absoluteX,
-      y: touches[0].absoluteY,
-    };
+    return { x: touches[0].x, y: touches[0].y };
   }
 
   return null;
@@ -48,7 +45,7 @@ export function calcGestureTouchDistance(e: GestureTouchEvent): number | null {
   const touches = e.allTouches;
   if (e.numberOfTouches !== 2 || !touches[0] || !touches[1]) return null;
 
-  const dx = Math.abs(touches[0].absoluteX - touches[1].absoluteX);
-  const dy = Math.abs(touches[0].absoluteY - touches[1].absoluteY);
+  const dx = Math.abs(touches[0].x - touches[1].x);
+  const dy = Math.abs(touches[0].x - touches[1].x);
   return Math.sqrt(dx * dx + dy * dy);
 }

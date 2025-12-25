@@ -12,8 +12,6 @@ export interface ZoomableViewEvent {
   offsetY: number;
   originalHeight: number;
   originalWidth: number;
-  originalPageX: number;
-  originalPageY: number;
 }
 
 export interface ReactNativeZoomableViewProps {

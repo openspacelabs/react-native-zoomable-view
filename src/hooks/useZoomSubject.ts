@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef } from 'react';
 import { View } from 'react-native';
 import { useSharedValue } from 'react-native-reanimated';
 
@@ -8,8 +8,6 @@ export const useZoomSubject = () => {
   const wrapperRef = useRef<View>(null);
   const originalWidth = useSharedValue(0);
   const originalHeight = useSharedValue(0);
-  const originalPageX = useSharedValue(0);
-  const originalPageY = useSharedValue(0);
   const originalX = useSharedValue(0);
   const originalY = useSharedValue(0);
   const measureZoomSubjectInterval = useRef<NodeJS.Timer>();
@@ -42,8 +40,6 @@ export const useZoomSubject = () => {
           originalY.value = y;
           originalWidth.value = width;
           originalHeight.value = height;
-          originalPageX.value = pageX;
-          originalPageY.value = pageY;
         });
       });
     });
@@ -71,8 +67,6 @@ export const useZoomSubject = () => {
     measure,
     originalWidth,
     originalHeight,
-    originalPageX,
-    originalPageY,
     originalX,
     originalY,
   };
