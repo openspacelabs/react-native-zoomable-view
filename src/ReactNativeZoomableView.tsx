@@ -852,7 +852,7 @@ const ReactNativeZoomableView: ForwardRefRenderFunction<
     }
 
     if (e.numberOfTouches === 2) {
-      runOnJS(clearLongPressTimeout);
+      runOnJS(clearLongPressTimeout)();
 
       // change some measurement states when switching gesture to ensure a smooth transition
       if (gestureType.value !== 'pinch') {
@@ -884,10 +884,13 @@ const ReactNativeZoomableView: ForwardRefRenderFunction<
   const firstTouch = useSharedValue<Vec2D | undefined>(undefined);
   const gesture = Gesture.Manual()
     .onTouchesDown((e, stateManager) => {
-      stateManager.activate();
-      stateManager.begin();
-      firstTouch.value = { x: e.allTouches[0].x, y: e.allTouches[0].y };
-      _handlePanResponderGrant(e);
+      // only begin if this is the first touch
+      if (!firstTouch.value) {
+        stateManager.activate();
+        stateManager.begin();
+        firstTouch.value = { x: e.allTouches[0].x, y: e.allTouches[0].y };
+        _handlePanResponderGrant(e);
+      }
     })
     .onTouchesMove((e) => {
       const dx = e.allTouches[0].x - (firstTouch.value?.x || 0);
