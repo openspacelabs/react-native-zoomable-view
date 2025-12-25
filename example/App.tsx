@@ -10,13 +10,10 @@ import {
   View,
   ViewProps,
 } from 'react-native';
-import Animated, {
-  runOnJS,
-  useAnimatedStyle,
-  useSharedValue,
-} from 'react-native-reanimated';
+import { runOnJS, useSharedValue } from 'react-native-reanimated';
 
 import { applyContainResizeMode } from '../src/helper/coordinateConversion';
+import { Dot } from './Dot';
 import { styles } from './style';
 
 const kittenSize = 800;
@@ -63,12 +60,6 @@ export default function App() {
   const staticPinPosition = { x: size.width / 2, y: size.height / 2 };
   const { size: contentSize } = applyContainResizeMode(imageSize, size);
 
-  const markerScaleStyle = useAnimatedStyle(() => {
-    return {
-      transform: [{ scale: scale.value }],
-    };
-  });
-
   const Wrapper = modal ? PageSheetModal : View;
 
   return (
@@ -109,14 +100,9 @@ export default function App() {
             <Image style={styles.img} source={{ uri }} />
 
             {showMarkers &&
-              (['20%', '40%', '60%', '80%'] as const).map((left) =>
-                (['20%', '40%', '60%', '80%'] as const).map((top) => (
-                  <Animated.View
-                    key={`${left}x${top}`}
-                    // These markers will move and zoom with the image, but will retain their size
-                    // because of the scale transformation.
-                    style={[styles.marker, { left, top }, markerScaleStyle]}
-                  />
+              [20, 40, 60, 80].map((left) =>
+                [20, 40, 60, 80].map((top) => (
+                  <Dot left={left} top={top} key={`${left}x${top}`} />
                 ))
               )}
           </View>
