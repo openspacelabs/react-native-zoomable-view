@@ -850,6 +850,7 @@ const ReactNativeZoomableView: ForwardRefRenderFunction<
 
       // change some measurement states when switching gesture to ensure a smooth transition
       if (gestureType.value !== 'pinch') {
+        lastGestureCenterPosition.value = calcGestureCenterPoint(e);
         lastGestureTouchDistance.value = calcGestureTouchDistance(e);
       }
       gestureType.value = 'pinch';
