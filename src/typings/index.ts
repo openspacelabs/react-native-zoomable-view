@@ -1,18 +1,10 @@
 import { ReactNode } from 'react';
 import {
-  Animated,
-  GestureResponderEvent,
   LayoutChangeEvent,
   PanResponderGestureState,
   ViewProps,
 } from 'react-native';
-
-export enum SwipeDirection {
-  SWIPE_UP = 'SWIPE_UP',
-  SWIPE_DOWN = 'SWIPE_DOWN',
-  SWIPE_LEFT = 'SWIPE_LEFT',
-  SWIPE_RIGHT = 'SWIPE_RIGHT',
-}
+import { GestureTouchEvent } from 'react-native-gesture-handler';
 
 export interface ZoomableViewEvent {
   zoomLevel: number;
@@ -20,8 +12,6 @@ export interface ZoomableViewEvent {
   offsetY: number;
   originalHeight: number;
   originalWidth: number;
-  originalPageX: number;
-  originalPageY: number;
 }
 
 export interface ReactNativeZoomableViewProps {
@@ -35,7 +25,6 @@ export interface ReactNativeZoomableViewProps {
   initialOffsetY?: number;
   contentWidth?: number;
   contentHeight?: number;
-  panBoundaryPadding?: number;
   maxZoom?: number;
   minZoom?: number;
   doubleTapDelay?: number;
@@ -48,113 +37,77 @@ export interface ReactNativeZoomableViewProps {
   visualTouchFeedbackEnabled?: boolean;
   disablePanOnInitialZoom?: boolean;
 
-  // Zoom animated value ref
-  zoomAnimatedValue?: Animated.Value;
-  panAnimatedValueXY?: Animated.ValueXY;
-
   // debug
   debug?: boolean;
 
   // callbacks
   onLayout?: (event: Pick<LayoutChangeEvent, 'nativeEvent'>) => void;
-  onTransform?: (zoomableViewEventObject: ZoomableViewEvent) => void;
+  onTransformWorklet?: (zoomableViewEventObject: ZoomableViewEvent) => void;
   onSingleTap?: (
-    event: GestureResponderEvent,
+    event: GestureTouchEvent,
     zoomableViewEventObject: ZoomableViewEvent
   ) => void;
   onDoubleTapBefore?: (
-    event: GestureResponderEvent,
+    event: GestureTouchEvent,
     zoomableViewEventObject: ZoomableViewEvent
   ) => void;
   onDoubleTapAfter?: (
-    event: GestureResponderEvent,
+    event: GestureTouchEvent,
     zoomableViewEventObject: ZoomableViewEvent
   ) => void;
-  onShiftingBefore?: (
-    event: GestureResponderEvent | null,
-    gestureState: PanResponderGestureState | null,
-    zoomableViewEventObject: ZoomableViewEvent
-  ) => boolean;
-  onShiftingAfter?: (
-    event: GestureResponderEvent | null,
-    gestureState: PanResponderGestureState | null,
-    zoomableViewEventObject: ZoomableViewEvent
-  ) => boolean;
   onShiftingEnd?: (
-    event: GestureResponderEvent,
-    gestureState: PanResponderGestureState,
-    zoomableViewEventObject: ZoomableViewEvent
-  ) => void;
-  onZoomBefore?: (
-    event: GestureResponderEvent | null,
-    gestureState: PanResponderGestureState | null,
-    zoomableViewEventObject: ZoomableViewEvent
-  ) => boolean | undefined;
-  onZoomAfter?: (
-    event: GestureResponderEvent | null,
-    gestureState: PanResponderGestureState | null,
+    event: GestureTouchEvent,
     zoomableViewEventObject: ZoomableViewEvent
   ) => void;
   onZoomEnd?: (
-    event: GestureResponderEvent,
-    gestureState: PanResponderGestureState,
+    event: GestureTouchEvent,
     zoomableViewEventObject: ZoomableViewEvent
   ) => void;
   onLongPress?: (
-    event: GestureResponderEvent,
-    gestureState: PanResponderGestureState,
+    event: GestureTouchEvent,
     zoomableViewEventObject: ZoomableViewEvent
   ) => void;
   onStartShouldSetPanResponder?: (
-    event: GestureResponderEvent,
-    gestureState: PanResponderGestureState,
+    event: GestureTouchEvent,
     zoomableViewEventObject: ZoomableViewEvent,
     baseComponentResult: boolean
   ) => boolean;
   onPanResponderGrant?: (
-    event: GestureResponderEvent,
-    gestureState: PanResponderGestureState,
+    event: GestureTouchEvent,
     zoomableViewEventObject: ZoomableViewEvent
   ) => void;
   onPanResponderEnd?: (
-    event: GestureResponderEvent,
-    gestureState: PanResponderGestureState,
+    event: GestureTouchEvent,
     zoomableViewEventObject: ZoomableViewEvent
   ) => void;
   onPanResponderMove?: (
-    event: GestureResponderEvent,
-    gestureState: PanResponderGestureState,
+    event: GestureTouchEvent,
     zoomableViewEventObject: ZoomableViewEvent
   ) => boolean;
   onPanResponderTerminate?: (
-    event: GestureResponderEvent,
-    gestureState: PanResponderGestureState,
+    event: GestureTouchEvent,
     zoomableViewEventObject: ZoomableViewEvent
   ) => void;
   onPanResponderTerminationRequest?: (
-    event: GestureResponderEvent,
-    gestureState: PanResponderGestureState,
+    event: GestureTouchEvent,
     zoomableViewEventObject: ZoomableViewEvent
   ) => boolean;
   onShouldBlockNativeResponder?: (
-    event: GestureResponderEvent,
-    gestureState: PanResponderGestureState,
+    event: GestureTouchEvent,
     zoomableViewEventObject: ZoomableViewEvent
   ) => boolean;
   onStartShouldSetPanResponderCapture?: (
-    event: GestureResponderEvent,
+    event: GestureTouchEvent,
     gestureState: PanResponderGestureState
   ) => boolean;
   onMoveShouldSetPanResponderCapture?: (
-    event: GestureResponderEvent,
+    event: GestureTouchEvent,
     gestureState: PanResponderGestureState
   ) => boolean;
-  onStaticPinPress?: (event: GestureResponderEvent) => void;
-  onStaticPinLongPress?: (event: GestureResponderEvent) => void;
   staticPinPosition?: Vec2D;
   staticPinIcon?: React.ReactElement;
   onStaticPinPositionChange?: (position: Vec2D) => void;
-  onStaticPinPositionMove?: (position: Vec2D) => void;
+  onStaticPinPositionMoveWorklet?: (position: Vec2D) => void;
   pinProps?: ViewProps;
 }
 
@@ -171,34 +124,4 @@ export interface Size2D {
 export interface TouchPoint extends Vec2D {
   id: string;
   isSecondTap?: boolean;
-}
-
-export interface ReactNativeZoomableViewState {
-  touches?: TouchPoint[];
-  originalWidth: number;
-  originalHeight: number;
-  originalPageX: number;
-  originalPageY: number;
-  originalX: number;
-  originalY: number;
-  debugPoints?: undefined | Vec2D[];
-  pinSize: Size2D;
-}
-
-export interface ReactNativeZoomableViewWithGesturesProps
-  extends ReactNativeZoomableViewProps {
-  swipeLengthThreshold?: number;
-  swipeVelocityThreshold?: number;
-  swipeDirectionalThreshold?: number;
-  swipeMinZoom?: number;
-  swipeMaxZoom?: number;
-  swipeDisabled?: boolean;
-  onSwipe?: (
-    swipeDirection: SwipeDirection,
-    gestureState: PanResponderGestureState
-  ) => void;
-  onSwipeUp?: (gestureState: PanResponderGestureState) => void;
-  onSwipeDown?: (gestureState: PanResponderGestureState) => void;
-  onSwipeLeft?: (gestureState: PanResponderGestureState) => void;
-  onSwipeRight?: (gestureState: PanResponderGestureState) => void;
 }

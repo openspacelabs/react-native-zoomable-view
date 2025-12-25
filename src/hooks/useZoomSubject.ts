@@ -1,16 +1,15 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef } from 'react';
 import { View } from 'react-native';
+import { useSharedValue } from 'react-native-reanimated';
 
 import { useLatestCallback } from './useLatestCallback';
 
 export const useZoomSubject = () => {
   const wrapperRef = useRef<View>(null);
-  const [originalWidth, setOriginalWidth] = useState(0);
-  const [originalHeight, setOriginalHeight] = useState(0);
-  const [originalPageX, setOriginalPageX] = useState(0);
-  const [originalPageY, setOriginalPageY] = useState(0);
-  const [originalX, setOriginalX] = useState(0);
-  const [originalY, setOriginalY] = useState(0);
+  const originalWidth = useSharedValue(0);
+  const originalHeight = useSharedValue(0);
+  const originalX = useSharedValue(0);
+  const originalY = useSharedValue(0);
   const measureZoomSubjectInterval = useRef<NodeJS.Timer>();
 
   /**
@@ -37,12 +36,10 @@ export const useZoomSubject = () => {
           // the component transitions from hidden to visible.
           if (!pageX && !pageY && !width && !height) return;
 
-          setOriginalX(x);
-          setOriginalY(y);
-          setOriginalWidth(width);
-          setOriginalHeight(height);
-          setOriginalPageX(pageX);
-          setOriginalPageY(pageY);
+          originalX.value = x;
+          originalY.value = y;
+          originalWidth.value = width;
+          originalHeight.value = height;
         });
       });
     });
@@ -70,8 +67,6 @@ export const useZoomSubject = () => {
     measure,
     originalWidth,
     originalHeight,
-    originalPageX,
-    originalPageY,
     originalX,
     originalY,
   };

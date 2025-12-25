@@ -1,40 +1,21 @@
 import React from 'react';
-import {
-  Animated,
-  GestureResponderEvent,
-  Image,
-  PanResponder,
-  PanResponderGestureState,
-  StyleSheet,
-  View,
-  ViewProps,
-} from 'react-native';
-import { Size2D } from 'src/typings';
+import { Image, StyleSheet, View, ViewProps } from 'react-native';
+
+import { Size2D } from '../typings';
 
 export const StaticPin = ({
   staticPinPosition,
   staticPinIcon,
   pinSize,
-  onParentMove,
-  onPress,
-  onLongPress,
   setPinSize,
   pinProps = {},
 }: {
   staticPinPosition: { x: number; y: number };
   staticPinIcon: React.ReactNode;
   pinSize: Size2D;
-  /** Internal handler for passing move event to parent */
-  onParentMove: (
-    evt: GestureResponderEvent,
-    gestureState: PanResponderGestureState
-  ) => boolean | undefined;
-  onPress?: (evt: GestureResponderEvent) => void;
-  onLongPress?: (evt: GestureResponderEvent) => void;
   setPinSize: (size: Size2D) => void;
   pinProps?: ViewProps;
 }) => {
-  const tapTime = React.useRef(0);
   const transform = [
     { translateY: -pinSize.height },
     { translateX: -pinSize.width / 2 },
@@ -42,37 +23,8 @@ export const StaticPin = ({
 
   const opacity = pinSize.width && pinSize.height ? 1 : 0;
 
-  const panResponder = React.useRef(
-    PanResponder.create({
-      onStartShouldSetPanResponder: () => {
-        tapTime.current = Date.now();
-
-        // We want to handle tap on this so set true
-        return true;
-      },
-      onPanResponderMove: (evt, gestureState) => {
-        // However if the user moves finger we want to pass this evt to parent
-        // to handle panning (tap not recognized)
-        if (Math.abs(gestureState.dx) > 5 && Math.abs(gestureState.dy) > 5)
-          onParentMove(evt, gestureState);
-      },
-      onPanResponderRelease: (evt, gestureState) => {
-        if (Math.abs(gestureState.dx) > 5 || Math.abs(gestureState.dy) > 5)
-          return;
-        const dt = Date.now() - tapTime.current;
-        if (onPress && dt < 500) {
-          onPress(evt);
-        }
-        if (onLongPress && dt > 500) {
-          // RN long press is 500ms
-          onLongPress(evt);
-        }
-      },
-    })
-  ).current;
-
   return (
-    <Animated.View
+    <View
       style={[
         {
           left: staticPinPosition.x,
@@ -88,14 +40,13 @@ export const StaticPin = ({
         onLayout={({ nativeEvent: { layout } }) => {
           setPinSize(layout);
         }}
-        {...panResponder.panHandlers}
       >
         {staticPinIcon || (
           // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment,@typescript-eslint/no-use-before-define
           <Image source={require('../assets/pin.png')} style={styles.pin} />
         )}
       </View>
-    </Animated.View>
+    </View>
   );
 };
 

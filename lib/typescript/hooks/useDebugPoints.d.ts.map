@@ -1,1 +1,1 @@
-{"version":3,"file":"useDebugPoints.d.ts","sourceRoot":"","sources":["../../../src/hooks/useDebugPoints.ts"],"names":[],"mappings":";AACA,OAAO,EAAE,qBAAqB,EAAE,MAAM,cAAc,CAAC;AAErD,OAAO,EAAE,KAAK,EAAE,MAAM,YAAY,CAAC;AAGnC,eAAO,MAAM,cAAc;mBAIV,MAAM;mBACN,MAAM;;;;;CAkCtB,CAAC"}
+{"version":3,"file":"useDebugPoints.d.ts","sourceRoot":"","sources":["../../../src/hooks/useDebugPoints.ts"],"names":[],"mappings":";AACA,OAAO,EAAE,iBAAiB,EAAE,MAAM,8BAA8B,CAAC;AAEjE,OAAO,EAAE,KAAK,EAAE,MAAM,YAAY,CAAC;AAGnC,eAAO,MAAM,cAAc;;;;CAqB1B,CAAC"}

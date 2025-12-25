@@ -1,4 +1,4 @@
-import { GestureResponderEvent, PanResponderGestureState } from 'react-native';
+import { GestureTouchEvent } from 'react-native-gesture-handler';
 import { Vec2D } from '../typings';
 export { calcNewScaledOffsetForZoomCentering } from './calcNewScaledOffsetForZoomCentering';
 /**
@@ -12,6 +12,6 @@ export { calcNewScaledOffsetForZoomCentering } from './calcNewScaledOffsetForZoo
  * because gestureState.moveX/Y is messed up on real device
  * (Sometimes it's the center point, but sometimes it randomly takes the position of one of the touches)
  */
-export declare function calcGestureCenterPoint(e: GestureResponderEvent, gestureState: PanResponderGestureState): Vec2D | null;
-export declare function calcGestureTouchDistance(e: GestureResponderEvent, gestureState: PanResponderGestureState): number | null;
+export declare function calcGestureCenterPoint(e: GestureTouchEvent): Vec2D | null;
+export declare function calcGestureTouchDistance(e: GestureTouchEvent): number | null;
 //# sourceMappingURL=index.d.ts.map

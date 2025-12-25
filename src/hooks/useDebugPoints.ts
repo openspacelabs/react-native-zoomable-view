@@ -1,16 +1,10 @@
 import { useState } from 'react';
-import { GestureResponderEvent } from 'react-native';
+import { GestureTouchEvent } from 'react-native-gesture-handler';
 
 import { Vec2D } from '../typings';
 import { useLatestCallback } from './useLatestCallback';
 
-export const useDebugPoints = ({
-  originalPageX,
-  originalPageY,
-}: {
-  originalPageX: number;
-  originalPageY: number;
-}) => {
+export const useDebugPoints = () => {
   const [debugPoints, setDebugPoints] = useState<Vec2D[]>([]);
 
   /**
@@ -20,22 +14,10 @@ export const useDebugPoints = ({
    * @param points
    */
   const setPinchDebugPoints = useLatestCallback(
-    (
-      gestureResponderEvent: GestureResponderEvent,
-      zoomCenter: Vec2D,
-      ...points: Vec2D[]
-    ) => {
-      const { touches } = gestureResponderEvent.nativeEvent;
-
+    (e: GestureTouchEvent, zoomCenter: Vec2D, ...points: Vec2D[]) => {
       setDebugPoints([
-        {
-          x: touches[0].pageX - originalPageX,
-          y: touches[0].pageY - originalPageY,
-        },
-        {
-          x: touches[1].pageX - originalPageX,
-          y: touches[1].pageY - originalPageY,
-        },
+        { x: e.allTouches[0].x, y: e.allTouches[0].y },
+        { x: e.allTouches[1].x, y: e.allTouches[1].y },
         zoomCenter,
         ...points,
       ]);

@@ -13,5 +13,5 @@
     "esModuleInterop": true,
     "moduleResolution": "node"
   },
-  "extends": "expo/tsconfig.base"
+  "extends": "../tsconfig"
 }
