@@ -1,7 +1,15 @@
 import { ReactNativeZoomableView } from '@openspacelabs/react-native-zoomable-view';
 import { debounce } from 'lodash';
-import React, { useCallback, useState } from 'react';
-import { Alert, Button, Image, Modal, Text, View } from 'react-native';
+import React, { ReactNode, useCallback, useState } from 'react';
+import {
+  Alert,
+  Button,
+  Image,
+  Modal,
+  Text,
+  View,
+  ViewProps,
+} from 'react-native';
 import Animated, {
   runOnJS,
   useAnimatedStyle,
@@ -18,9 +26,24 @@ const imageSize = { width: kittenSize, height: kittenSize };
 const stringifyPoint = (point?: { x: number; y: number }) =>
   point ? `${Math.round(point.x)}, ${Math.round(point.y)}` : 'Off map';
 
+const PageSheetModal = ({
+  children,
+  style,
+}: {
+  children: ReactNode;
+  style?: ViewProps['style'];
+}) => {
+  return (
+    <Modal animationType="slide" presentationStyle="pageSheet">
+      <View style={style}>{children}</View>
+    </Modal>
+  );
+};
+
 export default function App() {
   const scale = useSharedValue(1);
   const [showMarkers, setShowMarkers] = useState(true);
+  const [modal, setModal] = useState(false);
   const [size, setSize] = useState<{ width: number; height: number }>({
     width: 0,
     height: 0,
@@ -46,9 +69,11 @@ export default function App() {
     };
   });
 
+  const Wrapper = modal ? PageSheetModal : View;
+
   return (
-    <Modal presentationStyle={'pageSheet'} style={styles.container}>
-      {/*<Text>ReactNativeZoomableView</Text>*/}
+    <Wrapper style={styles.container}>
+      <Text>ReactNativeZoomableView</Text>
       <View
         style={styles.box}
         onLayout={(e) => {
@@ -105,6 +130,15 @@ export default function App() {
           setShowMarkers((value) => !value);
         }}
       />
-    </Modal>
+
+      <Button
+        // Toggle modal to test if zoomable view works correctly in modal,
+        // where pull-down-to-close gesture can interfere with pan gestures.
+        title={`Toggle Modal Mode`}
+        onPress={() => {
+          setModal((value) => !value);
+        }}
+      />
+    </Wrapper>
   );
 }
