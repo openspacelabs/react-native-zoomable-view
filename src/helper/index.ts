@@ -49,5 +49,7 @@ export function calcGestureTouchDistance(
 
   const dx = Math.abs(touches[0].pageX - touches[1].pageX);
   const dy = Math.abs(touches[0].pageY - touches[1].pageY);
-  return Math.sqrt(dx * dx + dy * dy);
+
+  // Minimum of 44pt to avoid strange rounding errors
+  return Math.max(44, Math.sqrt(dx * dx + dy * dy));
 }

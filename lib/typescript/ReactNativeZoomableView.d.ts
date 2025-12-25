@@ -1,5 +1,5 @@
 /// <reference types="lodash" />
-import { Component, RefObject } from 'react';
+import React, { Component, RefObject } from 'react';
 import { GestureResponderEvent, PanResponderCallbacks, PanResponderGestureState, PanResponderInstance, View } from 'react-native';
 import { ReactNativeZoomableViewProps, ReactNativeZoomableViewState, Vec2D, ZoomableViewEvent } from './typings';
 declare class ReactNativeZoomableView extends Component<ReactNativeZoomableViewProps, ReactNativeZoomableViewState> {
@@ -239,7 +239,8 @@ declare class ReactNativeZoomableView extends Component<ReactNativeZoomableViewP
      * @return {bool}
      */
     moveBy(offsetChangeX: number, offsetChangeY: number): void;
-    render(): JSX.Element;
+    render(): React.JSX.Element;
 }
 export default ReactNativeZoomableView;
 export { ReactNativeZoomableView };
+//# sourceMappingURL=ReactNativeZoomableView.d.ts.map
