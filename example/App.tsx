@@ -10,7 +10,7 @@ import {
   View,
   ViewProps,
 } from 'react-native';
-import { runOnJS, useSharedValue } from 'react-native-reanimated';
+import { runOnJS } from 'react-native-reanimated';
 
 import { applyContainResizeMode } from '../src/helper/coordinateConversion';
 import { Dot } from './Dot';
@@ -38,7 +38,6 @@ const PageSheetModal = ({
 };
 
 export default function App() {
-  const scale = useSharedValue(1);
   const [showMarkers, setShowMarkers] = useState(true);
   const [modal, setModal] = useState(false);
   const [size, setSize] = useState<{ width: number; height: number }>({
@@ -84,10 +83,6 @@ export default function App() {
           onStaticPinPositionMoveWorklet={(position) => {
             'worklet';
             runOnJS(debouncedUpdateMovePin)(position);
-          }}
-          onTransformWorklet={({ zoomLevel }) => {
-            'worklet';
-            scale.value = 1 / zoomLevel;
           }}
           maxZoom={30}
           // Give these to the zoomable view so it can apply the boundaries around the actual content.
