@@ -124,7 +124,9 @@ const ReactNativeZoomableView: ForwardRefRenderFunction<
   /**
    * Last press time (used to evaluate whether user double tapped)
    */
-  const longPressTimeout = useRef<NodeJS.Timeout>();
+  const longPressTimeout = useSharedValue<NodeJS.Timeout | undefined>(
+    undefined
+  );
   const onTransformInvocationInitialized = useSharedValue(false);
   const singleTapTimeoutId = useRef<NodeJS.Timeout>();
   const touches = useSharedValue<TouchPoint[]>([]);
@@ -290,16 +292,16 @@ const ReactNativeZoomableView: ForwardRefRenderFunction<
 
   const scheduleLongPressTimeout = useLatestCallback((e: GestureTouchEvent) => {
     if (props.onLongPress && props.longPressDuration) {
-      longPressTimeout.current = setTimeout(() => {
+      longPressTimeout.value = setTimeout(() => {
         props.onLongPress?.(e, _getZoomableViewEventObject());
-        longPressTimeout.current = undefined;
+        longPressTimeout.value = undefined;
       }, props.longPressDuration);
     }
   });
   const clearLongPressTimeout = useLatestCallback(() => {
-    if (longPressTimeout.current) {
-      clearTimeout(longPressTimeout.current);
-      longPressTimeout.current = undefined;
+    if (longPressTimeout.value) {
+      clearTimeout(longPressTimeout.value);
+      longPressTimeout.value = undefined;
     }
   });
 
@@ -829,7 +831,10 @@ const ReactNativeZoomableView: ForwardRefRenderFunction<
    *
    * @private
    */
-  const _handlePanResponderMove = (e: GestureTouchEvent) => {
+  const _handlePanResponderMove = (
+    e: GestureTouchEvent,
+    gestureState: { dx: number; dy: number }
+  ) => {
     'worklet';
 
     // Only supports 2 touches and below,
@@ -856,37 +861,39 @@ const ReactNativeZoomableView: ForwardRefRenderFunction<
       gestureType.value = 'pinch';
       _handlePinching(e);
     } else if (e.numberOfTouches === 1) {
-      //TODO
-      // if (longPressTimeout.current && (Math.abs(dx) > 5 || Math.abs(dy) > 5)) {
-      runOnJS(clearLongPressTimeout)();
-      // }
+      const { dx, dy } = gestureState;
+
+      if (longPressTimeout.value && (Math.abs(dx) > 5 || Math.abs(dy) > 5)) {
+        runOnJS(clearLongPressTimeout)();
+      }
 
       // change some measurement states when switching gesture to ensure a smooth transition
       if (gestureType.value !== 'shift') {
         lastGestureCenterPosition.value = calcGestureCenterPoint(e);
       }
 
-      // const isShiftGesture = Math.abs(dx) > 2 || Math.abs(dy) > 2;
-      // if (isShiftGesture) {
-      gestureType.value = 'shift';
-      _handleShifting(e);
-      // }
+      const isShiftGesture = Math.abs(dx) > 2 || Math.abs(dy) > 2;
+      if (isShiftGesture) {
+        gestureType.value = 'shift';
+        _handleShifting(e);
+      }
     }
   };
 
+  const firstTouch = useSharedValue<Vec2D | undefined>(undefined);
   const gesture = Gesture.Manual()
     .onTouchesDown((e, stateManager) => {
-      // console.log('start', e);
       stateManager.activate();
       stateManager.begin();
+      firstTouch.value = { x: e.allTouches[0].x, y: e.allTouches[0].y };
       _handlePanResponderGrant(e);
     })
     .onTouchesMove((e) => {
-      // console.log('move', e);
-      _handlePanResponderMove(e);
+      const dx = e.allTouches[0].x - (firstTouch.value?.x || 0);
+      const dy = e.allTouches[0].y - (firstTouch.value?.y || 0);
+      _handlePanResponderMove(e, { dx, dy });
     })
     .onTouchesUp((e, stateManager) => {
-      // console.log('up', e);
       // only end if this is the last touch being lifted
       if (e.numberOfTouches === 0) {
         _handlePanResponderEnd(e);
@@ -896,6 +903,9 @@ const ReactNativeZoomableView: ForwardRefRenderFunction<
     .onTouchesCancelled((e, stateManager) => {
       _handlePanResponderEnd(e);
       stateManager.end();
+    })
+    .onFinalize(() => {
+      firstTouch.value = undefined;
     });
 
   return (
