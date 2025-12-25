@@ -41,3 +41,4 @@ export declare function viewportPositionToImagePosition({ viewportPosition, imag
     imageSize: Size2D;
     zoomableEvent: ZoomableViewEvent;
 }): Vec2D | null;
+//# sourceMappingURL=coordinateConversion.d.ts.map

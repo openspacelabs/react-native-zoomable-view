@@ -49,3 +49,4 @@
  * @param zoomCenterXOrY
  */
 export declare function calcNewScaledOffsetForZoomCentering(oldOffsetXOrYScaled: number, zoomSubjectOriginalWidthOrHeight: number, oldScale: number, newScale: number, zoomCenterXOrY: number): number;
+//# sourceMappingURL=calcNewScaledOffsetForZoomCentering.d.ts.map
