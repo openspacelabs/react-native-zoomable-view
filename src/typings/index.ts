@@ -25,7 +25,6 @@ export interface ReactNativeZoomableViewProps {
   initialOffsetY?: number;
   contentWidth?: number;
   contentHeight?: number;
-  panBoundaryPadding?: number;
   maxZoom?: number;
   minZoom?: number;
   doubleTapDelay?: number;
@@ -56,24 +55,8 @@ export interface ReactNativeZoomableViewProps {
     event: GestureTouchEvent,
     zoomableViewEventObject: ZoomableViewEvent
   ) => void;
-  onShiftingBefore?: (
-    event: GestureTouchEvent | null,
-    zoomableViewEventObject: ZoomableViewEvent
-  ) => boolean;
-  onShiftingAfter?: (
-    event: GestureTouchEvent | null,
-    zoomableViewEventObject: ZoomableViewEvent
-  ) => boolean;
   onShiftingEnd?: (
     event: GestureTouchEvent,
-    zoomableViewEventObject: ZoomableViewEvent
-  ) => void;
-  onZoomBefore?: (
-    event: GestureTouchEvent | null,
-    zoomableViewEventObject: ZoomableViewEvent
-  ) => boolean | undefined;
-  onZoomAfter?: (
-    event: GestureTouchEvent | null,
     zoomableViewEventObject: ZoomableViewEvent
   ) => void;
   onZoomEnd?: (
