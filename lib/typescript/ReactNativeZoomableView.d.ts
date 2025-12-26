@@ -11,7 +11,7 @@ type ReactNativeZoomableView = {
 };
 declare const ReactNativeZoomableViewContext: React.Context<{
     zoom: SharedValue<number>;
-    inverseZoomStyle: {
+    unzoomStyle: {
         transform: {
             scale: number;
         }[];

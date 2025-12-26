@@ -60,7 +60,7 @@ const ReactNativeZoomableViewContext = React.createContext<
   | {
       zoom: SharedValue<number>;
       // A style that applies the inverse zoom level, so that children stay the same size when zooming. Generic type for compatibility with React Native versions.
-      inverseZoomStyle: { transform: { scale: number }[] };
+      unzoomStyle: { transform: { scale: number }[] };
       offsetX: SharedValue<number>;
       offsetY: SharedValue<number>;
     }
@@ -81,7 +81,7 @@ export const Unzoom = ({
   return (
     <Animated.View
       style={[
-        context?.inverseZoomStyle,
+        context?.unzoomStyle,
         {
           width: 1,
           height: 1,
@@ -957,7 +957,7 @@ const ReactNativeZoomableView: ForwardRefRenderFunction<
 
   return (
     <ReactNativeZoomableViewContext.Provider
-      value={{ zoom, offsetX, offsetY, inverseZoomStyle }}
+      value={{ zoom, offsetX, offsetY, unzoomStyle: inverseZoomStyle }}
     >
       <GestureHandlerRootView>
         <GestureDetector gesture={gesture}>
