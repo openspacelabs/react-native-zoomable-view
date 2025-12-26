@@ -19,6 +19,11 @@ declare const ReactNativeZoomableViewContext: React.Context<{
     offsetX: SharedValue<number>;
     offsetY: SharedValue<number>;
 } | undefined>;
+export declare const ConstantSizeMarker: ({ left, top, children, }: {
+    left: number;
+    top: number;
+    children: React.ReactNode;
+}) => React.JSX.Element;
 declare const ReactNativeZoomableView: ForwardRefRenderFunction<ReactNativeZoomableView, ReactNativeZoomableViewProps>;
 export default ReactNativeZoomableView;
 export { ReactNativeZoomableView, ReactNativeZoomableViewContext };

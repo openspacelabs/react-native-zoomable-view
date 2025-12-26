@@ -67,6 +67,35 @@ const ReactNativeZoomableViewContext = React.createContext<
   | undefined
 >(undefined);
 
+export const ConstantSizeMarker = ({
+  left,
+  top,
+  children,
+}: {
+  left: number;
+  top: number;
+  children: React.ReactNode;
+}) => {
+  const context = React.useContext(ReactNativeZoomableViewContext);
+
+  return (
+    <Animated.View
+      style={[
+        context?.inverseZoomStyle,
+        {
+          width: 1,
+          height: 1,
+          position: 'absolute',
+          left: `${left}%`,
+          top: `${top}%`,
+        },
+      ]}
+    >
+      {children}
+    </Animated.View>
+  );
+};
+
 const ReactNativeZoomableView: ForwardRefRenderFunction<
   ReactNativeZoomableView,
   ReactNativeZoomableViewProps

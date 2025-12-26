@@ -13,7 +13,7 @@ import {
 import { runOnJS } from 'react-native-reanimated';
 
 import { applyContainResizeMode } from '../src/helper/coordinateConversion';
-import { Dot } from './Dot';
+import { ConstantSizeMarker } from '../src/ReactNativeZoomableView';
 import { styles } from './style';
 
 const kittenSize = 800;
@@ -97,7 +97,13 @@ export default function App() {
             {showMarkers &&
               [20, 40, 60, 80].map((left) =>
                 [20, 40, 60, 80].map((top) => (
-                  <Dot left={left} top={top} key={`${left}x${top}`} />
+                  <ConstantSizeMarker
+                    left={left}
+                    top={top}
+                    key={`${left}x${top}`}
+                  >
+                    <View style={styles.marker} />
+                  </ConstantSizeMarker>
                 ))
               )}
           </View>
