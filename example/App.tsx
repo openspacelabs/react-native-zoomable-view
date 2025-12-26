@@ -10,13 +10,10 @@ import {
   View,
   ViewProps,
 } from 'react-native';
-import Animated, {
-  runOnJS,
-  useAnimatedStyle,
-  useSharedValue,
-} from 'react-native-reanimated';
+import { runOnJS } from 'react-native-reanimated';
 
 import { applyContainResizeMode } from '../src/helper/coordinateConversion';
+import { Unzoom } from '../src/ReactNativeZoomableView';
 import { styles } from './style';
 
 const kittenSize = 800;
@@ -41,7 +38,6 @@ const PageSheetModal = ({
 };
 
 export default function App() {
-  const scale = useSharedValue(1);
   const [showMarkers, setShowMarkers] = useState(true);
   const [modal, setModal] = useState(false);
   const [size, setSize] = useState<{ width: number; height: number }>({
@@ -62,12 +58,6 @@ export default function App() {
 
   const staticPinPosition = { x: size.width / 2, y: size.height / 2 };
   const { size: contentSize } = applyContainResizeMode(imageSize, size);
-
-  const markerScaleStyle = useAnimatedStyle(() => {
-    return {
-      transform: [{ scale: scale.value }],
-    };
-  });
 
   const Wrapper = modal ? PageSheetModal : View;
 
@@ -94,10 +84,6 @@ export default function App() {
             'worklet';
             runOnJS(debouncedUpdateMovePin)(position);
           }}
-          onTransformWorklet={({ zoomLevel }) => {
-            'worklet';
-            scale.value = 1 / zoomLevel;
-          }}
           maxZoom={30}
           // Give these to the zoomable view so it can apply the boundaries around the actual content.
           // Need to make sure the content is actually centered and the width and height are
@@ -109,14 +95,11 @@ export default function App() {
             <Image style={styles.img} source={{ uri }} />
 
             {showMarkers &&
-              (['20%', '40%', '60%', '80%'] as const).map((left) =>
-                (['20%', '40%', '60%', '80%'] as const).map((top) => (
-                  <Animated.View
-                    key={`${left}x${top}`}
-                    // These markers will move and zoom with the image, but will retain their size
-                    // because of the scale transformation.
-                    style={[styles.marker, { left, top }, markerScaleStyle]}
-                  />
+              [20, 40, 60, 80].map((left) =>
+                [20, 40, 60, 80].map((top) => (
+                  <Unzoom left={left} top={top} key={`${left}x${top}`}>
+                    <View style={styles.marker} />
+                  </Unzoom>
                 ))
               )}
           </View>

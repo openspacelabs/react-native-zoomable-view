@@ -43,5 +43,6 @@ export function calcGestureTouchDistance(e: GestureTouchEvent): number | null {
 
   const dx = Math.abs(touches[0].x - touches[1].x);
   const dy = Math.abs(touches[0].x - touches[1].x);
-  return Math.sqrt(dx * dx + dy * dy);
+
+  return Math.max(44, Math.sqrt(dx * dx + dy * dy));
 }
