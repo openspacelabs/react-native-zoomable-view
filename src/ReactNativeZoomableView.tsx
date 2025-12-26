@@ -67,7 +67,7 @@ const ReactNativeZoomableViewContext = React.createContext<
   | undefined
 >(undefined);
 
-export const ConstantSizeMarker = ({
+export const Unzoom = ({
   left,
   top,
   children,
