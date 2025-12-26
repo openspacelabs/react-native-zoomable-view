@@ -9,12 +9,17 @@ type ReactNativeZoomableView = {
     moveStaticPinTo: (position: Vec2D, duration?: number) => void;
     readonly gestureStarted: boolean;
 };
-export declare const ReactNativeZoomableViewContext: React.Context<{
+declare const ReactNativeZoomableViewContext: React.Context<{
     zoom: SharedValue<number>;
+    inverseZoomStyle: {
+        transform: {
+            scale: number;
+        }[];
+    };
     offsetX: SharedValue<number>;
     offsetY: SharedValue<number>;
 } | undefined>;
 declare const ReactNativeZoomableView: ForwardRefRenderFunction<ReactNativeZoomableView, ReactNativeZoomableViewProps>;
 export default ReactNativeZoomableView;
-export { ReactNativeZoomableView };
+export { ReactNativeZoomableView, ReactNativeZoomableViewContext };
 //# sourceMappingURL=ReactNativeZoomableView.d.ts.map
