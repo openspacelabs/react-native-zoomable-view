@@ -10,3 +10,4 @@ export declare const DebugRect: ({ height, x, y, color, }: {
     y: number;
     color: string;
 }) => JSX.Element;
+//# sourceMappingURL=index.d.ts.map
