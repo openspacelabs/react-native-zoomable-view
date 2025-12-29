@@ -87,7 +87,7 @@ const ReactNativeZoomableView: ForwardRefRenderFunction<
     minZoom: 0.5,
     pinchToZoomInSensitivity: 1,
     pinchToZoomOutSensitivity: 1,
-    movementSensibility: 1,
+    movementSensitivity: 1,
     doubleTapDelay: 300,
     zoomStep: 0.5,
     onLongPress: undefined,
@@ -113,12 +113,13 @@ const ReactNativeZoomableView: ForwardRefRenderFunction<
     contentHeight: propContentHeight,
     onTransformWorklet,
     onStaticPinPositionMoveWorklet,
+    onPanResponderMoveWorklet,
     zoomEnabled: propZoomEnabled,
     maxZoom: propMaxZoom,
     minZoom: propMinZoom,
     pinchToZoomInSensitivity: propPinchToZoomInSensitivity,
     pinchToZoomOutSensitivity: propPinchToZoomOutSensitivity,
-    movementSensibility: propMovementSensibility,
+    movementSensitivity: propMovementSensitivity,
     panEnabled: propPanEnabled,
     disablePanOnInitialZoom: propDisablePanOnInitialZoom,
     initialZoom: propsInitialZoom,
@@ -163,12 +164,15 @@ const ReactNativeZoomableView: ForwardRefRenderFunction<
     () => propDisablePanOnInitialZoom
   );
   const initialZoom = useDerivedValue(() => propsInitialZoom);
-  const movementSensibility = useDerivedValue(() => propMovementSensibility);
+  const movementSensitivity = useDerivedValue(() => propMovementSensitivity);
   const onPanResponderGrant = useLatestCallback(
     props.onPanResponderGrant || (() => undefined)
   );
   const onPanResponderEnd = useLatestCallback(
     props.onPanResponderEnd || (() => undefined)
+  );
+  const onPanResponderTerminate = useLatestCallback(
+    props.onPanResponderTerminate || (() => undefined)
   );
   const onZoomEnd = useLatestCallback(props.onZoomEnd || (() => undefined));
   const onShiftingEnd = useLatestCallback(
@@ -369,12 +373,12 @@ const ReactNativeZoomableView: ForwardRefRenderFunction<
 
     let shift = null;
 
-    if (lastGestureCenterPosition.value && movementSensibility.value) {
+    if (lastGestureCenterPosition.value && movementSensitivity.value) {
       const dx = gestureCenterPoint.x - lastGestureCenterPosition.value.x;
       const dy = gestureCenterPoint.y - lastGestureCenterPosition.value.y;
 
-      const shiftX = dx / zoom.value / movementSensibility.value;
-      const shiftY = dy / zoom.value / movementSensibility.value;
+      const shiftX = dx / zoom.value / movementSensitivity.value;
+      const shiftY = dy / zoom.value / movementSensitivity.value;
 
       shift = {
         x: shiftX,
@@ -838,6 +842,10 @@ const ReactNativeZoomableView: ForwardRefRenderFunction<
   ) => {
     'worklet';
 
+    if (onPanResponderMoveWorklet?.(e, _getZoomableViewEventObject())) {
+      return;
+    }
+
     // Only supports 2 touches and below,
     // any invalid number will cause the gesture to end.
     if (e.numberOfTouches <= 2) {
@@ -848,7 +856,7 @@ const ReactNativeZoomableView: ForwardRefRenderFunction<
       if (gestureStarted.value) {
         _handlePanResponderEnd(e);
       }
-      return true;
+      return;
     }
 
     if (e.numberOfTouches === 2) {
@@ -906,6 +914,7 @@ const ReactNativeZoomableView: ForwardRefRenderFunction<
     })
     .onTouchesCancelled((e, stateManager) => {
       _handlePanResponderEnd(e);
+      runOnJS(onPanResponderTerminate)(e, _getZoomableViewEventObject());
       stateManager.end();
     })
     .onFinalize(() => {

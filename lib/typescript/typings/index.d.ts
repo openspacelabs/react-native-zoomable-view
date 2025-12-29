@@ -1,5 +1,5 @@
 import { ReactNode } from 'react';
-import { LayoutChangeEvent, PanResponderGestureState, ViewProps } from 'react-native';
+import { LayoutChangeEvent, ViewProps } from 'react-native';
 import { GestureTouchEvent } from 'react-native-gesture-handler';
 export interface ZoomableViewEvent {
     zoomLevel: number;
@@ -25,7 +25,7 @@ export interface ReactNativeZoomableViewProps {
     zoomStep?: number;
     pinchToZoomInSensitivity?: number;
     pinchToZoomOutSensitivity?: number;
-    movementSensibility?: number;
+    movementSensitivity?: number;
     longPressDuration?: number;
     visualTouchFeedbackEnabled?: boolean;
     disablePanOnInitialZoom?: boolean;
@@ -38,15 +38,10 @@ export interface ReactNativeZoomableViewProps {
     onShiftingEnd?: (event: GestureTouchEvent, zoomableViewEventObject: ZoomableViewEvent) => void;
     onZoomEnd?: (event: GestureTouchEvent, zoomableViewEventObject: ZoomableViewEvent) => void;
     onLongPress?: (event: GestureTouchEvent, zoomableViewEventObject: ZoomableViewEvent) => void;
-    onStartShouldSetPanResponder?: (event: GestureTouchEvent, zoomableViewEventObject: ZoomableViewEvent, baseComponentResult: boolean) => boolean;
     onPanResponderGrant?: (event: GestureTouchEvent, zoomableViewEventObject: ZoomableViewEvent) => void;
     onPanResponderEnd?: (event: GestureTouchEvent, zoomableViewEventObject: ZoomableViewEvent) => void;
-    onPanResponderMove?: (event: GestureTouchEvent, zoomableViewEventObject: ZoomableViewEvent) => boolean;
+    onPanResponderMoveWorklet?: (event: GestureTouchEvent, zoomableViewEventObject: ZoomableViewEvent) => boolean;
     onPanResponderTerminate?: (event: GestureTouchEvent, zoomableViewEventObject: ZoomableViewEvent) => void;
-    onPanResponderTerminationRequest?: (event: GestureTouchEvent, zoomableViewEventObject: ZoomableViewEvent) => boolean;
-    onShouldBlockNativeResponder?: (event: GestureTouchEvent, zoomableViewEventObject: ZoomableViewEvent) => boolean;
-    onStartShouldSetPanResponderCapture?: (event: GestureTouchEvent, gestureState: PanResponderGestureState) => boolean;
-    onMoveShouldSetPanResponderCapture?: (event: GestureTouchEvent, gestureState: PanResponderGestureState) => boolean;
     staticPinPosition?: Vec2D;
     staticPinIcon?: React.ReactElement;
     onStaticPinPositionChange?: (position: Vec2D) => void;
