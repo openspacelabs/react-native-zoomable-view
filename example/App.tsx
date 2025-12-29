@@ -14,10 +14,10 @@ import {
   ViewProps,
 } from 'react-native';
 import Animated, {
-  runOnJS,
   useAnimatedStyle,
   useSharedValue,
 } from 'react-native-reanimated';
+import { scheduleOnRN } from 'react-native-worklets';
 
 import { applyContainResizeMode } from '../src/helper/coordinateConversion';
 import { styles } from './style';
@@ -97,7 +97,7 @@ export default function App() {
           onStaticPinPositionChange={debouncedUpdatePin}
           onStaticPinPositionMoveWorklet={(position) => {
             'worklet';
-            runOnJS(debouncedUpdateMovePin)(position);
+            scheduleOnRN(debouncedUpdateMovePin, position);
           }}
           onTransformWorklet={({ zoomLevel }) => {
             'worklet';
