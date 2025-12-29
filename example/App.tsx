@@ -13,10 +13,7 @@ import {
   View,
   ViewProps,
 } from 'react-native';
-import Animated, {
-  useAnimatedStyle,
-  useSharedValue,
-} from 'react-native-reanimated';
+import Animated, { useSharedValue } from 'react-native-reanimated';
 import { scheduleOnRN } from 'react-native-worklets';
 
 import { applyContainResizeMode } from '../src/helper/coordinateConversion';
@@ -67,12 +64,6 @@ export default function App() {
   const staticPinPosition = { x: size.width / 2, y: size.height / 2 };
   const { size: contentSize } = applyContainResizeMode(imageSize, size);
 
-  const markerScaleStyle = useAnimatedStyle(() => {
-    return {
-      transform: [{ scale: scale.value }],
-    };
-  });
-
   const Wrapper = modal ? PageSheetModal : View;
 
   return (
@@ -120,7 +111,11 @@ export default function App() {
                     key={`${left}x${top}`}
                     // These markers will move and zoom with the image, but will retain their size
                     // because of the scale transformation.
-                    style={[styles.marker, { left, top }, markerScaleStyle]}
+                    style={[
+                      styles.marker,
+                      { left, top },
+                      { transform: [{ scaleX: scale }, { scaleY: scale }] },
+                    ]}
                   />
                 ))
               )}

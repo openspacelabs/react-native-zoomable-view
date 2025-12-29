@@ -1,1 +1,1 @@
-{"version":3,"file":"ReactNativeZoomableView.d.ts","sourceRoot":"","sources":["../../src/ReactNativeZoomableView.tsx"],"names":[],"mappings":"AACA,OAAO,KAQN,MAAM,OAAO,CAAC;AAiCf,OAAO,EACL,4BAA4B,EAC5B,0BAA0B,EAI3B,MAAM,WAAW,CAAC;AAs7BnB,eAAO,MAAM,uBAAuB,iHAA2C,CAAC"}
+{"version":3,"file":"ReactNativeZoomableView.d.ts","sourceRoot":"","sources":["../../src/ReactNativeZoomableView.tsx"],"names":[],"mappings":"AACA,OAAO,KAQN,MAAM,OAAO,CAAC;AAgCf,OAAO,EACL,4BAA4B,EAC5B,0BAA0B,EAI3B,MAAM,WAAW,CAAC;AAo7BnB,eAAO,MAAM,uBAAuB,iHAA2C,CAAC"}

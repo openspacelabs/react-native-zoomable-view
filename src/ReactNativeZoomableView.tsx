@@ -20,7 +20,6 @@ import Animated, {
   makeMutable,
   runOnJS,
   useAnimatedReaction,
-  useAnimatedStyle,
   useDerivedValue,
   useSharedValue,
   withTiming,
@@ -928,18 +927,16 @@ const ReactNativeZoomableViewInner: ForwardRefRenderFunction<
               // eslint-disable-next-line @typescript-eslint/no-use-before-define
               styles.zoomSubject,
               props.style,
-              useAnimatedStyle(() => {
-                return {
-                  transform: [
-                    // In RN79, we need to split the scale into X and Y to avoid
-                    // the content getting pixelated when zooming in
-                    { scaleX: zoom.value },
-                    { scaleY: zoom.value },
-                    { translateX: offsetX.value },
-                    { translateY: offsetY.value },
-                  ],
-                };
-              }),
+              {
+                transform: [
+                  // In RN79, we need to split the scale into X and Y to avoid
+                  // the content getting pixelated when zooming in
+                  { scaleX: zoom },
+                  { scaleY: zoom },
+                  { translateX: offsetX },
+                  { translateY: offsetY },
+                ],
+              },
             ]}
           >
             {children}
