@@ -1,6 +1,9 @@
-import { ReactNativeZoomableView } from '@openspacelabs/react-native-zoomable-view';
+import {
+  ReactNativeZoomableView,
+  ReactNativeZoomableViewRef,
+} from '@openspacelabs/react-native-zoomable-view';
 import { debounce } from 'lodash';
-import React, { ReactNode, useCallback, useState } from 'react';
+import React, { ReactNode, useCallback, useRef, useState } from 'react';
 import {
   Alert,
   Button,
@@ -41,6 +44,7 @@ const PageSheetModal = ({
 };
 
 export default function App() {
+  const ref = useRef<ReactNativeZoomableViewRef>(null);
   const scale = useSharedValue(1);
   const [showMarkers, setShowMarkers] = useState(true);
   const [modal, setModal] = useState(false);
@@ -81,6 +85,7 @@ export default function App() {
         }}
       >
         <ReactNativeZoomableView
+          ref={ref}
           debug
           onLongPress={() => {
             Alert.alert('Long press detected');

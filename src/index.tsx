@@ -3,9 +3,10 @@ import {
   getImageOriginOnTransformSubject,
   viewportPositionToImagePosition,
 } from './helper/coordinateConversion';
-import ReactNativeZoomableView from './ReactNativeZoomableView';
+import { ReactNativeZoomableView } from './ReactNativeZoomableView';
 import type {
   ReactNativeZoomableViewProps,
+  ReactNativeZoomableViewRef,
   ZoomableViewEvent,
 } from './typings';
 
@@ -15,6 +16,7 @@ export {
   getImageOriginOnTransformSubject,
   ReactNativeZoomableView,
   ReactNativeZoomableViewProps,
+  ReactNativeZoomableViewRef,
   viewportPositionToImagePosition,
   ZoomableViewEvent,
 };

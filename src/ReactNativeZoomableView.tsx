@@ -1,5 +1,6 @@
 import { debounce, defaults } from 'lodash';
 import React, {
+  forwardRef,
   ForwardRefRenderFunction,
   useImperativeHandle,
   useLayoutEffect,
@@ -41,22 +42,14 @@ import { useLatestCallback } from './hooks/useLatestCallback';
 import { useZoomSubject } from './hooks/useZoomSubject';
 import {
   ReactNativeZoomableViewProps,
+  ReactNativeZoomableViewRef,
   TouchPoint,
   Vec2D,
   ZoomableViewEvent,
 } from './typings';
 
-type ReactNativeZoomableView = {
-  moveTo(newOffsetX: number, newOffsetY: number): void;
-  moveBy(offsetChangeX: number, offsetChangeY: number): void;
-  zoomTo(newZoomLevel: number, zoomCenter?: Vec2D): boolean;
-  zoomBy(zoomLevelChange: number): boolean;
-  moveStaticPinTo: (position: Vec2D, duration?: number) => void;
-  readonly gestureStarted: boolean;
-};
-
-const ReactNativeZoomableView: ForwardRefRenderFunction<
-  ReactNativeZoomableView,
+const ReactNativeZoomableViewInner: ForwardRefRenderFunction<
+  ReactNativeZoomableViewRef,
   ReactNativeZoomableViewProps
 > = (props, ref) => {
   const {
@@ -1003,6 +996,4 @@ const styles = StyleSheet.create({
   },
 });
 
-export default ReactNativeZoomableView;
-
-export { ReactNativeZoomableView };
+export const ReactNativeZoomableView = forwardRef(ReactNativeZoomableViewInner);

@@ -8,6 +8,14 @@ export interface ZoomableViewEvent {
     originalHeight: number;
     originalWidth: number;
 }
+export type ReactNativeZoomableViewRef = {
+    moveTo(newOffsetX: number, newOffsetY: number): void;
+    moveBy(offsetChangeX: number, offsetChangeY: number): void;
+    zoomTo(newZoomLevel: number, zoomCenter?: Vec2D): boolean;
+    zoomBy(zoomLevelChange: number): boolean;
+    moveStaticPinTo: (position: Vec2D, duration?: number) => void;
+    readonly gestureStarted: boolean;
+};
 export interface ReactNativeZoomableViewProps {
     style?: ViewProps['style'];
     children?: ReactNode;
