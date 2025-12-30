@@ -1,3 +1,3 @@
-import { Animated } from 'react-native';
-export declare function getZoomToAnimation(animValue: Animated.Value, toValue: number): Animated.CompositeAnimation;
+import { WithTimingConfig } from 'react-native-reanimated';
+export declare const zoomToAnimation: WithTimingConfig;
 //# sourceMappingURL=index.d.ts.map

@@ -159,7 +159,7 @@ These options can be used to limit and change the zoom behavior.
 | zoomStep                   | number  | How much zoom should be applied on double tap                                                                            | 0.5       |
 | pinchToZoomInSensitivity   | number  | the level of resistance (sensitivity) to zoom in (0 - 10) - higher is less sensitive                                     | 3         |
 | pinchToZoomOutSensitivity  | number  | the level of resistance (sensitivity) to zoom out (0 - 10) - higher is less sensitive                                    | 1         |
-| movementSensibility        | number  | how resistant should shifting the view around be? (0.5 - 5) - higher is less sensitive                                   | 1.9       |
+| movementSensitivity        | number  | how resistant should shifting the view around be? (0.5 - 5) - higher is less sensitive                                   | 1.9       |
 | initialOffsetX             | number  | The horizontal offset the image should start at                                                                          | 0         |
 | initialOffsetY             | number  | The vertical offset the image should start at                                                                            | 0         |
 | contentHeight              | number  | Specify if you want to treat the height of the **centered** content inside the zoom subject as the zoom subject's height | undefined |
@@ -182,19 +182,15 @@ These optional props can be used to keep a "static" pin in the centre of the scr
 
 These events can be used to work with data after specific events.
 
-| name              | description                                                                                                                                               | params                                                   | expected return                                                                            |
-| ----------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------- | ------------------------------------------------------------------------------------------ |
-| onTransform       | Will be called when the transformation configuration (zoom level and offset) changes                                                                      | zoomableViewEventObject                                  | void                                                                                       |
-| onDoubleTapBefore | Will be called at the start of a double tap                                                                                                               | event, gestureState, zoomableViewEventObject             | void                                                                                       |
-| onDoubleTapAfter  | Will be called at the end of a double tap                                                                                                                 | event, gestureState, zoomableViewEventObject             | void                                                                                       |
-| onShiftingBefore  | Will be called when user taps and moves the view, but before our view movement work kicks in (so this is the place to interrupt movement, if you need to) | event, gestureState, zoomableViewEventObject             | {boolean} if this returns true, ZoomableView will not process the shift, otherwise it will |
-| onShiftingAfter   | Will be called when user taps and moves the view, but after the values have changed already                                                               | event, gestureState, zoomableViewEventObject             | void                                                                                       |
-| onShiftingEnd     | Will be called when user stops a tap and move gesture                                                                                                     | event, gestureState, zoomableViewEventObject             | void                                                                                       |
-| onZoomBefore      | Will be called while the user pinches the screen, but before our zoom work kicks in (so this is the place to interrupt zooming, if you need to)           | event, gestureState, zoomableViewEventObject             | {boolean} if this returns true, ZoomableView will not process the pinch, otherwise it will |
-| onZoomAfter       | Will be called while the user pinches the screen, but after the values have changed already                                                               | event, gestureState, zoomableViewEventObject             | {boolean} if this returns true, ZoomableView will not process the pinch, otherwise it will |
-| onZoomEnd         | Will be called after pinchzooming has ended                                                                                                               | event, gestureState, zoomableViewEventObject             | {boolean} if this returns true, ZoomableView will not process the pinch, otherwise it will |
-| onLongPress       | Will be called after the user pressed on the image for a while                                                                                            | event, gestureState                                      | void                                                                                       |
-| onLayout          | Like `View`'s `onLayout`, but different in that it syncs with this component's internal state and returns a fake sythentic event                          | Like `View`'s `onLayout` but the synthetic event is fake | void                                                                                       |
+| name              | description                                                                                                                      | params                                                   | expected return |
+| ----------------- | -------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------- | --------------- |
+| onTransform       | Will be called when the transformation configuration (zoom level and offset) changes                                             | zoomableViewEventObject                                  | void            |
+| onDoubleTapBefore | Will be called at the start of a double tap                                                                                      | event, zoomableViewEventObject                           | void            |
+| onDoubleTapAfter  | Will be called at the end of a double tap                                                                                        | event, zoomableViewEventObject                           | void            |
+| onShiftingEnd     | Will be called when user stops a tap and move gesture                                                                            | event, zoomableViewEventObject                           | void            |
+| onZoomEnd         | Will be called after pinchzooming has ended                                                                                      | event, zoomableViewEventObject                           | void            |
+| onLongPress       | Will be called after the user pressed on the image for a while                                                                   | event                                                    | void            |
+| onLayout          | Like `View`'s `onLayout`, but different in that it syncs with this component's internal state and returns a fake sythentic event | Like `View`'s `onLayout` but the synthetic event is fake | void            |
 
 #### Methods
 
@@ -259,17 +255,15 @@ export default function App() {
 
 #### Pan Responder Hooks
 
-Sometimes you need to change deeper level behavior, so we prepared these panresponder hooks for you.
+`react-native-gesture-handler` is now used instead of the built-in PanResponder. As such, we have removed some hooks that
+are no longer supported and made the rest backward compatible.
 
-| name                             | description                                                                                                                                                                                                         | params                                                            | expected return                                     |
-| -------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------- | --------------------------------------------------- |
-| onStartShouldSetPanResponder     | description                                                                                                                                                                                                         | event, gestureState, zoomableViewEventObject, baseComponentResult | {boolean} whether panresponder should be set or not |
-| onPanResponderGrant              | description                                                                                                                                                                                                         | event, gestureState, zoomableViewEventObject                      | void                                                |
-| onPanResponderEnd                | Will be called when gesture ends (more accurately, on pan responder "release")                                                                                                                                      | event, gestureState, zoomableViewEventObject                      | void                                                |
-| onPanResponderTerminate          | Will be called when the gesture is force-interrupted by another handler                                                                                                                                             | event, gestureState, zoomableViewEventObject                      | void                                                |
-| onPanResponderTerminationRequest | Callback asking whether the gesture should be interrupted by another handler (**iOS only** due to https://github.com/facebook/react-native/issues/27778, https://github.com/facebook/react-native/issues/5696, ...) | event, gestureState, zoomableViewEventObject                      | void                                                |
-| onPanResponderMove               | Will be called when user moves while touching                                                                                                                                                                       | event, gestureState, zoomableViewEventObject                      | void                                                |
-| onShouldBlockNativeResponder     | Returns whether this component should block native components from becoming the JS responder                                                                                                                        | event, gestureState, zoomableViewEventObject                      | boolean                                             |
+| name                      | description                                                                    | params                         | expected return                                                                 |
+| ------------------------- | ------------------------------------------------------------------------------ | ------------------------------ | ------------------------------------------------------------------------------- |
+| onPanResponderGrant       | description                                                                    | event, zoomableViewEventObject | void                                                                            |
+| onPanResponderEnd         | Will be called when gesture ends (more accurately, on pan responder "release") | event, zoomableViewEventObject | void                                                                            |
+| onPanResponderTerminate   | Will be called when the gesture is force-interrupted by another handler        | event, zoomableViewEventObject | void                                                                            |
+| onPanResponderMoveWorklet | Will be called when user moves while touching                                  | event, zoomableViewEventObject | {boolean} if true is returned, pinch and shift operations will not be processed |
 
 ### zoomableViewEventObject
 
@@ -282,8 +276,6 @@ The zoomableViewEventObject object is attached to every event and represents the
       offsetY: number,           // current offset top
       originalHeight: number,    // original height of the zoom subject
       originalWidth: number,     // original width of the zoom subject
-      originalPageX: number,     // original absolute X of the zoom subject
-      originalPageY: number,     // original absolite Y of the zoom subject
    }
 ```
 

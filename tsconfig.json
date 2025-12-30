@@ -1,8 +1,8 @@
 {
   "compilerOptions": {
-    "baseUrl": "./",
+    "rootDir": ".",
     "paths": {
-      "@openspacelabs/react-native-zoomable-view": ["./src/index"]
+      "@openspacelabs/react-native-zoomable-view": ["./src/index"],
     },
     "declaration": true,
     "module": "esnext",

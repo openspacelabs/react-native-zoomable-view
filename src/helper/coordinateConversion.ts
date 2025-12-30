@@ -1,14 +1,4 @@
-import { Size2D, Vec2D, ZoomableViewEvent } from 'src/typings';
-
-export const defaultTransformSubjectData: ZoomableViewEvent = {
-  offsetX: 0,
-  offsetY: 0,
-  zoomLevel: 0,
-  originalWidth: 0,
-  originalHeight: 0,
-  originalPageX: 0,
-  originalPageY: 0,
-};
+import { Size2D, Vec2D, ZoomableViewEvent } from '../typings';
 
 /**
  * Assuming you have an image that's being resized to fit into a container
@@ -25,6 +15,8 @@ export function applyContainResizeMode(
   imgSize: Size2D,
   containerSize: Size2D
 ): { size: Size2D; scale: number } | { size: null; scale: null } {
+  'worklet';
+
   const { width: imageWidth, height: imageHeight } = imgSize;
   const { width: areaWidth, height: areaHeight } = containerSize;
   const imageAspect = imageWidth / imageHeight;
@@ -63,6 +55,8 @@ export function getImageOriginOnTransformSubject(
   resizedImageSize: Size2D,
   transformSubject: ZoomableViewEvent
 ) {
+  'worklet';
+
   const { offsetX, offsetY, zoomLevel, originalWidth, originalHeight } =
     transformSubject;
   return {
@@ -95,6 +89,8 @@ export function viewportPositionToImagePosition({
   imageSize: Size2D;
   zoomableEvent: ZoomableViewEvent;
 }): Vec2D | null {
+  'worklet';
+
   const { size: resizedImgSize, scale: resizedImgScale } =
     applyContainResizeMode(imageSize, {
       width: zoomableEvent.originalWidth,
