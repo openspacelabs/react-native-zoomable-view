@@ -65,7 +65,7 @@ export interface ReactNativeZoomableViewProps {
     zoomableViewEventObject: ZoomableViewEvent
   ) => void;
   onZoomEnd?: (
-    event: GestureTouchEvent,
+    event: GestureTouchEvent | undefined,
     zoomableViewEventObject: ZoomableViewEvent
   ) => void;
   onLongPress?: (

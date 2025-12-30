@@ -44,7 +44,7 @@ export interface ReactNativeZoomableViewProps {
     onDoubleTapBefore?: (event: GestureTouchEvent, zoomableViewEventObject: ZoomableViewEvent) => void;
     onDoubleTapAfter?: (event: GestureTouchEvent, zoomableViewEventObject: ZoomableViewEvent) => void;
     onShiftingEnd?: (event: GestureTouchEvent, zoomableViewEventObject: ZoomableViewEvent) => void;
-    onZoomEnd?: (event: GestureTouchEvent, zoomableViewEventObject: ZoomableViewEvent) => void;
+    onZoomEnd?: (event: GestureTouchEvent | undefined, zoomableViewEventObject: ZoomableViewEvent) => void;
     onLongPress?: (event: GestureTouchEvent, zoomableViewEventObject: ZoomableViewEvent) => void;
     onPanResponderGrant?: (event: GestureTouchEvent, zoomableViewEventObject: ZoomableViewEvent) => void;
     onPanResponderEnd?: (event: GestureTouchEvent, zoomableViewEventObject: ZoomableViewEvent) => void;

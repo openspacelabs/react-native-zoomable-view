@@ -556,6 +556,7 @@ const ReactNativeZoomableViewInner: ForwardRefRenderFunction<
 
         // == Zoom Animation Ends ==
         zoomToDestination.value = undefined;
+        runOnJS(onZoomEnd)(undefined, _getZoomableViewEventObject());
       });
 
       return true;
