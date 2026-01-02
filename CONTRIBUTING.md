@@ -88,6 +88,19 @@ To publish new versions, run the following:
 yarn release
 ```
 
+### Changelog and Release Notes
+
+Release notes are automatically generated from merged pull requests. Please label your PRs with:
+
+- `breaking`: Breaking changes (major version bump)
+- `enhancement`: New features (minor version bump)
+- `bug`: Bug fixes (patch version bump)
+- `documentation`: Documentation updates
+
+PRs labeled with `dependencies` are excluded from release notes.
+
+Release notes are organized by category based on labels (see `.github/release.yml`).
+
 ### Scripts
 
 The `package.json` file contains various scripts for common tasks:
