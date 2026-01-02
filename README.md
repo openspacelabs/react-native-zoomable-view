@@ -51,6 +51,10 @@ Check out this [Expo Snack](https://snack.expo.dev/@thomasttvo/eaf257)
 
 We are working with the original maintainers of this library to transfer the NPM alias for `react-native-zoomable-view`. In the meantime, you will want to use `@openspacelabs/react-native-zoomable-view` as the package identifier.
 
+**Requirements:**
+- React Native >= 0.79.0
+- React >= 16.8.0
+
 To add this package, run
 
 `npm add @openspacelabs/react-native-zoomable-view`
