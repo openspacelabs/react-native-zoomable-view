@@ -1,0 +1,36 @@
+name: Release
+
+on:
+  release:
+    types: [published]
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20.x'
+          registry-url: 'https://registry.npmjs.org'
+          cache: 'yarn'
+
+      - name: Verify npm version
+        run: npm --version
+
+      - name: Install dependencies
+        run: yarn install --frozen-lockfile
+
+      - name: Build
+        run: yarn build
+
+      - name: Publish to npm
+        # --access public: Scoped packages (@openspacelabs/*) default to private, this makes it public
+        # Authentication: Uses OIDC (no tokens needed)
+        # Configured at: https://www.npmjs.com/package/@openspacelabs/react-native-zoomable-view/access
+        run: npm publish --access public
