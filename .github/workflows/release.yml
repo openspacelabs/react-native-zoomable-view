@@ -30,4 +30,7 @@ jobs:
         run: yarn build
 
       - name: Publish to npm
+        # --access public: Scoped packages (@openspacelabs/*) default to private, this makes it public
+        # Authentication: Uses OIDC (no tokens needed)
+        # Configured at: https://www.npmjs.com/package/@openspacelabs/react-native-zoomable-view/access
         run: npm publish --access public
