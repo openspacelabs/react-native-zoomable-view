@@ -1,0 +1,44 @@
+name: PR Labels
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, labeled, unlabeled]
+
+jobs:
+  check-labels:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Extract valid labels from release.yml
+        id: extract-labels
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const yaml = require('js-yaml');
+
+            const releaseConfig = yaml.load(fs.readFileSync('.github/release.yml', 'utf8'));
+            const labels = [];
+
+            if (releaseConfig.changelog?.categories) {
+              for (const category of releaseConfig.changelog.categories) {
+                if (category.labels) {
+                  for (const label of category.labels) {
+                    if (label !== '*') {
+                      labels.push(label);
+                    }
+                  }
+                }
+              }
+            }
+
+            const labelsString = labels.join(',');
+            core.info(`Extracted labels: ${labelsString}`);
+            core.setOutput('labels', labelsString);
+
+      - uses: mheap/github-action-required-labels@v5
+        with:
+          mode: minimum
+          count: 1
+          labels: ${{ steps.extract-labels.outputs.labels }}
