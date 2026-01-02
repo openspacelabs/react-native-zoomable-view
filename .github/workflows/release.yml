@@ -21,7 +21,7 @@ jobs:
         run: yarn install --frozen-lockfile
 
       - name: Build
-        run: yarn react-native-builder-bob build
+        run: yarn build
 
       - name: Publish to npm
         run: npm publish

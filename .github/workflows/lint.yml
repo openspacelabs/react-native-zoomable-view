@@ -22,5 +22,5 @@ jobs:
     - name: Run ESLint
       run: yarn run lint
     - name: Build
-      run: yarn react-native-builder-bob build
+      run: yarn build
 
