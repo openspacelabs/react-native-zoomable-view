@@ -38,6 +38,10 @@ Check out this [Expo Snack](https://snack.expo.dev/@thomasttvo/eaf257)
 
 ![](https://thumbs.gfycat.com/NaughtyBlackandwhiteBudgie-size_restricted.gif)
 
+## Changelog
+
+See [GitHub Releases](https://github.com/openspacelabs/react-native-zoomable-view/releases) for version history and release notes.
+
 ## Getting started
 
 - [Installation](#installation)

@@ -65,7 +65,6 @@
   "devDependencies": {
     "@commitlint/config-conventional": "^11.0.0",
     "@react-native/eslint-config": "^0.73.0",
-    "@release-it/conventional-changelog": "^2.0.0",
     "@types/lodash": "^4.17.7",
     "@types/react": "^16.9.19",
     "@types/react-native": "^0.65.4",
@@ -115,12 +114,8 @@
       "publish": true
     },
     "github": {
-      "release": true
-    },
-    "plugins": {
-      "@release-it/conventional-changelog": {
-        "preset": "angular"
-      }
+      "release": true,
+      "autoGenerate": true
     }
   },
   "eslintConfig": {
