@@ -78,15 +78,26 @@ We use [TypeScript](https://www.typescriptlang.org/) for type checking, [ESLint]
 
 Our pre-commit hooks verify that the linter and tests pass when committing.
 
+### Build Process
+
+The library source code in `src/` is built to `lib/` for distribution. The `lib/` directory is not tracked in git.
+
+- **Local development**: No build needed - the example app reads directly from `src/`
+- **Pull requests**: CI automatically builds to verify there are no build errors
+- **Releases**: GitHub Actions automatically builds and publishes to npm
+
+You don't need to run build commands locally unless testing the built output.
+
 ### Publishing to npm
 
-We use [release-it](https://github.com/release-it/release-it) to make it easier to publish new versions. It handles common tasks like bumping version based on semver, creating tags and releases etc.
+We use [release-it](https://github.com/release-it/release-it) to create releases and [GitHub Actions](.github/workflows/release.yml) to build and publish to npm.
 
-To publish new versions, run the following:
+To publish new versions:
 
-```sh
-yarn release
-```
+1. Run `yarn release` locally (creates git tag and GitHub release)
+2. GitHub Actions automatically builds and publishes to npm
+
+Only maintainers with npm publish rights can create releases.
 
 ### Scripts
 

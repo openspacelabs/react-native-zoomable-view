@@ -1,14 +1,26 @@
 name: Checks
-on: push
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+
 jobs:
-  build:
+  checks:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v2
-    - name: Install modules
-      run: yarn
-    - name: Run tsc
+    - name: Setup Node.js
+      uses: actions/setup-node@v2
+      with:
+        node-version: '16'
+        cache: 'yarn'
+    - name: Install dependencies
+      run: yarn install --frozen-lockfile
+    - name: Run TypeScript
       run: yarn run typescript
     - name: Run ESLint
       run: yarn run lint
+    - name: Build
+      run: yarn react-native-builder-bob build
 

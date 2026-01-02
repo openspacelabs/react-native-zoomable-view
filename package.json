@@ -98,7 +98,7 @@
   },
   "husky": {
     "hooks": {
-      "pre-commit": "yarn lint && yarn typescript && bob build && git add lib"
+      "pre-commit": "yarn lint && yarn typescript"
     }
   },
   "commitlint": {
@@ -112,7 +112,7 @@
       "tagName": "v${version}"
     },
     "npm": {
-      "publish": true
+      "publish": false
     },
     "github": {
       "release": true
