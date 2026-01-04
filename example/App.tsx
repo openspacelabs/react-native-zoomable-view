@@ -1,4 +1,7 @@
-import { ReactNativeZoomableView } from '@openspacelabs/react-native-zoomable-view';
+import {
+  FixedSize,
+  ReactNativeZoomableView,
+} from '@openspacelabs/react-native-zoomable-view';
 import { debounce } from 'lodash';
 import React, { ReactNode, useCallback, useState } from 'react';
 import {
@@ -13,7 +16,6 @@ import {
 import { runOnJS } from 'react-native-reanimated';
 
 import { applyContainResizeMode } from '../src/helper/coordinateConversion';
-import { Unzoom } from '../src/ReactNativeZoomableView';
 import { styles } from './style';
 
 const kittenSize = 800;
@@ -97,9 +99,9 @@ export default function App() {
             {showMarkers &&
               [20, 40, 60, 80].map((left) =>
                 [20, 40, 60, 80].map((top) => (
-                  <Unzoom left={left} top={top} key={`${left}x${top}`}>
+                  <FixedSize left={left} top={top} key={`${left}x${top}`}>
                     <View style={styles.marker} />
-                  </Unzoom>
+                  </FixedSize>
                 ))
               )}
           </View>

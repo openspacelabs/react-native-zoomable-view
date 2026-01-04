@@ -1,3 +1,4 @@
+import FixedSize from './components/FixedSize';
 import {
   applyContainResizeMode,
   getImageOriginOnTransformSubject,
@@ -12,6 +13,7 @@ import type {
 export {
   // Helper functions for coordinate conversion
   applyContainResizeMode,
+  FixedSize,
   getImageOriginOnTransformSubject,
   ReactNativeZoomableView,
   ReactNativeZoomableViewProps,
