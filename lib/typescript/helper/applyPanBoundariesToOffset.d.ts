@@ -12,3 +12,4 @@
  * @returns {number}
  */
 export declare function applyPanBoundariesToOffset(offsetScaled: number, containerSize: number, contentSize: number, scale: number, boundaryPadding: number): number;
+//# sourceMappingURL=applyPanBoundariesToOffset.d.ts.map

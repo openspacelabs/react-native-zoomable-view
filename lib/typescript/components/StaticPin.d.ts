@@ -16,3 +16,4 @@ export declare const StaticPin: ({ staticPinPosition, pinAnim, staticPinIcon, pi
     setPinSize: (size: Size2D) => void;
     pinProps?: ViewProps | undefined;
 }) => JSX.Element;
+//# sourceMappingURL=StaticPin.d.ts.map

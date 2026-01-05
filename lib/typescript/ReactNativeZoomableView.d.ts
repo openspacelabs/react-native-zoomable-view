@@ -243,3 +243,4 @@ declare class ReactNativeZoomableView extends Component<ReactNativeZoomableViewP
 }
 export default ReactNativeZoomableView;
 export { ReactNativeZoomableView };
+//# sourceMappingURL=ReactNativeZoomableView.d.ts.map

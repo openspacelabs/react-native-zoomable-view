@@ -108,3 +108,4 @@ export interface ReactNativeZoomableViewWithGesturesProps extends ReactNativeZoo
     onSwipeLeft?: (gestureState: PanResponderGestureState) => void;
     onSwipeRight?: (gestureState: PanResponderGestureState) => void;
 }
+//# sourceMappingURL=index.d.ts.map

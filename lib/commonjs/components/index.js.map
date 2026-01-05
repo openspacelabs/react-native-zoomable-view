@@ -1,1 +1,1 @@
-{"version":3,"sources":["index.tsx"],"names":[],"mappings":";;;;;;;;;;;;AAAA","sourcesContent":["export { AnimatedTouchFeedback } from './AnimatedTouchFeedback';\n"]}
+{"version":3,"names":["_AnimatedTouchFeedback","require"],"sourceRoot":"../../../src","sources":["components/index.tsx"],"mappings":";;;;;;;;;;;AAAA,IAAAA,sBAAA,GAAAC,OAAA","ignoreList":[]}
