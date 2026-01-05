@@ -13,12 +13,10 @@ jobs:
       - name: Extract valid labels from release.yml
         id: extract-labels
         run: |
-          labels=$(
-            yq eval '.changelog.categories[].labels[]' .github/release.yml \
-              | grep -v '^\*$' \  # Remove wildcard entries (*)
-              | tr '\n' ',' \      # Convert newlines to commas
-              | sed 's/,$//'       # Remove trailing comma
-          )
+          labels=$(yq eval '.changelog.categories[].labels[]' .github/release.yml)
+          labels=$(echo "$labels" | grep -v '^\*$')  # Remove wildcard entries (*)
+          labels=$(echo "$labels" | tr '\n' ',')     # Convert newlines to commas
+          labels=$(echo "$labels" | sed 's/,$//')    # Remove trailing comma
           echo "labels=$labels" >> $GITHUB_OUTPUT
           echo "Extracted labels: $labels"
 
