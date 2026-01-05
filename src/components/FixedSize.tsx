@@ -28,16 +28,14 @@ export const FixedSize = ({
 
   return (
     <Animated.View
-      style={[
-        context?.fixedSizeStyle,
-        {
-          width: 1,
-          height: 1,
-          position: 'absolute',
-          left: `${left}%`,
-          top: `${top}%`,
-        },
-      ]}
+      style={{
+        transform: [{ scale: context?.inverseZoom ?? 1 }],
+        width: 1,
+        height: 1,
+        position: 'absolute',
+        left: `${left}%`,
+        top: `${top}%`,
+      }}
     >
       {children}
     </Animated.View>
