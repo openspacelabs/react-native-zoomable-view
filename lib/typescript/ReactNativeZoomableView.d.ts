@@ -1,6 +1,5 @@
-import React, { ForwardRefRenderFunction } from 'react';
-import type { DerivedValue } from 'react-native-reanimated';
-import { SharedValue } from '../node_modules/react-native-reanimated/src/commonTypes';
+import { ForwardRefRenderFunction } from 'react';
+import { ReactNativeZoomableViewContext } from './ReactNativeZoomableViewContext';
 import { ReactNativeZoomableViewProps, Vec2D } from './typings';
 type ReactNativeZoomableView = {
     moveTo(newOffsetX: number, newOffsetY: number): void;
@@ -10,17 +9,6 @@ type ReactNativeZoomableView = {
     moveStaticPinTo: (position: Vec2D, duration?: number) => void;
     readonly gestureStarted: boolean;
 };
-declare const ReactNativeZoomableViewContext: React.Context<{
-    zoom: SharedValue<number>;
-    inverseZoom: DerivedValue<number>;
-    inverseZoomStyle: {
-        transform: {
-            scale: number;
-        }[];
-    };
-    offsetX: SharedValue<number>;
-    offsetY: SharedValue<number>;
-} | undefined>;
 declare const ReactNativeZoomableView: ForwardRefRenderFunction<ReactNativeZoomableView, ReactNativeZoomableViewProps>;
 export default ReactNativeZoomableView;
 export { ReactNativeZoomableView, ReactNativeZoomableViewContext };

@@ -1,7 +1,7 @@
 import React from 'react';
 import Animated from 'react-native-reanimated';
 
-import { ReactNativeZoomableViewContext } from '../ReactNativeZoomableView';
+import { ReactNativeZoomableViewContext } from '../ReactNativeZoomableViewContext';
 /**
  * A wrapper component that keeps elements at a fixed visual size regardless of zoom level.
  *

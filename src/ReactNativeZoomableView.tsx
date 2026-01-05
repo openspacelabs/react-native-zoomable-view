@@ -1,5 +1,6 @@
 import { debounce, defaults } from 'lodash';
-import React, {
+import React from 'react';
+import {
   ForwardRefRenderFunction,
   useImperativeHandle,
   useLayoutEffect,
@@ -14,7 +15,6 @@ import {
   GestureHandlerRootView,
   GestureTouchEvent,
 } from 'react-native-gesture-handler';
-import type { DerivedValue } from 'react-native-reanimated';
 import Animated, {
   cancelAnimation,
   makeMutable,
@@ -26,7 +26,6 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated';
 
-import { SharedValue } from '../node_modules/react-native-reanimated/src/commonTypes';
 import { zoomToAnimation } from './animations';
 import { AnimatedTouchFeedback } from './components';
 import { StaticPin } from './components/StaticPin';
@@ -41,6 +40,7 @@ import { getNextZoomStep } from './helper/getNextZoomStep';
 import { useDebugPoints } from './hooks/useDebugPoints';
 import { useLatestCallback } from './hooks/useLatestCallback';
 import { useZoomSubject } from './hooks/useZoomSubject';
+import { ReactNativeZoomableViewContext } from './ReactNativeZoomableViewContext';
 import {
   ReactNativeZoomableViewProps,
   TouchPoint,
@@ -56,18 +56,6 @@ type ReactNativeZoomableView = {
   moveStaticPinTo: (position: Vec2D, duration?: number) => void;
   readonly gestureStarted: boolean;
 };
-
-const ReactNativeZoomableViewContext = React.createContext<
-  | {
-      zoom: SharedValue<number>;
-      // A style that applies the inverse zoom level, so that children stay the same size when zooming. Generic type for compatibility with React Native versions.
-      inverseZoom: DerivedValue<number>;
-      inverseZoomStyle: { transform: { scale: number }[] };
-      offsetX: SharedValue<number>;
-      offsetY: SharedValue<number>;
-    }
-  | undefined
->(undefined);
 
 const ReactNativeZoomableView: ForwardRefRenderFunction<
   ReactNativeZoomableView,
