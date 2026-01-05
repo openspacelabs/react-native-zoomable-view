@@ -1,9 +1,5 @@
 import { ReactNode } from 'react';
-import {
-  LayoutChangeEvent,
-  PanResponderGestureState,
-  ViewProps,
-} from 'react-native';
+import { LayoutChangeEvent, ViewProps } from 'react-native';
 import { GestureTouchEvent } from 'react-native-gesture-handler';
 
 export interface ZoomableViewEvent {
@@ -13,6 +9,15 @@ export interface ZoomableViewEvent {
   originalHeight: number;
   originalWidth: number;
 }
+
+export type ReactNativeZoomableViewRef = {
+  moveTo(newOffsetX: number, newOffsetY: number): void;
+  moveBy(offsetChangeX: number, offsetChangeY: number): void;
+  zoomTo(newZoomLevel: number, zoomCenter?: Vec2D): boolean;
+  zoomBy(zoomLevelChange: number): boolean;
+  moveStaticPinTo: (position: Vec2D, duration?: number) => void;
+  readonly gestureStarted: boolean;
+};
 
 export interface ReactNativeZoomableViewProps {
   // options
@@ -32,7 +37,7 @@ export interface ReactNativeZoomableViewProps {
   zoomStep?: number;
   pinchToZoomInSensitivity?: number;
   pinchToZoomOutSensitivity?: number;
-  movementSensibility?: number;
+  movementSensitivity?: number;
   longPressDuration?: number;
   visualTouchFeedbackEnabled?: boolean;
   disablePanOnInitialZoom?: boolean;
@@ -60,18 +65,13 @@ export interface ReactNativeZoomableViewProps {
     zoomableViewEventObject: ZoomableViewEvent
   ) => void;
   onZoomEnd?: (
-    event: GestureTouchEvent,
+    event: GestureTouchEvent | undefined,
     zoomableViewEventObject: ZoomableViewEvent
   ) => void;
   onLongPress?: (
     event: GestureTouchEvent,
     zoomableViewEventObject: ZoomableViewEvent
   ) => void;
-  onStartShouldSetPanResponder?: (
-    event: GestureTouchEvent,
-    zoomableViewEventObject: ZoomableViewEvent,
-    baseComponentResult: boolean
-  ) => boolean;
   onPanResponderGrant?: (
     event: GestureTouchEvent,
     zoomableViewEventObject: ZoomableViewEvent
@@ -80,7 +80,7 @@ export interface ReactNativeZoomableViewProps {
     event: GestureTouchEvent,
     zoomableViewEventObject: ZoomableViewEvent
   ) => void;
-  onPanResponderMove?: (
+  onPanResponderMoveWorklet?: (
     event: GestureTouchEvent,
     zoomableViewEventObject: ZoomableViewEvent
   ) => boolean;
@@ -88,22 +88,6 @@ export interface ReactNativeZoomableViewProps {
     event: GestureTouchEvent,
     zoomableViewEventObject: ZoomableViewEvent
   ) => void;
-  onPanResponderTerminationRequest?: (
-    event: GestureTouchEvent,
-    zoomableViewEventObject: ZoomableViewEvent
-  ) => boolean;
-  onShouldBlockNativeResponder?: (
-    event: GestureTouchEvent,
-    zoomableViewEventObject: ZoomableViewEvent
-  ) => boolean;
-  onStartShouldSetPanResponderCapture?: (
-    event: GestureTouchEvent,
-    gestureState: PanResponderGestureState
-  ) => boolean;
-  onMoveShouldSetPanResponderCapture?: (
-    event: GestureTouchEvent,
-    gestureState: PanResponderGestureState
-  ) => boolean;
   staticPinPosition?: Vec2D;
   staticPinIcon?: React.ReactElement;
   onStaticPinPositionChange?: (position: Vec2D) => void;

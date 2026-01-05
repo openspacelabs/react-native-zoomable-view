@@ -1,9 +1,10 @@
 import {
   FixedSize,
   ReactNativeZoomableView,
+  ReactNativeZoomableViewRef,
 } from '@openspacelabs/react-native-zoomable-view';
 import { debounce } from 'lodash';
-import React, { ReactNode, useCallback, useState } from 'react';
+import React, { ReactNode, useCallback, useRef, useState } from 'react';
 import {
   Alert,
   Button,
@@ -13,7 +14,7 @@ import {
   View,
   ViewProps,
 } from 'react-native';
-import { runOnJS } from 'react-native-reanimated';
+import { scheduleOnRN } from 'react-native-worklets';
 
 import { applyContainResizeMode } from '../src/helper/coordinateConversion';
 import { styles } from './style';
@@ -40,6 +41,7 @@ const PageSheetModal = ({
 };
 
 export default function App() {
+  const ref = useRef<ReactNativeZoomableViewRef>(null);
   const [showMarkers, setShowMarkers] = useState(true);
   const [modal, setModal] = useState(false);
   const [size, setSize] = useState<{ width: number; height: number }>({
@@ -73,6 +75,7 @@ export default function App() {
         }}
       >
         <ReactNativeZoomableView
+          ref={ref}
           debug
           onLongPress={() => {
             Alert.alert('Long press detected');
@@ -84,7 +87,7 @@ export default function App() {
           onStaticPinPositionChange={debouncedUpdatePin}
           onStaticPinPositionMoveWorklet={(position) => {
             'worklet';
-            runOnJS(debouncedUpdateMovePin)(position);
+            scheduleOnRN(debouncedUpdateMovePin, position);
           }}
           maxZoom={30}
           // Give these to the zoomable view so it can apply the boundaries around the actual content.
