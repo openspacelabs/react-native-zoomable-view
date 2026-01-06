@@ -8,7 +8,7 @@ import React, {
   useRef,
   useState,
 } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { View } from 'react-native';
 import {
   Gesture,
   GestureDetector,
@@ -41,6 +41,7 @@ import { useDebugPoints } from './hooks/useDebugPoints';
 import { useLatestCallback } from './hooks/useLatestCallback';
 import { useZoomSubject } from './hooks/useZoomSubject';
 import { ReactNativeZoomableViewContext } from './ReactNativeZoomableViewContext';
+import { styles } from './styles';
 import {
   ReactNativeZoomableViewProps,
   ReactNativeZoomableViewRef,
@@ -919,6 +920,19 @@ const ReactNativeZoomableViewInner: ForwardRefRenderFunction<
       firstTouch.value = undefined;
     });
 
+  const transformStyle = useAnimatedStyle(() => {
+    return {
+      transform: [
+        // In RN79, we need to split the scale into X and Y to avoid
+        // the content getting pixelated when zooming in
+        { scaleX: zoom.value },
+        { scaleY: zoom.value },
+        { translateX: offsetX.value },
+        { translateY: offsetY.value },
+      ],
+    };
+  });
+
   return (
     <ReactNativeZoomableViewContext.Provider
       value={{ zoom, inverseZoom, inverseZoomStyle, offsetX, offsetY }}
@@ -926,29 +940,12 @@ const ReactNativeZoomableViewInner: ForwardRefRenderFunction<
       <GestureHandlerRootView>
         <GestureDetector gesture={gesture}>
           <View
-            // eslint-disable-next-line @typescript-eslint/no-use-before-define
             style={styles.container}
             ref={zoomSubjectWrapperRef}
             onLayout={measureZoomSubject}
           >
             <Animated.View
-              style={[
-                // eslint-disable-next-line @typescript-eslint/no-use-before-define
-                styles.zoomSubject,
-                props.style,
-                useAnimatedStyle(() => {
-                  return {
-                    transform: [
-                      // In RN79, we need to split the scale into X and Y to avoid
-                      // the content getting pixelated when zooming in
-                      { scaleX: zoom.value },
-                      { scaleY: zoom.value },
-                      { translateX: offsetX.value },
-                      { translateY: offsetY.value },
-                    ],
-                  };
-                }),
-              ]}
+              style={[styles.zoomSubject, props.style, transformStyle]}
             >
               {children}
             </Animated.View>
@@ -989,21 +986,5 @@ const ReactNativeZoomableViewInner: ForwardRefRenderFunction<
     </ReactNativeZoomableViewContext.Provider>
   );
 };
-
-const styles = StyleSheet.create({
-  container: {
-    alignItems: 'center',
-    flex: 1,
-    justifyContent: 'center',
-    overflow: 'hidden',
-    position: 'relative',
-  },
-  zoomSubject: {
-    alignItems: 'center',
-    flex: 1,
-    justifyContent: 'center',
-    width: '100%',
-  },
-});
 
 export const ReactNativeZoomableView = forwardRef(ReactNativeZoomableViewInner);
