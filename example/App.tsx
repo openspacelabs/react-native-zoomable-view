@@ -1,4 +1,5 @@
 import {
+  FixedSize,
   ReactNativeZoomableView,
   ReactNativeZoomableViewRef,
 } from '@openspacelabs/react-native-zoomable-view';
@@ -13,7 +14,6 @@ import {
   View,
   ViewProps,
 } from 'react-native';
-import Animated, { useSharedValue } from 'react-native-reanimated';
 import { scheduleOnRN } from 'react-native-worklets';
 
 import { applyContainResizeMode } from '../src/helper/coordinateConversion';
@@ -42,7 +42,6 @@ const PageSheetModal = ({
 
 export default function App() {
   const ref = useRef<ReactNativeZoomableViewRef>(null);
-  const scale = useSharedValue(1);
   const [showMarkers, setShowMarkers] = useState(true);
   const [modal, setModal] = useState(false);
   const [size, setSize] = useState<{ width: number; height: number }>({
@@ -90,10 +89,6 @@ export default function App() {
             'worklet';
             scheduleOnRN(debouncedUpdateMovePin, position);
           }}
-          onTransformWorklet={({ zoomLevel }) => {
-            'worklet';
-            scale.value = 1 / zoomLevel;
-          }}
           maxZoom={30}
           // Give these to the zoomable view so it can apply the boundaries around the actual content.
           // Need to make sure the content is actually centered and the width and height are
@@ -105,18 +100,11 @@ export default function App() {
             <Image style={styles.img} source={{ uri }} />
 
             {showMarkers &&
-              (['20%', '40%', '60%', '80%'] as const).map((left) =>
-                (['20%', '40%', '60%', '80%'] as const).map((top) => (
-                  <Animated.View
-                    key={`${left}x${top}`}
-                    // These markers will move and zoom with the image, but will retain their size
-                    // because of the scale transformation.
-                    style={[
-                      styles.marker,
-                      { left, top },
-                      { transform: [{ scaleX: scale }, { scaleY: scale }] },
-                    ]}
-                  />
+              [20, 40, 60, 80].map((left) =>
+                [20, 40, 60, 80].map((top) => (
+                  <FixedSize left={left} top={top} key={`${left}x${top}`}>
+                    <View style={styles.marker} />
+                  </FixedSize>
                 ))
               )}
           </View>

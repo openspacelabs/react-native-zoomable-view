@@ -8,7 +8,7 @@ import React, {
   useRef,
   useState,
 } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { View } from 'react-native';
 import {
   Gesture,
   GestureDetector,
@@ -20,6 +20,7 @@ import Animated, {
   makeMutable,
   runOnJS,
   useAnimatedReaction,
+  useAnimatedStyle,
   useDerivedValue,
   useSharedValue,
   withTiming,
@@ -39,6 +40,8 @@ import { getNextZoomStep } from './helper/getNextZoomStep';
 import { useDebugPoints } from './hooks/useDebugPoints';
 import { useLatestCallback } from './hooks/useLatestCallback';
 import { useZoomSubject } from './hooks/useZoomSubject';
+import { ReactNativeZoomableViewContext } from './ReactNativeZoomableViewContext';
+import { styles } from './styles';
 import {
   ReactNativeZoomableViewProps,
   ReactNativeZoomableViewRef,
@@ -120,8 +123,11 @@ const ReactNativeZoomableViewInner: ForwardRefRenderFunction<
 
   const offsetX = useSharedValue(0);
   const offsetY = useSharedValue(0);
-
   const zoom = useSharedValue(1);
+  const inverseZoom = useDerivedValue(() => 1 / zoom.value);
+  const inverseZoomStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: inverseZoom.value }],
+  }));
 
   const lastGestureCenterPosition = useSharedValue<Vec2D | null>(null);
   const lastGestureTouchDistance = useSharedValue<number | null>(150);
@@ -914,84 +920,71 @@ const ReactNativeZoomableViewInner: ForwardRefRenderFunction<
       firstTouch.value = undefined;
     });
 
+  const transformStyle = useAnimatedStyle(() => {
+    return {
+      transform: [
+        // In RN79, we need to split the scale into X and Y to avoid
+        // the content getting pixelated when zooming in
+        { scaleX: zoom.value },
+        { scaleY: zoom.value },
+        { translateX: offsetX.value },
+        { translateY: offsetY.value },
+      ],
+    };
+  });
+
   return (
-    <GestureHandlerRootView>
-      <GestureDetector gesture={gesture}>
-        <View
-          // eslint-disable-next-line @typescript-eslint/no-use-before-define
-          style={styles.container}
-          ref={zoomSubjectWrapperRef}
-          onLayout={measureZoomSubject}
-        >
-          <Animated.View
-            style={[
-              // eslint-disable-next-line @typescript-eslint/no-use-before-define
-              styles.zoomSubject,
-              props.style,
-              {
-                transform: [
-                  // In RN79, we need to split the scale into X and Y to avoid
-                  // the content getting pixelated when zooming in
-                  { scaleX: zoom },
-                  { scaleY: zoom },
-                  { translateX: offsetX },
-                  { translateY: offsetY },
-                ],
-              },
-            ]}
+    <ReactNativeZoomableViewContext.Provider
+      value={{ zoom, inverseZoom, inverseZoomStyle, offsetX, offsetY }}
+    >
+      <GestureHandlerRootView>
+        <GestureDetector gesture={gesture}>
+          <View
+            style={styles.container}
+            ref={zoomSubjectWrapperRef}
+            onLayout={measureZoomSubject}
           >
-            {children}
-          </Animated.View>
+            <Animated.View
+              style={[styles.zoomSubject, props.style, transformStyle]}
+            >
+              {children}
+            </Animated.View>
 
-          {visualTouchFeedbackEnabled &&
-            stateTouches.map(
-              (touch) =>
-                doubleTapDelay && (
-                  <AnimatedTouchFeedback
-                    x={touch.x}
-                    y={touch.y}
-                    key={touch.id}
-                    animationDuration={doubleTapDelay}
-                    onAnimationDone={() => {
-                      _removeTouch(touch);
-                    }}
-                  />
-                )
+            {visualTouchFeedbackEnabled &&
+              stateTouches.map(
+                (touch) =>
+                  doubleTapDelay && (
+                    <AnimatedTouchFeedback
+                      x={touch.x}
+                      y={touch.y}
+                      key={touch.id}
+                      animationDuration={doubleTapDelay}
+                      onAnimationDone={() => {
+                        _removeTouch(touch);
+                      }}
+                    />
+                  )
+              )}
+
+            {/* For Debugging Only */}
+            {debugPoints.map(({ x, y }, index) => {
+              return <DebugTouchPoint key={index} x={x} y={y} />;
+            })}
+
+            {propStaticPinPosition && (
+              <StaticPin
+                staticPinIcon={staticPinIcon}
+                staticPinPosition={propStaticPinPosition}
+                pinSize={pinSize}
+                setPinSize={setPinSize}
+                pinProps={pinProps}
+              />
             )}
-
-          {/* For Debugging Only */}
-          {debugPoints.map(({ x, y }, index) => {
-            return <DebugTouchPoint key={index} x={x} y={y} />;
-          })}
-
-          {propStaticPinPosition && (
-            <StaticPin
-              staticPinIcon={staticPinIcon}
-              staticPinPosition={propStaticPinPosition}
-              pinSize={pinSize}
-              setPinSize={setPinSize}
-              pinProps={pinProps}
-            />
-          )}
-        </View>
-      </GestureDetector>
-    </GestureHandlerRootView>
+          </View>
+        </GestureDetector>
+      </GestureHandlerRootView>
+    </ReactNativeZoomableViewContext.Provider>
   );
 };
-const styles = StyleSheet.create({
-  container: {
-    alignItems: 'center',
-    flex: 1,
-    justifyContent: 'center',
-    overflow: 'hidden',
-    position: 'relative',
-  },
-  zoomSubject: {
-    alignItems: 'center',
-    flex: 1,
-    justifyContent: 'center',
-    width: '100%',
-  },
-});
 
 export const ReactNativeZoomableView = forwardRef(ReactNativeZoomableViewInner);
