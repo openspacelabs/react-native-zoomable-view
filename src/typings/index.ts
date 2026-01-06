@@ -19,6 +19,9 @@ export type ReactNativeZoomableViewRef = {
   readonly gestureStarted: boolean;
 };
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type Worklet<T extends (...args: any[]) => any> = T;
+
 export interface ReactNativeZoomableViewProps {
   // options
   style?: ViewProps['style'];
@@ -47,7 +50,11 @@ export interface ReactNativeZoomableViewProps {
 
   // callbacks
   onLayout?: (event: Pick<LayoutChangeEvent, 'nativeEvent'>) => void;
-  onTransformWorklet?: (zoomableViewEventObject: ZoomableViewEvent) => void;
+  /**
+   * Called on the UI thread.
+   * Must be a worklet.
+   */
+  onTransform?: Worklet<(zoomableViewEventObject: ZoomableViewEvent) => void>;
   onSingleTap?: (
     event: GestureTouchEvent,
     zoomableViewEventObject: ZoomableViewEvent
@@ -80,18 +87,28 @@ export interface ReactNativeZoomableViewProps {
     event: GestureTouchEvent,
     zoomableViewEventObject: ZoomableViewEvent
   ) => void;
-  onPanResponderMoveWorklet?: (
-    event: GestureTouchEvent,
-    zoomableViewEventObject: ZoomableViewEvent
-  ) => boolean;
+  onPanResponderMove?: Worklet<
+    (
+      event: GestureTouchEvent,
+      zoomableViewEventObject: ZoomableViewEvent
+    ) => boolean
+  >;
   onPanResponderTerminate?: (
     event: GestureTouchEvent,
     zoomableViewEventObject: ZoomableViewEvent
   ) => void;
   staticPinPosition?: Vec2D;
   staticPinIcon?: React.ReactElement;
-  onStaticPinPositionChange?: (position: Vec2D) => void;
-  onStaticPinPositionMoveWorklet?: (position: Vec2D) => void;
+  /**
+   * Called on the UI thread.
+   * Must be a worklet.
+   */
+  onStaticPinPositionChange?: Worklet<(position: Vec2D) => void>;
+  /**
+   * Called on the UI thread.
+   * Must be a worklet.
+   */
+  onStaticPinPositionMove?: Worklet<(position: Vec2D) => void>;
   pinProps?: ViewProps;
 }
 

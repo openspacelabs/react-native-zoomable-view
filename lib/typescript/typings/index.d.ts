@@ -16,6 +16,7 @@ export type ReactNativeZoomableViewRef = {
     moveStaticPinTo: (position: Vec2D, duration?: number) => void;
     readonly gestureStarted: boolean;
 };
+type Worklet<T extends (...args: any[]) => any> = T;
 export interface ReactNativeZoomableViewProps {
     style?: ViewProps['style'];
     children?: ReactNode;
@@ -39,7 +40,11 @@ export interface ReactNativeZoomableViewProps {
     disablePanOnInitialZoom?: boolean;
     debug?: boolean;
     onLayout?: (event: Pick<LayoutChangeEvent, 'nativeEvent'>) => void;
-    onTransformWorklet?: (zoomableViewEventObject: ZoomableViewEvent) => void;
+    /**
+     * Called on the UI thread.
+     * Must be a worklet.
+     */
+    onTransform?: Worklet<(zoomableViewEventObject: ZoomableViewEvent) => void>;
     onSingleTap?: (event: GestureTouchEvent, zoomableViewEventObject: ZoomableViewEvent) => void;
     onDoubleTapBefore?: (event: GestureTouchEvent, zoomableViewEventObject: ZoomableViewEvent) => void;
     onDoubleTapAfter?: (event: GestureTouchEvent, zoomableViewEventObject: ZoomableViewEvent) => void;
@@ -48,12 +53,20 @@ export interface ReactNativeZoomableViewProps {
     onLongPress?: (event: GestureTouchEvent, zoomableViewEventObject: ZoomableViewEvent) => void;
     onPanResponderGrant?: (event: GestureTouchEvent, zoomableViewEventObject: ZoomableViewEvent) => void;
     onPanResponderEnd?: (event: GestureTouchEvent, zoomableViewEventObject: ZoomableViewEvent) => void;
-    onPanResponderMoveWorklet?: (event: GestureTouchEvent, zoomableViewEventObject: ZoomableViewEvent) => boolean;
+    onPanResponderMove?: Worklet<(event: GestureTouchEvent, zoomableViewEventObject: ZoomableViewEvent) => boolean>;
     onPanResponderTerminate?: (event: GestureTouchEvent, zoomableViewEventObject: ZoomableViewEvent) => void;
     staticPinPosition?: Vec2D;
     staticPinIcon?: React.ReactElement;
-    onStaticPinPositionChange?: (position: Vec2D) => void;
-    onStaticPinPositionMoveWorklet?: (position: Vec2D) => void;
+    /**
+     * Called on the UI thread.
+     * Must be a worklet.
+     */
+    onStaticPinPositionChange?: Worklet<(position: Vec2D) => void>;
+    /**
+     * Called on the UI thread.
+     * Must be a worklet.
+     */
+    onStaticPinPositionMove?: Worklet<(position: Vec2D) => void>;
     pinProps?: ViewProps;
 }
 export interface Vec2D {
@@ -68,4 +81,5 @@ export interface TouchPoint extends Vec2D {
     id: string;
     isSecondTap?: boolean;
 }
+export {};
 //# sourceMappingURL=index.d.ts.map

@@ -85,7 +85,7 @@ export default function App() {
           // Callback that returns the position of the pin
           // on the actual source image
           onStaticPinPositionChange={debouncedUpdatePin}
-          onStaticPinPositionMoveWorklet={(position) => {
+          onStaticPinPositionMove={(position) => {
             'worklet';
             scheduleOnRN(debouncedUpdateMovePin, position);
           }}
