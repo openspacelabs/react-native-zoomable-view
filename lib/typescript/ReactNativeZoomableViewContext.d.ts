@@ -10,5 +10,16 @@ export declare const ReactNativeZoomableViewContext: import("react").Context<{
     };
     offsetX: SharedValue<number>;
     offsetY: SharedValue<number>;
-} | undefined>;
+} | null>;
+export declare const useZoomableViewContext: () => {
+    zoom: SharedValue<number>;
+    inverseZoom: DerivedValue<number>;
+    inverseZoomStyle: {
+        transform: {
+            scale: number;
+        }[];
+    };
+    offsetX: SharedValue<number>;
+    offsetY: SharedValue<number>;
+};
 //# sourceMappingURL=ReactNativeZoomableViewContext.d.ts.map
