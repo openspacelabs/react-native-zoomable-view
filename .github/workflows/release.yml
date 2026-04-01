@@ -32,6 +32,6 @@ jobs:
       - name: Publish to npm
         # --access public: Scoped packages (@openspacelabs/*) default to private, this makes it public
         # id-token: write (above) enables --provenance for signed attestations, not registry auth
-        run: npm publish --access public
+        run: npm publish --access public --provenance
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
