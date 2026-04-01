@@ -97,7 +97,7 @@
   },
   "husky": {
     "hooks": {
-      "pre-commit": "yarn lint && yarn typescript && bob build && git add lib"
+      "pre-commit": "yarn lint && yarn typescript"
     }
   },
   "commitlint": {
