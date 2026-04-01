@@ -95,9 +95,9 @@ We use [release-it](https://github.com/release-it/release-it) to create releases
 To publish new versions:
 
 1. Run `yarn release` locally (creates git tag and GitHub release)
-2. GitHub Actions automatically builds and publishes to npm using OIDC authentication
+2. GitHub Actions automatically builds and publishes to npm
 
-Only maintainers with permission to create releases can publish. No npm tokens are required - authentication happens via GitHub's trusted publishing (OIDC).
+Only maintainers with permission to create releases can publish. The repository must have an `NPM_TOKEN` secret configured (Settings → Secrets and variables → Actions) for CI to publish to npm.
 
 ### Scripts
 

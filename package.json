@@ -22,7 +22,7 @@
     "!**/__mocks__"
   ],
   "scripts": {
-    "prepare": "bob build",
+    "prepublishOnly": "bob build",
     "test": "jest",
     "typescript": "tsc --noEmit",
     "lint": "eslint \"**/*.{js,ts,tsx}\"",
@@ -114,7 +114,7 @@
       "tagName": "v${version}"
     },
     "npm": {
-      "publish": true
+      "publish": false
     },
     "github": {
       "release": true
