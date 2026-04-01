@@ -470,7 +470,7 @@ class ReactNativeZoomableView extends Component<
   };
 
   /**
-   * Calculates pinch distance
+   * Handles the pan responder grant event
    *
    * @param e
    * @param gestureState
@@ -689,8 +689,14 @@ class ReactNativeZoomableView extends Component<
       return;
     }
 
-    if (!distance) return;
-    if (!this.lastGestureTouchDistance) return;
+    if (!distance) {
+      this.lastGestureTouchDistance = null;
+      return;
+    }
+    if (!this.lastGestureTouchDistance) {
+      this.lastGestureTouchDistance = distance;
+      return;
+    }
 
     // define the new zoom level and take zoom level sensitivity into consideration
     const zoomGrowthFromLastGestureState =

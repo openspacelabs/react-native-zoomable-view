@@ -15,5 +15,5 @@ export declare const StaticPin: ({ staticPinPosition, pinAnim, staticPinIcon, pi
     onLongPress?: ((evt: GestureResponderEvent) => void) | undefined;
     setPinSize: (size: Size2D) => void;
     pinProps?: ViewProps | undefined;
-}) => React.JSX.Element;
+}) => JSX.Element;
 //# sourceMappingURL=StaticPin.d.ts.map
