@@ -53,8 +53,5 @@ buck-out/
 android/app/libs
 android/keystores/debug.keystore
 
-# Build output
-lib/
-
 # Expo
 .expo/*
