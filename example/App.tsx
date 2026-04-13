@@ -1,10 +1,10 @@
-import React, { useCallback, useRef, useState } from 'react';
-import { View, Text, Image, Animated, Button } from 'react-native';
-
 import { ReactNativeZoomableView } from '@openspacelabs/react-native-zoomable-view';
-import { styles } from './style';
 import { debounce } from 'lodash';
+import React, { useCallback, useRef, useState } from 'react';
+import { Animated, Button, Image, Text, View } from 'react-native';
+
 import { applyContainResizeMode } from '../src/helper/coordinateConversion';
+import { styles } from './style';
 
 const kittenSize = 800;
 const uri = `https://placekitten.com/${kittenSize}/${kittenSize}`;
@@ -66,8 +66,8 @@ export default function App() {
             <Image style={styles.img} source={{ uri }} />
 
             {showMarkers &&
-              ['20%', '40%', '60%', '80%'].map((left) =>
-                ['20%', '40%', '60%', '80%'].map((top) => (
+              (['20%', '40%', '60%', '80%'] as const).map((left) =>
+                (['20%', '40%', '60%', '80%'] as const).map((top) => (
                   <Animated.View
                     key={`${left}x${top}`}
                     // These markers will move and zoom with the image, but will retain their size

@@ -22,9 +22,11 @@
     "!**/__mocks__"
   ],
   "scripts": {
+    "prepublishOnly": "yarn build",
     "test": "jest",
     "typescript": "tsc --noEmit",
     "lint": "eslint \"**/*.{js,ts,tsx}\"",
+    "build": "bob build",
     "release": "release-it",
     "example": "yarn --cwd example",
     "pods": "cd example && pod-install --quiet",
@@ -66,7 +68,6 @@
     "@commitlint/config-conventional": "^11.0.0",
     "@react-native/eslint-config": "^0.73.0",
     "@release-it/conventional-changelog": "^2.0.0",
-    "@types/jest": "^26.0.0",
     "@types/lodash": "^4.17.7",
     "@types/react": "^16.9.19",
     "@types/react-native": "^0.65.4",
@@ -76,19 +77,19 @@
     "eslint": "^8.57.1",
     "eslint-config-prettier": "^7.0.0",
     "eslint-plugin-prettier": "^3.1.3",
+    "eslint-plugin-simple-import-sort": "^12.1.1",
     "husky": "^4.2.5",
-    "jest": "^26.0.1",
     "pod-install": "^0.1.0",
     "prettier": "^2.0.5",
     "react": "17.0.2",
-    "react-native": "0.68.2",
-    "react-native-builder-bob": "^0.18.1",
+    "react-native": "0.79.7",
+    "react-native-builder-bob": "^0.30.0",
     "release-it": "^14.2.2",
     "typescript": "^4.9.5"
   },
   "peerDependencies": {
     "react": ">=16.8.0",
-    "react-native": ">=0.54.0"
+    "react-native": ">=0.79.0"
   },
   "jest": {
     "preset": "react-native",
@@ -119,7 +120,7 @@
   },
   "husky": {
     "hooks": {
-      "pre-commit": "yarn lint && yarn typescript && bob build && git add lib"
+      "pre-commit": "yarn lint && yarn typescript"
     }
   },
   "commitlint": {
@@ -133,7 +134,7 @@
       "tagName": "v${version}"
     },
     "npm": {
-      "publish": true
+      "publish": false
     },
     "github": {
       "release": true
@@ -159,7 +160,8 @@
     "plugins": [
       "prettier",
       "react",
-      "react-native"
+      "react-native",
+      "simple-import-sort"
     ],
     "rules": {
       "prettier/prettier": [
@@ -172,7 +174,9 @@
           "useTabs": false
         }
       ],
-      "react-native/no-color-literals": "off"
+      "react-native/no-color-literals": "off",
+      "simple-import-sort/imports": "error",
+      "simple-import-sort/exports": "error"
     },
     "overrides": [
       {
@@ -208,6 +212,11 @@
           "*.test.ts",
           "*.test.tsx"
         ],
+        "parserOptions": {
+          "project": [
+            "./tsconfig.test.json"
+          ]
+        },
         "rules": {
           "@typescript-eslint/no-unsafe-assignment": "off",
           "@typescript-eslint/no-unsafe-member-access": "off",
@@ -216,7 +225,10 @@
           "@typescript-eslint/no-unsafe-argument": "off",
           "@typescript-eslint/no-explicit-any": "off",
           "@typescript-eslint/no-unnecessary-condition": "off",
-          "@typescript-eslint/ban-types": "off"
+          "@typescript-eslint/ban-types": "off",
+          "@typescript-eslint/ban-ts-comment": "off",
+          "@typescript-eslint/no-unused-vars": "off",
+          "@typescript-eslint/no-var-requires": "off"
         }
       }
     ]

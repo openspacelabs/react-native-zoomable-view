@@ -341,7 +341,11 @@ describe('ReactNativeZoomableView - Rendering & Initialization', () => {
         for (const child of children) {
           if (child && Array.isArray(child)) {
             for (const subChild of child) {
-              if (subChild && subChild.type && subChild.type.name === 'AnimatedTouchFeedback') {
+              if (
+                subChild &&
+                subChild.type &&
+                subChild.type.name === 'AnimatedTouchFeedback'
+              ) {
                 feedbackElement = subChild;
                 break;
               }
