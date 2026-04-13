@@ -76,17 +76,30 @@ Our pre-commit hooks verify that your commit message matches this format when co
 
 We use [TypeScript](https://www.typescriptlang.org/) for type checking, [ESLint](https://eslint.org/) with [Prettier](https://prettier.io/) for linting and formatting the code, and [Jest](https://jestjs.io/) for testing.
 
-Our pre-commit hooks verify that the linter and tests pass when committing.
+Our pre-commit hooks verify that the linter and type checks pass when committing.
+
+### Build Process
+
+The library source code in `src/` is built to `lib/` for distribution. The `lib/` directory is not tracked in git.
+
+- **Local development**: No build needed - the example app reads directly from `src/`
+- **Pull requests**: CI automatically builds to verify there are no build errors
+- **Releases**: GitHub Actions automatically builds and publishes to npm
+
+You don't need to run build commands locally unless testing the built output.
 
 ### Publishing to npm
 
-We use [release-it](https://github.com/release-it/release-it) to make it easier to publish new versions. It handles common tasks like bumping version based on semver, creating tags and releases etc.
+We use [release-it](https://github.com/release-it/release-it) to create releases and [GitHub Actions](.github/workflows/release.yml) to build and publish to npm.
 
-To publish new versions, run the following:
+To publish new versions:
 
-```sh
-yarn release
-```
+1. Run `yarn release` locally (creates git tag and GitHub release)
+2. GitHub Actions automatically builds and publishes to npm
+
+Only maintainers with permission to create releases can publish. The repository must have an `NPM_TOKEN` secret configured (Settings → Secrets and variables → Actions) for CI to publish to npm.
+
+> **Note:** GitHub pre-releases (e.g. `v3.0.0-beta.1`) intentionally skip the npm publish step to prevent beta versions from being tagged as `latest`. The CI job will show as "Skipped" — this is expected. To publish a pre-release manually, build locally and run `npm publish --tag beta --access public`.
 
 ### Changelog and Release Notes
 
