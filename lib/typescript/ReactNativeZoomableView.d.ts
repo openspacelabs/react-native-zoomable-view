@@ -38,6 +38,10 @@ declare class ReactNativeZoomableView extends Component<ReactNativeZoomableViewP
     private lastGestureCenterPosition;
     private lastGestureTouchDistance;
     private gestureType;
+    private panListenerId;
+    private zoomListenerId;
+    private panTransformListenerId;
+    private zoomTransformListenerId;
     private _gestureStarted;
     private set gestureStarted(value);
     get gestureStarted(): boolean;

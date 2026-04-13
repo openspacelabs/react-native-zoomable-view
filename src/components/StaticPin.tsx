@@ -53,7 +53,7 @@ export const StaticPin = ({
       onPanResponderMove: (evt, gestureState) => {
         // However if the user moves finger we want to pass this evt to parent
         // to handle panning (tap not recognized)
-        if (Math.abs(gestureState.dx) > 5 && Math.abs(gestureState.dy) > 5)
+        if (Math.abs(gestureState.dx) > 5 || Math.abs(gestureState.dy) > 5)
           onParentMove(evt, gestureState);
       },
       onPanResponderRelease: (evt, gestureState) => {

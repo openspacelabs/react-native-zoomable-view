@@ -84,6 +84,11 @@ class ReactNativeZoomableView extends Component<
   private lastGestureTouchDistance: number | null = null;
   private gestureType: 'pinch' | 'shift' | null;
 
+  private panListenerId: string | undefined;
+  private zoomListenerId: string | undefined;
+  private panTransformListenerId: string | undefined;
+  private zoomTransformListenerId: string | undefined;
+
   private _gestureStarted = false;
   private set gestureStarted(v: boolean) {
     this._gestureStarted = v;
@@ -164,11 +169,11 @@ class ReactNativeZoomableView extends Component<
 
     this.panAnim.setValue({ x: this.offsetX, y: this.offsetY });
     this.zoomAnim.setValue(this.zoomLevel);
-    this.panAnim.addListener(({ x, y }) => {
+    this.panListenerId = this.panAnim.addListener(({ x, y }) => {
       this.offsetX = x;
       this.offsetY = y;
     });
-    this.zoomAnim.addListener(({ value }) => {
+    this.zoomListenerId = this.zoomAnim.addListener(({ value }) => {
       this.zoomLevel = value;
     });
 
@@ -190,8 +195,12 @@ class ReactNativeZoomableView extends Component<
       !this.onTransformInvocationInitialized &&
       this._invokeOnTransform().successful
     ) {
-      this.panAnim.addListener(() => this._invokeOnTransform());
-      this.zoomAnim.addListener(() => this._invokeOnTransform());
+      this.panTransformListenerId = this.panAnim.addListener(() =>
+        this._invokeOnTransform()
+      );
+      this.zoomTransformListenerId = this.zoomAnim.addListener(() =>
+        this._invokeOnTransform()
+      );
       this.onTransformInvocationInitialized = true;
     }
 
@@ -244,6 +253,14 @@ class ReactNativeZoomableView extends Component<
   componentWillUnmount() {
     this.measureZoomSubjectInterval &&
       clearInterval(this.measureZoomSubjectInterval);
+
+    // Remove animation listeners to prevent memory leaks and post-unmount callbacks
+    if (this.panListenerId) this.panAnim.removeListener(this.panListenerId);
+    if (this.zoomListenerId) this.zoomAnim.removeListener(this.zoomListenerId);
+    if (this.panTransformListenerId)
+      this.panAnim.removeListener(this.panTransformListenerId);
+    if (this.zoomTransformListenerId)
+      this.zoomAnim.removeListener(this.zoomTransformListenerId);
   }
 
   debouncedOnStaticPinPositionChange = debounce(
@@ -400,8 +417,15 @@ class ReactNativeZoomableView extends Component<
       this._getZoomableViewEventObject()
     );
 
-    this.panAnim.stopAnimation();
-    this.zoomAnim.stopAnimation();
+    this.panAnim.x.stopAnimation((x) => {
+      this.offsetX = x;
+    });
+    this.panAnim.y.stopAnimation((y) => {
+      this.offsetY = y;
+    });
+    this.zoomAnim.stopAnimation((zoom) => {
+      this.zoomLevel = zoom;
+    });
     this.gestureStarted = true;
   };
 
