@@ -88,6 +88,7 @@ class ReactNativeZoomableView extends Component<
   private zoomListenerId: string | undefined;
   private panTransformListenerId: string | undefined;
   private zoomTransformListenerId: string | undefined;
+  private zoomToListenerId: string | undefined;
 
   private _gestureStarted = false;
   private set gestureStarted(v: boolean) {
@@ -254,6 +255,11 @@ class ReactNativeZoomableView extends Component<
     this.measureZoomSubjectInterval &&
       clearInterval(this.measureZoomSubjectInterval);
 
+    // Stop in-flight animations to prevent post-unmount callbacks
+    // (e.g. _resolveAndHandleTap's 200ms pan animation calling onStaticPinPositionChange)
+    this.panAnim.stopAnimation();
+    this.zoomAnim.stopAnimation();
+
     // Remove animation listeners to prevent memory leaks and post-unmount callbacks
     if (this.panListenerId) this.panAnim.removeListener(this.panListenerId);
     if (this.zoomListenerId) this.zoomAnim.removeListener(this.zoomListenerId);
@@ -261,6 +267,9 @@ class ReactNativeZoomableView extends Component<
       this.panAnim.removeListener(this.panTransformListenerId);
     if (this.zoomTransformListenerId)
       this.zoomAnim.removeListener(this.zoomTransformListenerId);
+    // Clean up zoomTo() listener if mid-animation at unmount
+    if (this.zoomToListenerId)
+      this.zoomAnim.removeListener(this.zoomToListenerId);
   }
 
   debouncedOnStaticPinPositionChange = debounce(
@@ -1024,7 +1033,7 @@ class ReactNativeZoomableView extends Component<
     this.props.onZoomBefore?.(null, null, this._getZoomableViewEventObject());
 
     // == Perform Pan Animation to preserve the zoom center while zooming ==
-    let listenerId = '';
+    this.zoomToListenerId = undefined;
     if (zoomCenter) {
       // Calculates panAnim values based on changes in zoomAnim.
       let prevScale = this.zoomLevel;
@@ -1032,30 +1041,35 @@ class ReactNativeZoomableView extends Component<
       //  it will jitter panAnim once in a while,
       //  because here panAnim is being calculated in js.
       // However the jittering should mostly occur in simulator.
-      listenerId = this.zoomAnim.addListener(({ value: newScale }) => {
-        this.panAnim.setValue({
-          x: calcNewScaledOffsetForZoomCentering(
-            this.offsetX,
-            this.state.originalWidth,
-            prevScale,
-            newScale,
-            zoomCenter.x
-          ),
-          y: calcNewScaledOffsetForZoomCentering(
-            this.offsetY,
-            this.state.originalHeight,
-            prevScale,
-            newScale,
-            zoomCenter.y
-          ),
-        });
-        prevScale = newScale;
-      });
+      this.zoomToListenerId = this.zoomAnim.addListener(
+        ({ value: newScale }) => {
+          this.panAnim.setValue({
+            x: calcNewScaledOffsetForZoomCentering(
+              this.offsetX,
+              this.state.originalWidth,
+              prevScale,
+              newScale,
+              zoomCenter.x
+            ),
+            y: calcNewScaledOffsetForZoomCentering(
+              this.offsetY,
+              this.state.originalHeight,
+              prevScale,
+              newScale,
+              zoomCenter.y
+            ),
+          });
+          prevScale = newScale;
+        }
+      );
     }
 
     // == Perform Zoom Animation ==
     getZoomToAnimation(this.zoomAnim, newZoomLevel).start(() => {
-      this.zoomAnim.removeListener(listenerId);
+      if (this.zoomToListenerId) {
+        this.zoomAnim.removeListener(this.zoomToListenerId);
+        this.zoomToListenerId = undefined;
+      }
     });
     // == Zoom Animation Ends ==
 
