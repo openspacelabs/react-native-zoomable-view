@@ -157,7 +157,7 @@ These options can be used to limit and change the zoom behavior.
 | doubleTapDelay             | number  | How much delay will still be recognized as double press (ms)                                                             | 300       |
 | doubleTapZoomToCenter      | boolean | If true, double tapping will always zoom to center of View instead of the direction it was double tapped in              |
 | zoomStep                   | number  | How much zoom should be applied on double tap                                                                            | 0.5       |
-| pinchToZoomInSensitivity   | number  | the level of resistance (sensitivity) to zoom in (0 - 10) - higher is less sensitive                                     | 3         |
+| pinchToZoomInSensitivity   | number  | the level of resistance (sensitivity) to zoom in (0 - 10) - higher is less sensitive                                     | 1         |
 | pinchToZoomOutSensitivity  | number  | the level of resistance (sensitivity) to zoom out (0 - 10) - higher is less sensitive                                    | 1         |
 | movementSensibility        | number  | how resistant should shifting the view around be? (0.5 - 5) - higher is less sensitive                                   | 1         |
 | initialOffsetX             | number  | The horizontal offset the image should start at                                                                          | 0         |
