@@ -99,6 +99,8 @@ To publish new versions:
 
 Only maintainers with permission to create releases can publish. The repository must have an `NPM_TOKEN` secret configured (Settings → Secrets and variables → Actions) for CI to publish to npm.
 
+> **Note:** GitHub pre-releases (e.g. `v3.0.0-beta.1`) intentionally skip the npm publish step to prevent beta versions from being tagged as `latest`. The CI job will show as "Skipped" — this is expected. To publish a pre-release manually, build locally and run `npm publish --tag beta --access public`.
+
 ### Scripts
 
 The `package.json` file contains various scripts for common tasks:
