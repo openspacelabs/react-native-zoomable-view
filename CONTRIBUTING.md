@@ -103,16 +103,18 @@ Only maintainers with permission to create releases can publish. The repository 
 
 ### Changelog and Release Notes
 
-Release notes are automatically generated from merged pull requests. Please label your PRs with:
+Release notes are automatically generated from merged pull requests using GitHub's release notes feature. Labels control which category a PR appears under in the release notes — they do not affect version numbering. The maintainer chooses the version (major/minor/patch) interactively when running `yarn release`.
 
-- `breaking`: Breaking changes (major version bump)
-- `enhancement`: New features (minor version bump)
-- `bug`: Bug fixes (patch version bump)
+Please label your PRs with:
+
+- `breaking`: Breaking changes
+- `enhancement`: New features
+- `bug`: Bug fixes
 - `documentation`: Documentation updates
 
-PRs labeled with `dependencies` are excluded from release notes.
+PRs labeled with `ignore-for-release` or `dependencies` are excluded from release notes.
 
-Release notes are organized by category based on labels (see `.github/release.yml`).
+Release notes categories are configured in `.github/release.yml`.
 
 ### Scripts
 
