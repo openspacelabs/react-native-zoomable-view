@@ -1,6 +1,6 @@
 const path = require('path');
 const escape = require('escape-string-regexp');
-const { getDefaultConfig } = require('@expo/metro-config'); // or require("expo/metro-config")
+const { getDefaultConfig } = require('@expo/metro-config');
 
 const pak = require('../package.json');
 const root = path.resolve(__dirname, '..');
@@ -27,6 +27,7 @@ config.resolver.blockList = [
 ];
 
 // 4) Force peers to resolve from example/node_modules
+
 config.resolver.extraNodeModules = {
   ...modules.reduce((acc, name) => {
     acc[name] = path.join(__dirname, 'node_modules', name);
@@ -37,7 +38,8 @@ config.resolver.extraNodeModules = {
   '@openspacelabs/react-native-zoomable-view': path.resolve(root, 'src'),
 };
 
-// 5) Usually not needed if you extend Expo config, but keep if you’re aliasing src
+// 5) Usually not needed if you extend Expo config, but keep if you're aliasing src
+
 config.transformer.assetRegistryPath = require.resolve(
   'react-native/Libraries/Image/AssetRegistry'
 );

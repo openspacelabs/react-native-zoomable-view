@@ -1,1 +1,0 @@
-{"version":3,"names":["Easing","zoomToAnimation","easing","out","ease","duration"],"sourceRoot":"../../../src","sources":["animations/index.ts"],"mappings":";;AAAA,SAASA,MAAM,QAA0B,yBAAyB;AAElE,OAAO,MAAMC,eAAiC,GAAG;EAC/CC,MAAM,EAAEF,MAAM,CAACG,GAAG,CAACH,MAAM,CAACI,IAAI,CAAC;EAC/BC,QAAQ,EAAE;AACZ,CAAC","ignoreList":[]}

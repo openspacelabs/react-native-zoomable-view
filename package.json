@@ -22,9 +22,11 @@
     "!**/__mocks__"
   ],
   "scripts": {
+    "prepublishOnly": "yarn build",
     "test": "jest",
     "typescript": "tsc --noEmit",
     "lint": "eslint \"**/*.{js,ts,tsx}\"",
+    "build": "bob build",
     "release": "release-it",
     "example": "yarn --cwd example",
     "pods": "cd example && pod-install --quiet",
@@ -105,7 +107,7 @@
   },
   "husky": {
     "hooks": {
-      "pre-commit": "yarn lint && yarn typescript && bob build && git add lib"
+      "pre-commit": "yarn lint && yarn typescript"
     }
   },
   "commitlint": {
@@ -119,7 +121,7 @@
       "tagName": "v${version}"
     },
     "npm": {
-      "publish": true
+      "publish": false
     },
     "github": {
       "release": true
