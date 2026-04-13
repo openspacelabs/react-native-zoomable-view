@@ -2,6 +2,10 @@
 
 # ──────────────────────────────────────────────
 # CodeRabbit configuration for react-native-zoomable-view
+#
+# PR reviews disabled — Claude Code Review already runs on this repo.
+# CodeRabbit is used only for issue triage.
+#
 # Docs: https://docs.coderabbit.ai/reference/configuration
 # ──────────────────────────────────────────────
 
@@ -14,46 +18,15 @@ tone_instructions: >-
 
 early_access: true
 
-# ── PR Reviews ────────────────────────────────
+# ── PR Reviews (disabled — Claude Code Review handles PRs) ──
 reviews:
-  profile: "chill" # advisory, non-blocking
   request_changes_workflow: false
-  high_level_summary: true
+  high_level_summary: false
   high_level_summary_in_walkthrough: false
-  collapse_walkthrough: true
-  sequence_diagrams: true
-  related_issues: true
-  related_prs: true
   poem: false
 
   auto_review:
-    enabled: true
-    drafts: false
-    base_branches:
-      - "master"
-
-  path_instructions:
-    - path: "src/**"
-      instructions: >-
-        This is the core library code. Review with strict TypeScript standards:
-        prefer pure functions over stateful classes, flag any use of `any` type,
-        call out opportunities to migrate JSDoc comments to proper TS types,
-        flag untyped or loosely-typed component props (prefer explicit interfaces),
-        and watch for missing null/undefined checks on optional values.
-
-    - path: "example/**"
-      instructions: >-
-        This is the demo/example app that showcases library usage. Be less strict
-        here — focus on whether the example clearly demonstrates the library API,
-        whether props and callbacks are used correctly, and whether the code would
-        help a new user understand the library. Style nits are low priority.
-
-    - path: "**/*.test.*"
-      instructions: >-
-        Focus on test quality: meaningful assertions (not just snapshot dumps),
-        good coverage of edge cases (zero/negative zoom, rapid gesture sequences),
-        clear test descriptions, and proper setup/teardown. Flag tests that
-        test implementation details rather than behavior.
+    enabled: false
 
 # ── Chat ──────────────────────────────────────
 chat:
