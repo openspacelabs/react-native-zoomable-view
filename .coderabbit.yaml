@@ -1,0 +1,110 @@
+# yaml-language-server: $schema=https://coderabbit.ai/integrations/schema.v2.json
+
+# ──────────────────────────────────────────────
+# CodeRabbit configuration for react-native-zoomable-view
+# Docs: https://docs.coderabbit.ai/reference/configuration
+# ──────────────────────────────────────────────
+
+language: "en-US"
+
+tone_instructions: >-
+  Be helpful and constructive, not pedantic. Suggest improvements as
+  friendly recommendations rather than demands. When flagging issues,
+  explain WHY something matters, not just that it violates a rule.
+
+early_access: true
+
+# ── PR Reviews ────────────────────────────────
+reviews:
+  profile: "chill" # advisory, non-blocking
+  request_changes_workflow: false
+  high_level_summary: true
+  high_level_summary_in_walkthrough: false
+  collapse_walkthrough: true
+  sequence_diagrams: true
+  related_issues: true
+  related_prs: true
+  poem: false
+
+  auto_review:
+    enabled: true
+    drafts: false
+    base_branches:
+      - "master"
+
+  path_instructions:
+    - path: "src/**"
+      instructions: >-
+        This is the core library code. Review with strict TypeScript standards:
+        prefer pure functions over stateful classes, flag any use of `any` type,
+        call out opportunities to migrate JSDoc comments to proper TS types,
+        flag untyped or loosely-typed component props (prefer explicit interfaces),
+        and watch for missing null/undefined checks on optional values.
+
+    - path: "example/**"
+      instructions: >-
+        This is the demo/example app that showcases library usage. Be less strict
+        here — focus on whether the example clearly demonstrates the library API,
+        whether props and callbacks are used correctly, and whether the code would
+        help a new user understand the library. Style nits are low priority.
+
+    - path: "**/*.test.*"
+      instructions: >-
+        Focus on test quality: meaningful assertions (not just snapshot dumps),
+        good coverage of edge cases (zero/negative zoom, rapid gesture sequences),
+        clear test descriptions, and proper setup/teardown. Flag tests that
+        test implementation details rather than behavior.
+
+# ── Chat ──────────────────────────────────────
+chat:
+  auto_reply: true
+
+# ── Knowledge Base ────────────────────────────
+knowledge_base:
+  opt_out: false
+  learnings:
+    scope: "auto"
+  issues:
+    scope: "auto"
+  pull_requests:
+    scope: "auto"
+
+# ── Issue Enrichment (triage) ─────────────────
+issue_enrichment:
+  auto_enrich:
+    enabled: true # duplicate detection, similar issues, suggested assignees
+
+  labeling:
+    auto_apply_labels: true
+    labeling_instructions:
+      - label: "bug"
+        instructions: >-
+          Apply when the issue describes broken behavior: a crash, visual
+          glitch, incorrect zoom/pan calculation, or regression from a
+          previous version.
+      - label: "enhancement"
+        instructions: >-
+          Apply when the issue requests new functionality or an improvement
+          to existing behavior (new props, new events, better defaults).
+      - label: "question"
+        instructions: >-
+          Apply when the issue is primarily asking how to use the library,
+          requesting documentation, or seeking guidance on integration.
+      - label: "needs-reproduction"
+        instructions: >-
+          Apply when a bug report lacks a minimal reproducible example,
+          device/OS info, or clear steps to reproduce. This signals the
+          maintainers that more information is needed before triage.
+      - label: "platform: ios"
+        instructions: "Apply when the issue is specific to iOS."
+      - label: "platform: android"
+        instructions: "Apply when the issue is specific to Android."
+
+  planning:
+    enabled: true
+    auto_planning:
+      enabled: true
+      labels:
+        - "bug"
+        - "enhancement"
+        - "!question"
