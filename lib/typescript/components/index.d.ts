@@ -1,1 +1,0 @@
-export { AnimatedTouchFeedback } from './AnimatedTouchFeedback';
