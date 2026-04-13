@@ -1040,6 +1040,12 @@ class ReactNativeZoomableView extends Component<
     this.props.onZoomBefore?.(null, null, this._getZoomableViewEventObject());
 
     // == Perform Pan Animation to preserve the zoom center while zooming ==
+    // Remove any in-flight zoomTo listener before adding a new one,
+    // otherwise rapid successive zoomTo() calls (e.g. fast double-taps)
+    // leak the previous listener on zoomAnim permanently.
+    if (this.zoomToListenerId) {
+      this.zoomAnim.removeListener(this.zoomToListenerId);
+    }
     this.zoomToListenerId = undefined;
     if (zoomCenter) {
       // Calculates panAnim values based on changes in zoomAnim.
