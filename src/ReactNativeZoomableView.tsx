@@ -270,6 +270,13 @@ class ReactNativeZoomableView extends Component<
     // Clean up zoomTo() listener if mid-animation at unmount
     if (this.zoomToListenerId)
       this.zoomAnim.removeListener(this.zoomToListenerId);
+
+    // Clear pending timeouts that could fire post-unmount
+    if (this.singleTapTimeoutId) clearTimeout(this.singleTapTimeoutId);
+    if (this.longPressTimeout) clearTimeout(this.longPressTimeout);
+
+    // Cancel debounced calls that could invoke props post-unmount
+    this.debouncedOnStaticPinPositionChange.cancel();
   }
 
   debouncedOnStaticPinPositionChange = debounce(
