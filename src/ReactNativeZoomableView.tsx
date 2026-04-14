@@ -91,6 +91,7 @@ class ReactNativeZoomableView extends Component<
   private zoomToListenerId: string | undefined;
 
   private _gestureStarted = false;
+  private mounted = false;
   private set gestureStarted(v: boolean) {
     this._gestureStarted = v;
   }
@@ -240,6 +241,7 @@ class ReactNativeZoomableView extends Component<
   }
 
   componentDidMount() {
+    this.mounted = true;
     this.measureZoomSubject();
     // We've already run `grabZoomSubjectOriginalMeasurements` at various events
     // to make sure the measurements are promptly updated.
@@ -252,6 +254,7 @@ class ReactNativeZoomableView extends Component<
   }
 
   componentWillUnmount() {
+    this.mounted = false;
     this.measureZoomSubjectInterval &&
       clearInterval(this.measureZoomSubjectInterval);
 
@@ -886,7 +889,7 @@ class ReactNativeZoomableView extends Component<
             useNativeDriver: true,
             duration: 200,
           }).start(({ finished }) => {
-            if (finished) this._updateStaticPin();
+            if (finished && this.mounted) this._updateStaticPin();
           });
         }
 
@@ -1215,6 +1218,7 @@ class ReactNativeZoomableView extends Component<
             onPress={onStaticPinPress}
             onLongPress={onStaticPinLongPress}
             onParentMove={this._handlePanResponderMove}
+            onParentRelease={this._handlePanResponderEnd}
             setPinSize={(size: Size2D) => {
               this.setState({ pinSize: size });
             }}

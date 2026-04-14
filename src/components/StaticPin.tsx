@@ -16,6 +16,7 @@ export const StaticPin = ({
   staticPinIcon,
   pinSize,
   onParentMove,
+  onParentRelease,
   onPress,
   onLongPress,
   setPinSize,
@@ -29,6 +30,10 @@ export const StaticPin = ({
     evt: GestureResponderEvent,
     gestureState: PanResponderGestureState
   ) => boolean | undefined;
+  onParentRelease: (
+    evt: GestureResponderEvent,
+    gestureState: PanResponderGestureState
+  ) => void;
   onPress?: (evt: GestureResponderEvent) => void;
   onLongPress?: (evt: GestureResponderEvent) => void;
   setPinSize: (size: Size2D) => void;
@@ -57,8 +62,10 @@ export const StaticPin = ({
           onParentMove(evt, gestureState);
       },
       onPanResponderRelease: (evt, gestureState) => {
-        if (Math.abs(gestureState.dx) > 5 || Math.abs(gestureState.dy) > 5)
+        if (Math.abs(gestureState.dx) > 5 || Math.abs(gestureState.dy) > 5) {
+          onParentRelease(evt, gestureState);
           return;
+        }
         const dt = Date.now() - tapTime.current;
         if (onPress && dt < 500) {
           onPress(evt);
