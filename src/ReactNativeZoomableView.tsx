@@ -257,8 +257,8 @@ class ReactNativeZoomableView extends Component<
 
     // Stop in-flight animations to prevent post-unmount callbacks
     // (e.g. _resolveAndHandleTap's 200ms pan animation calling onStaticPinPositionChange)
-    this.panAnim.stopAnimation();
-    this.zoomAnim.stopAnimation();
+    if (!this.props.panAnimatedValueXY) this.panAnim.stopAnimation();
+    if (!this.props.zoomAnimatedValue) this.zoomAnim.stopAnimation();
 
     // Remove animation listeners to prevent memory leaks and post-unmount callbacks
     if (this.panListenerId) this.panAnim.removeListener(this.panListenerId);
@@ -885,8 +885,8 @@ class ReactNativeZoomableView extends Component<
             },
             useNativeDriver: true,
             duration: 200,
-          }).start(() => {
-            this._updateStaticPin();
+          }).start(({ finished }) => {
+            if (finished) this._updateStaticPin();
           });
         }
 
@@ -1045,8 +1045,8 @@ class ReactNativeZoomableView extends Component<
     // leak the previous listener on zoomAnim permanently.
     if (this.zoomToListenerId) {
       this.zoomAnim.removeListener(this.zoomToListenerId);
+      this.zoomToListenerId = undefined;
     }
-    this.zoomToListenerId = undefined;
     if (zoomCenter) {
       // Calculates panAnim values based on changes in zoomAnim.
       let prevScale = this.zoomLevel;
@@ -1054,34 +1054,36 @@ class ReactNativeZoomableView extends Component<
       //  it will jitter panAnim once in a while,
       //  because here panAnim is being calculated in js.
       // However the jittering should mostly occur in simulator.
-      this.zoomToListenerId = this.zoomAnim.addListener(
-        ({ value: newScale }) => {
-          this.panAnim.setValue({
-            x: calcNewScaledOffsetForZoomCentering(
-              this.offsetX,
-              this.state.originalWidth,
-              prevScale,
-              newScale,
-              zoomCenter.x
-            ),
-            y: calcNewScaledOffsetForZoomCentering(
-              this.offsetY,
-              this.state.originalHeight,
-              prevScale,
-              newScale,
-              zoomCenter.y
-            ),
-          });
-          prevScale = newScale;
-        }
-      );
+      const listenerId = this.zoomAnim.addListener(({ value: newScale }) => {
+        this.panAnim.setValue({
+          x: calcNewScaledOffsetForZoomCentering(
+            this.offsetX,
+            this.state.originalWidth,
+            prevScale,
+            newScale,
+            zoomCenter.x
+          ),
+          y: calcNewScaledOffsetForZoomCentering(
+            this.offsetY,
+            this.state.originalHeight,
+            prevScale,
+            newScale,
+            zoomCenter.y
+          ),
+        });
+        prevScale = newScale;
+      });
+      this.zoomToListenerId = listenerId;
     }
 
     // == Perform Zoom Animation ==
+    const listenerId = this.zoomToListenerId;
     getZoomToAnimation(this.zoomAnim, newZoomLevel).start(() => {
-      if (this.zoomToListenerId) {
-        this.zoomAnim.removeListener(this.zoomToListenerId);
-        this.zoomToListenerId = undefined;
+      if (listenerId) {
+        this.zoomAnim.removeListener(listenerId);
+        if (this.zoomToListenerId === listenerId) {
+          this.zoomToListenerId = undefined;
+        }
       }
     });
     // == Zoom Animation Ends ==

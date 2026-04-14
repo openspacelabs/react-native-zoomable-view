@@ -203,10 +203,10 @@ The following methods allow you to control the ZoomableView zoom level & positio
 
 | name   | description                                                                                                          | params                                 | expected return |
 | ------ | -------------------------------------------------------------------------------------------------------------------- | -------------------------------------- | --------------- |
-| zoomTo | Changes the zoom level to a specific number                                                                          | newZoomLevel: number                   | Promise<bool>   |
-| zoomBy | Changes the zoom level relative to the current level (use positive numbers to zoom in, negative numbers to zoom out) | zoomLevelChange: number                | Promise<bool>   |
-| moveTo | Shifts the zoomed part to a specific point (in px relative to x: 0, y: 0)                                            | newOffsetX: number, newOffsetY: number | Promise<void>   |
-| moveBy | Shifts the zoomed part by a specific pixel number                                                                    | newOffsetX: number, newOffsetY: number | Promise<void>   |
+| zoomTo | Changes the zoom level to a specific number                                                                          | newZoomLevel: number                   | boolean         |
+| zoomBy | Changes the zoom level relative to the current level (use positive numbers to zoom in, negative numbers to zoom out) | zoomLevelChange: number                | boolean         |
+| moveTo | Shifts the zoomed part to a specific point (in px relative to x: 0, y: 0)                                            | newOffsetX: number, newOffsetY: number | void            |
+| moveBy | Shifts the zoomed part by a specific pixel number                                                                    | newOffsetX: number, newOffsetY: number | void            |
 
 #### Properties
 
