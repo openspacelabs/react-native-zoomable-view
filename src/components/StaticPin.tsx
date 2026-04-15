@@ -75,6 +75,11 @@ export const StaticPin = ({
           onLongPress(evt);
         }
       },
+      onPanResponderTerminate: (evt, gestureState) => {
+        if (Math.abs(gestureState.dx) > 5 || Math.abs(gestureState.dy) > 5) {
+          onParentRelease(evt, gestureState);
+        }
+      },
     })
   ).current;
 
