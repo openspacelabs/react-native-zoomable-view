@@ -1219,6 +1219,14 @@ class ReactNativeZoomableView extends Component<
             onLongPress={onStaticPinLongPress}
             onParentMove={this._handlePanResponderMove}
             onParentRelease={this._handlePanResponderEnd}
+            onParentTerminate={(evt, gestureState) => {
+              this._handlePanResponderEnd(evt, gestureState);
+              this.props.onPanResponderTerminate?.(
+                evt,
+                gestureState,
+                this._getZoomableViewEventObject()
+              );
+            }}
             setPinSize={(size: Size2D) => {
               this.setState({ pinSize: size });
             }}

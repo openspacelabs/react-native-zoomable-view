@@ -17,6 +17,7 @@ export const StaticPin = ({
   pinSize,
   onParentMove,
   onParentRelease,
+  onParentTerminate,
   onPress,
   onLongPress,
   setPinSize,
@@ -31,6 +32,10 @@ export const StaticPin = ({
     gestureState: PanResponderGestureState
   ) => boolean | undefined;
   onParentRelease: (
+    evt: GestureResponderEvent,
+    gestureState: PanResponderGestureState
+  ) => void;
+  onParentTerminate: (
     evt: GestureResponderEvent,
     gestureState: PanResponderGestureState
   ) => void;
@@ -83,7 +88,7 @@ export const StaticPin = ({
       onPanResponderTerminate: (evt, gestureState) => {
         if (parentNotified.current) {
           parentNotified.current = false;
-          onParentRelease(evt, gestureState);
+          onParentTerminate(evt, gestureState);
         }
       },
     })
