@@ -47,6 +47,7 @@ export const StaticPin = ({
   pinProps?: ViewProps;
 }) => {
   const tapTime = React.useRef(0);
+  const hasDragged = React.useRef(false);
   const parentNotified = React.useRef(false);
   const { style: pinStyle, ...restPinProps } = pinProps;
   const pressDuration = longPressDuration ?? 500;
@@ -61,6 +62,7 @@ export const StaticPin = ({
     PanResponder.create({
       onStartShouldSetPanResponder: () => {
         tapTime.current = Date.now();
+        hasDragged.current = false;
         parentNotified.current = false;
 
         // We want to handle tap on this so set true
@@ -70,16 +72,22 @@ export const StaticPin = ({
         // However if the user moves finger we want to pass this evt to parent
         // to handle panning (tap not recognized)
         if (Math.abs(gestureState.dx) > 5 || Math.abs(gestureState.dy) > 5) {
+          hasDragged.current = true;
           const accepted = onParentMove(evt, gestureState);
-          if (accepted !== false) {
+          if (accepted === undefined) {
             parentNotified.current = true;
           }
         }
       },
       onPanResponderRelease: (evt, gestureState) => {
         if (parentNotified.current) {
+          hasDragged.current = false;
           parentNotified.current = false;
           onParentRelease(evt, gestureState);
+          return;
+        }
+        if (hasDragged.current) {
+          hasDragged.current = false;
           return;
         }
         const dt = Date.now() - tapTime.current;
@@ -92,6 +100,7 @@ export const StaticPin = ({
       },
       onPanResponderTerminate: (evt, gestureState) => {
         if (parentNotified.current) {
+          hasDragged.current = false;
           parentNotified.current = false;
           onParentTerminate(evt, gestureState);
         }

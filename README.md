@@ -175,8 +175,11 @@ These optional props can be used to keep a "static" pin in the centre of the scr
 | ------------------------- | ------------------------- | -------------------------------------- |
 | staticPinPosition         | Vec2D                     | Where in the viewport to put the pin   |
 | staticPinIcon             | Element                   | The pin icon itself                    |
+| onStaticPinPress          | (event) => void           | Callback when the pin is pressed       |
+| onStaticPinLongPress      | (event) => void           | Callback when the pin is long pressed  |
 | onStaticPinPositionChange | (position: Vec2D) => void | Callback every time the pin is at rest |
 | onStaticPinPositionMove   | (position: Vec2D) => void | Callback live while the pin is moving  |
+| pinProps                  | ViewProps                 | Props forwarded to the pin wrapper     |
 
 #### Callbacks
 
