@@ -958,6 +958,7 @@ class ReactNativeZoomableView extends Component<
   }
 
   private _removeTouch(touch: TouchPoint) {
+    if (!this.mounted) return;
     this.touches.splice(this.touches.indexOf(touch), 1);
     this.setState({ touches: [...this.touches] });
   }
@@ -1156,6 +1157,7 @@ class ReactNativeZoomableView extends Component<
       children,
       visualTouchFeedbackEnabled,
       doubleTapDelay,
+      longPressDuration,
       staticPinPosition,
       onStaticPinLongPress,
       onStaticPinPress,
@@ -1227,6 +1229,7 @@ class ReactNativeZoomableView extends Component<
                 this._getZoomableViewEventObject()
               );
             }}
+            longPressDuration={longPressDuration}
             setPinSize={(size: Size2D) => {
               this.setState({ pinSize: size });
             }}

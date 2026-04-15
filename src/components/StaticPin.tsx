@@ -18,6 +18,7 @@ export const StaticPin = ({
   onParentMove,
   onParentRelease,
   onParentTerminate,
+  longPressDuration,
   onPress,
   onLongPress,
   setPinSize,
@@ -39,6 +40,7 @@ export const StaticPin = ({
     evt: GestureResponderEvent,
     gestureState: PanResponderGestureState
   ) => void;
+  longPressDuration?: number;
   onPress?: (evt: GestureResponderEvent) => void;
   onLongPress?: (evt: GestureResponderEvent) => void;
   setPinSize: (size: Size2D) => void;
@@ -46,6 +48,8 @@ export const StaticPin = ({
 }) => {
   const tapTime = React.useRef(0);
   const parentNotified = React.useRef(false);
+  const { style: pinStyle, ...restPinProps } = pinProps;
+  const pressDuration = longPressDuration ?? 500;
   const transform = [
     { translateY: -pinSize.height },
     { translateX: -pinSize.width / 2 },
@@ -66,8 +70,10 @@ export const StaticPin = ({
         // However if the user moves finger we want to pass this evt to parent
         // to handle panning (tap not recognized)
         if (Math.abs(gestureState.dx) > 5 || Math.abs(gestureState.dy) > 5) {
-          parentNotified.current = true;
-          onParentMove(evt, gestureState);
+          const accepted = onParentMove(evt, gestureState);
+          if (accepted !== false) {
+            parentNotified.current = true;
+          }
         }
       },
       onPanResponderRelease: (evt, gestureState) => {
@@ -77,11 +83,10 @@ export const StaticPin = ({
           return;
         }
         const dt = Date.now() - tapTime.current;
-        if (onPress && dt < 500) {
+        if (onPress && dt < pressDuration) {
           onPress(evt);
         }
-        if (onLongPress && dt > 500) {
-          // RN long press is 500ms
+        if (onLongPress && dt >= pressDuration) {
           onLongPress(evt);
         }
       },
@@ -103,8 +108,9 @@ export const StaticPin = ({
         },
         styles.pinWrapper,
         { opacity, transform },
+        pinStyle,
       ]}
-      {...pinProps}
+      {...restPinProps}
     >
       <View
         onLayout={({ nativeEvent: { layout } }) => {
