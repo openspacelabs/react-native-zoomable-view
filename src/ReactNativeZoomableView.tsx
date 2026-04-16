@@ -1036,8 +1036,10 @@ class ReactNativeZoomableView extends Component<
   /**
    * Zooms to a specific level. A "zoom center" can be provided, which specifies
    * the point that will remain in the same position on the screen after the zoom.
-   * The coordinates of the zoom center is relative to the zoom subject.
-   * { x: 0, y: 0 } is the very center of the zoom subject.
+   * The coordinates of the zoom center are viewport-relative (in pixels).
+   * { x: 0, y: 0 } is the top-left corner of the viewport.
+   * To zoom to the center of the viewport, use
+   * { x: originalWidth / 2, y: originalHeight / 2 }.
    *
    * @param newZoomLevel
    * @param zoomCenter - If not supplied, the container's center is the zoom center
@@ -1091,6 +1093,7 @@ class ReactNativeZoomableView extends Component<
     // == Perform Zoom Animation ==
     const listenerId = this.zoomToListenerId;
     getZoomToAnimation(this.zoomAnim, newZoomLevel).start(({ finished }) => {
+      if (!this.mounted) return;
       if (listenerId) {
         this.zoomAnim.removeListener(listenerId);
         if (this.zoomToListenerId === listenerId) {
