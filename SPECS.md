@@ -43,7 +43,7 @@ Class component (`React.Component`) using React Native's `PanResponder` and `Ani
 |------|------|---------|-------------|
 | `zoomEnabled` | `boolean` | `true` | Enable/disable zooming dynamically. **Transitioning from `true` to `false` immediately snaps zoom to `initialZoom`** via a non-animated `zoomAnim.setValue()` in `componentDidUpdate` — bypasses `onZoomBefore`/`onZoomAfter` entirely (but `onTransform` does fire). Re-enabling does not restore the previous zoom level. If `initialZoom=0`, the reset is skipped (falsy guard). Asymmetric with `panEnabled`, which has no equivalent reset |
 | `panEnabled` | `boolean` | `true` | Enable/disable panning dynamically |
-| `initialZoom` | `number` | `1` | Zoom level on startup |
+| `initialZoom` | `number` | `1` | Zoom level on startup. **`0` is silently ignored** at startup — the constructor uses a plain truthy guard (`if (this.props.initialZoom)`), so `0` is falsy and `zoomLevel` stays at the internal default of `1`. Asymmetric with `initialOffsetX`/`initialOffsetY` which correctly use `!= null` guards and accept `0` |
 | `maxZoom` | `number` | `1.5` | Maximum zoom level. `null` = unlimited pinch zoom, but disables double-tap zoom entirely (see Double-Tap Zoom section) |
 | `minZoom` | `number` | `0.5` | Minimum zoom level |
 | `initialOffsetX` | `number` | `0` | Starting horizontal offset |
@@ -142,10 +142,10 @@ Animate to a specific zoom level. `zoomCenter` specifies the point in top-left-r
 Zoom by a delta from current level. Defaults to `zoomStep` if delta is `0`, `null`, or `undefined` (uses `||=`, so any falsy value triggers the default). If `zoomStep` is also falsy, the call is a no-op.
 
 ### `moveTo(newOffsetX: number, newOffsetY: number): void`
-Move the viewport so a specific position in the zoom subject is centered.
+Move the viewport so a specific position in the zoom subject is centered. **Requires layout measurement to have completed** — the method reads `originalWidth`/`originalHeight` from state and silently no-ops (returns with no error) if either is `0` (i.e., before `onLayout` fires). Calls from `componentDidMount`, from `useEffect` with empty deps, or from refs before first layout will be silently dropped. Fires `onShiftingBefore`/`onShiftingAfter` via `_setNewOffsetPosition`.
 
 ### `moveBy(offsetChangeX: number, offsetChangeY: number): void`
-Shift the viewport by a pixel offset.
+Shift the viewport by a pixel offset. Unlike `moveTo()`, has no layout-measurement prerequisite — works immediately on mount because it operates on current offset values, not measured dimensions. Fires `onShiftingBefore`/`onShiftingAfter` via `_setNewOffsetPosition`.
 
 ### `moveStaticPinTo(position: Vec2D, duration?: number): void`
 Pan the view so the static pin points at `position` in content coordinates. Requires `staticPinPosition`, `contentWidth`, and `contentHeight` to be set. If `duration` is provided, animates the pan; otherwise instant. **Does not fire `onShiftingBefore`/`onShiftingAfter`** — sets offsets directly without routing through `_setNewOffsetPosition`, bypassing the onShifting gate entirely. Unlike `moveTo()`/`moveBy()`, consumers' `onShiftingBefore` gate cannot block this method.
@@ -213,7 +213,7 @@ If the consumer's `onShiftingBefore` callback returns `true`, the pan frame is s
 
 ## Static Pin
 
-The static pin is a draggable overlay positioned at `staticPinPosition` in content coordinates. It renders as an `Animated.View` positioned absolutely within the zoom container.
+The static pin is a draggable overlay positioned at `staticPinPosition` in **component/viewport coordinates** (component-relative pixels, same space as CSS `left`/`top` — see Props API row and Coordinate System § Viewport Coordinates). It renders as an `Animated.View` positioned absolutely within the zoom container.
 
 ### Pin Positioning
 - CSS position: `left: staticPinPosition.x`, `top: staticPinPosition.y`
