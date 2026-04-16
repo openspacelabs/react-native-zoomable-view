@@ -10,7 +10,7 @@ We've rewritten most of the logic in the original library to address the followi
 - [x] Fixed incorrect zoom center (happens during pinching and double tapping)
 - [x] Fixed incorrect pan boundaries
 - [x] Added the ability to zoom and pan at the same time (before you can only perform 1 of these 2 at a time)
-- [x] Added “pan momentum”, “zoom to”, and “boundaries-crossed” animations
+- [x] Added “zoom to” animations
 - [x] Added onSingleTap (besides the existing onDoubleTap)
 - [x] Added animated touch feedback when the zoom subject is tapped on
 - [x] Added "react-native-builder-bob" as a framework for library management/maintenance
