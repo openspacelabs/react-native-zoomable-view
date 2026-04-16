@@ -897,11 +897,12 @@ class ReactNativeZoomableView extends Component<
             duration: 200,
           }).start(({ finished }) => {
             if (finished && this.mounted) {
-              // Flush the pending debounced onStaticPinPositionChange
-              // instead of calling _updateStaticPin() directly — the
-              // direct call caused a double-fire (immediate + debounce
-              // timer ~100ms later). Matches the pattern used in
-              // _handlePanResponderEnd and zoomTo().start().
+              // Flush the pending debounced onStaticPinPositionChange so
+              // the final post-animation pin position is delivered
+              // synchronously. A direct (non-debounced) call here caused
+              // a double-fire (immediate + debounce timer ~100ms later).
+              // Matches the pattern used in _handlePanResponderEnd and
+              // zoomTo().start().
               this.debouncedOnStaticPinPositionChange.flush();
             }
           });
@@ -958,12 +959,6 @@ class ReactNativeZoomableView extends Component<
         zoomLevel: this.zoomLevel,
       },
     });
-  };
-
-  private _updateStaticPin = () => {
-    const position = this._staticPinPosition();
-    if (!position) return;
-    this.props.onStaticPinPositionChange?.(position);
   };
 
   private _addTouch(touch: TouchPoint) {
@@ -1118,12 +1113,17 @@ class ReactNativeZoomableView extends Component<
     }
 
     // == Perform Zoom Animation ==
-    const listenerId = this.zoomToListenerId;
+    // Capture the listener id at animation start so the completion
+    // callback can only remove the listener it was paired with. A
+    // subsequent zoomTo() may register a new listener (stored on
+    // this.zoomToListenerId) before this callback fires; removing that
+    // newer listener here would cancel the in-flight zoom's pan sync.
+    const capturedListenerId = this.zoomToListenerId;
     getZoomToAnimation(this.zoomAnim, newZoomLevel).start(({ finished }) => {
       if (!this.mounted) return;
-      if (listenerId) {
-        this.zoomAnim.removeListener(listenerId);
-        if (this.zoomToListenerId === listenerId) {
+      if (capturedListenerId) {
+        this.zoomAnim.removeListener(capturedListenerId);
+        if (this.zoomToListenerId === capturedListenerId) {
           this.zoomToListenerId = undefined;
         }
       }
