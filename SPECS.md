@@ -54,7 +54,7 @@ Class component (`React.Component`) using React Native's `PanResponder` and `Ani
 | `movementSensibility` | `number` | `1` | Pan movement resistance (0.5-5, higher = less sensitive) |
 | `disablePanOnInitialZoom` | `boolean` | `false` | Block panning when at initial zoom level |
 | `doubleTapDelay` | `number` | `300` | Max ms between taps for double-tap detection |
-| `doubleTapZoomToCenter` | `boolean` | - | Double tap always zooms to view center instead of tap point |
+| `doubleTapZoomToCenter` | `boolean` | - | Double tap always zooms to view center instead of tap point. **Known bug:** currently passes `{x:0,y:0}` which anchors to top-left, not center (see Coordinate System § Known Issue) |
 
 ### Content Dimensions
 
@@ -99,7 +99,7 @@ Most callbacks receive `(event, gestureState, zoomableViewEventObject)`. Excepti
 | `onLayout` | Internal measurements change | Receives `{ nativeEvent: { layout } }` |
 | `onSingleTap` | Single tap confirmed (after double-tap delay) | `(event, zoomableViewEventObject)` — no gestureState |
 | `onDoubleTapBefore` | Before double-tap zoom executes | `(event, zoomableViewEventObject)` — no gestureState |
-| `onDoubleTapAfter` | After double-tap zoom executes | `(event, zoomableViewEventObject)` — no gestureState |
+| `onDoubleTapAfter` | After double-tap zoom executes (fires synchronously before animation runs). `zoomLevel` in the event is overridden to the TARGET zoom level, not the current pre-animation level; `offsetX`/`offsetY` still reflect pre-animation state | `(event, zoomableViewEventObject)` — no gestureState |
 | `onLongPress` | Long press detected | |
 | `onShiftingBefore` | Before pan frame applies. Return `true` to block | `event` and `gestureState` are `null` — null-guard required |
 | `onShiftingAfter` | After pan frame applies | `event` and `gestureState` are `null` — null-guard required |
@@ -166,7 +166,7 @@ Uses `PanResponder` with `onStartShouldSetPanResponder: true` (always claims the
 - **No movement**: `gestureType` stays `null` → treated as tap on release
 
 ### Gesture Lifecycle
-1. `onPanResponderGrant` → Stop all in-flight animations (capturing final values via `stopAnimation` callback), set `gestureStarted = true`, start long-press timer (only if `onLongPress` prop is provided)
+1. `onPanResponderGrant` → Start long-press timer (only if `onLongPress` prop is provided), fire consumer `onPanResponderGrant` callback (`gestureStarted` is still `false` at this point), then stop in-flight animations (capturing final values via `stopAnimation` callback) and set `gestureStarted = true`
 2. `onPanResponderMove` → Classify gesture, dispatch to `_handlePinching` or `_handleShifting`
 3. `onPanResponderEnd` / `onPanResponderTerminate` → If no gesture type, resolve as tap. Fire end callbacks. Update static pin position. Reset state.
 
@@ -264,7 +264,7 @@ Taps are resolved after `onPanResponderEnd` when no gesture type was classified 
 3. **No second tap (timeout fires):** Clears saved state, fires `onSingleTap` callback, and if `staticPinPosition` is set, animates a 200ms pan toward the tap position relative to the pin.
 
 ### Timeout Cleanup
-- `singleTapTimeoutId` is cleared on: double-tap detection, `onPanResponderGrant` (new gesture starts), and `componentWillUnmount`
+- `singleTapTimeoutId` is cleared on: double-tap detection and `componentWillUnmount` (not cleared on new gesture start — a tap followed by immediate pan within `doubleTapDelay` will fire `onSingleTap` mid-gesture)
 - `doubleTapFirstTapReleaseTimestamp` is cleared on: double-tap detection and single-tap timeout fire
 
 ---
