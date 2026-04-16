@@ -41,7 +41,7 @@ Class component (`React.Component`) using React Native's `PanResponder` and `Ani
 
 | Prop | Type | Default | Description |
 |------|------|---------|-------------|
-| `zoomEnabled` | `boolean` | `true` | Enable/disable zooming dynamically |
+| `zoomEnabled` | `boolean` | `true` | Enable/disable zooming dynamically. **Transitioning from `true` to `false` immediately snaps zoom to `initialZoom`** via a non-animated `zoomAnim.setValue()` in `componentDidUpdate` — bypasses `onZoomBefore`/`onZoomAfter` entirely (but `onTransform` does fire). Re-enabling does not restore the previous zoom level. If `initialZoom=0`, the reset is skipped (falsy guard). Asymmetric with `panEnabled`, which has no equivalent reset |
 | `panEnabled` | `boolean` | `true` | Enable/disable panning dynamically |
 | `initialZoom` | `number` | `1` | Zoom level on startup |
 | `maxZoom` | `number` | `1.5` | Maximum zoom level. `null` = unlimited pinch zoom, but disables double-tap zoom entirely (see Double-Tap Zoom section) |
@@ -74,7 +74,7 @@ Class component (`React.Component`) using React Native's `PanResponder` and `Ani
 
 | Prop | Type | Default | Description |
 |------|------|---------|-------------|
-| `staticPinPosition` | `Vec2D` | `undefined` | Pin position in content coordinates. Enables the pin when set |
+| `staticPinPosition` | `Vec2D` | `undefined` | Pin position in **component/viewport coordinates** (component-relative pixels, same space as CSS `left`/`top` on the pin View; used directly as the pinch zoom center and as the `viewportPosition` input to `viewportPositionToImagePosition`). Enables the pin when set. Not to be confused with content coordinates — a pin at `{x: contentWidth/2}` on a smaller viewport will render off-screen |
 | `staticPinIcon` | `ReactElement` | built-in pin image | Custom pin icon |
 | `onStaticPinPositionChange` | `(pos: Vec2D) => void` | - | Fires when pin's content position changes. Debounced (100ms) during active gestures; fires immediately at gesture end and after single-tap animation (may double-fire if a debounced call is pending) |
 | `onStaticPinPositionMove` | `(pos: Vec2D) => void` | - | Fires on every transform frame with pin's current content position |
@@ -95,7 +95,7 @@ Most callbacks receive `(event, gestureState, zoomableViewEventObject)`. Excepti
 
 | Callback | When | Signature exception |
 |----------|------|---------------------|
-| `onTransform` | Every pan/zoom frame | Receives only `ZoomableViewEvent` (no event/gestureState) |
+| `onTransform` | Every pan/zoom frame. Also fires from `componentDidUpdate` when layout measurements change (first layout, rotation) and when `staticPinPosition` prop changes programmatically — not only during gestures. Fires **twice per pan/pinch frame** during active gestures because `_setNewOffsetPosition` and `_handlePinching` both call `panAnim.setValue()` AND `zoomAnim.setValue()`, each of which independently triggers `_invokeOnTransform()` via its listener — consumers dispatching state updates should deduplicate | Receives only `ZoomableViewEvent` (no event/gestureState) |
 | `onLayout` | Internal measurements change | Receives `{ nativeEvent: { layout } }` |
 | `onSingleTap` | Single tap confirmed (after double-tap delay) | `(event, zoomableViewEventObject)` — no gestureState |
 | `onDoubleTapBefore` | Before double-tap zoom executes | `(event, zoomableViewEventObject)` — no gestureState |
@@ -108,9 +108,9 @@ Most callbacks receive `(event, gestureState, zoomableViewEventObject)`. Excepti
 | `onZoomAfter` | After each pinch frame (real event/gestureState) AND synchronously at end of `zoomTo()` invocation before animation frames run (null, null) — `zoomLevel` in the event reflects the pre-animation value, not the target | During `zoomTo()`: `event` and `gestureState` are `null` — null-guard required |
 | `onZoomEnd` | Pinch gesture ends | |
 | `onPanResponderGrant` | Gesture responder acquired | |
-| `onPanResponderEnd` | Gesture responder released | |
+| `onPanResponderEnd` | Gesture responder released — fires on normal release AND as the first step of termination (the terminate handler calls `_handlePanResponderEnd` before firing `onPanResponderTerminate`) | |
 | `onPanResponderMove` | Every move frame. Return `true` to intercept (prevents default handling) | |
-| `onPanResponderTerminate` | Responder taken by another component | |
+| `onPanResponderTerminate` | Responder taken by another component. **Not** mutually exclusive with `onPanResponderEnd`: on termination, `onPanResponderEnd` (plus `onZoomEnd`/`onShiftingEnd` based on gestureType) fires first, then `onPanResponderTerminate` fires. Three callbacks total per termination event | |
 | `onPanResponderTerminationRequest` | Another component wants responder. Return `true` to allow. **Default when not provided: deny (`false`)** — component never yields to another responder. To allow embedding in `ScrollView` or React Navigation, provide this callback returning `true` | |
 | `onShouldBlockNativeResponder` | Block native responder. Default: `true` | |
 | `onStartShouldSetPanResponder` | Before gesture responder is set | `(event, gestureState, zoomableViewEventObject, baseComponentResult)` — 4 args; return value is ignored (component always claims responder) |
@@ -168,7 +168,7 @@ Uses `PanResponder` with `onStartShouldSetPanResponder: true` (always claims the
 ### Gesture Lifecycle
 1. `onPanResponderGrant` → Start long-press timer (only if `onLongPress` prop is provided), fire consumer `onPanResponderGrant` callback (`gestureStarted` is still `false` at this point), then stop in-flight animations (capturing final values via `stopAnimation` callback) and set `gestureStarted = true`
 2. `onPanResponderMove` → Classify gesture, dispatch to `_handlePinching` or `_handleShifting`
-3. `onPanResponderEnd` / `onPanResponderTerminate` → If no gesture type, resolve as tap. Fire end callbacks. Update static pin position. Reset state.
+3. `onPanResponderEnd` → If no gesture type, resolve as tap. Fire end callbacks (including `onZoomEnd`/`onShiftingEnd` based on gestureType). Update static pin position. Reset state. On termination the same handler runs first, then `onPanResponderTerminate` fires additionally (both callbacks fire on termination — they are not alternatives).
 
 ### Gesture-to-Shift Transition
 When switching from pinch to shift (or vice versa), `lastGestureCenterPosition` is recalculated at the transition boundary to prevent a jump. The center point resets so the delta calculation starts fresh.
@@ -184,8 +184,11 @@ When switching from pinch to shift (or vice versa), `lastGestureCenterPosition` 
 - Min/max zoom enforced per frame
 
 ### Double-Tap Zoom
-- Cycles between current level x (1 + `zoomStep`) and `initialZoom` (multiplicative — e.g., zoomStep=0.5 zooms 50% above current level)
-- When at `maxZoom`, returns to `initialZoom`
+- Advances zoom level as `currentLevel × (1 + zoomStep)` (multiplicative — e.g., `zoomStep=0.5` zooms 50% above current level), with three possible return paths in `_getNextZoomStep()`:
+  1. If the computed next step **overshoots `maxZoom`**, it is **clamped to `maxZoom`** (intermediate step, not `initialZoom`)
+  2. When already at `maxZoom` (detected via `zoomLevel.toFixed(2) === maxZoom.toFixed(2)` — 2-decimal precision, ~0.005 tolerance), returns `initialZoom`
+  3. Otherwise returns the computed step
+- Example cycle for `initialZoom=1, maxZoom=2, zoomStep=0.5`: `1 → 1.5 → 2 (clamped, not 2.25) → 1 → ...` — three distinct cycle states, not two
 - **When `maxZoom` is `null`:** double-tap zoom is disabled entirely. `onDoubleTapBefore` fires but no zoom occurs and `onDoubleTapAfter` is never called (because `_getNextZoomStep()` returns `undefined` when `maxZoom == null`). Pinch zoom is unaffected. `zoomStep=null` has the identical effect via the same `undefined`-return path in `_getNextZoomStep()`.
 - **When `zoomEnabled` is `false`:** BOTH `onDoubleTapBefore` AND `onDoubleTapAfter` fire despite no zoom animation running. `_getNextZoomStep()` does not check `zoomEnabled`, so it returns a valid next step; `zoomTo()` is then called, bails out early (`!this.props.zoomEnabled` returns `false`), but `_handleDoubleTap` does not check the return value and fires `onDoubleTapAfter` unconditionally with a synthetic `zoomLevel` override equal to the would-be target. Consumers relying on the Before/After pair as a state-change signal will see a matched pair indistinguishable from a successful zoom even though the view did not change. Unlike the `maxZoom`/`zoomStep=null` cases (where only `onDoubleTapBefore` fires), there is no observable signal to distinguish this from a real zoom.
 - Zoom center = tap position (or view center if `doubleTapZoomToCenter`)
@@ -313,7 +316,10 @@ This captures the final animated value into the JS-side mirrors, preventing drif
 ## Coordinate System
 
 ### Content Coordinates
-`staticPinPosition`, `contentWidth`, `contentHeight`, and `moveStaticPinTo` all operate in "content coordinates" — the logical pixel space of the content being zoomed. Origin is top-left of the content.
+`contentWidth`, `contentHeight`, and `moveStaticPinTo`'s `position` argument operate in "content coordinates" — the logical pixel space of the content being zoomed. Origin is top-left of the content. `onStaticPinPositionChange`/`onStaticPinPositionMove` callback payloads are also in content space (they are the output of `viewportPositionToImagePosition`).
+
+### Viewport Coordinates
+`staticPinPosition` operates in viewport/component coordinates — component-relative pixels, the same space as CSS `left`/`top` on the pin View. It is used directly as the pinch zoom center and passed as the `viewportPosition` input to `viewportPositionToImagePosition`. The viewport space and content space are only the same when the content is rendered unscaled and un-offset at the component's top-left.
 
 ### Viewport-to-Image Conversion
 `viewportPositionToImagePosition` converts a viewport pixel position to content coordinates, accounting for current zoom, offset, and measured dimensions. Used to compute the pin's logical position after every transform.
