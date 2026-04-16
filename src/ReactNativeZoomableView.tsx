@@ -896,7 +896,14 @@ class ReactNativeZoomableView extends Component<
             useNativeDriver: true,
             duration: 200,
           }).start(({ finished }) => {
-            if (finished && this.mounted) this._updateStaticPin();
+            if (finished && this.mounted) {
+              // Flush the pending debounced onStaticPinPositionChange
+              // instead of calling _updateStaticPin() directly — the
+              // direct call caused a double-fire (immediate + debounce
+              // timer ~100ms later). Matches the pattern used in
+              // _handlePanResponderEnd and zoomTo().start().
+              this.debouncedOnStaticPinPositionChange.flush();
+            }
           });
         }
 
@@ -1039,6 +1046,8 @@ class ReactNativeZoomableView extends Component<
         ? maxZoom
         : (initialZoom ?? 1) * Math.pow(1 + zoomStep, 3);
 
+    // This cycle-back is only reachable when maxZoom == null; when
+    // maxZoom != null the equivalent check above already returned.
     if (zoomLevel.toFixed(2) === effectiveMax.toFixed(2)) {
       return initialZoom;
     }
