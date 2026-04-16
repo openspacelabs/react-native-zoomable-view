@@ -440,6 +440,11 @@ class ReactNativeZoomableView extends Component<
           this._getZoomableViewEventObject()
         );
         this.longPressTimeout = null;
+        // Clear double-tap state after a confirmed long press so that the
+        // subsequent release doesn't spuriously trigger onDoubleTap. This
+        // matters when longPressDuration < doubleTapDelay.
+        delete this.doubleTapFirstTapReleaseTimestamp;
+        delete this.doubleTapFirstTap;
       }, this.props.longPressDuration);
     }
 
