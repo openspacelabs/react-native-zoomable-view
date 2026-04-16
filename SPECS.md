@@ -49,8 +49,8 @@ Class component (`React.Component`) using React Native's `PanResponder` and `Ani
 | `initialOffsetX` | `number` | `0` | Starting horizontal offset |
 | `initialOffsetY` | `number` | `0` | Starting vertical offset |
 | `zoomStep` | `number` | `0.5` | Zoom increment on double tap |
-| `pinchToZoomInSensitivity` | `number` | `1` | Resistance to zoom in (0-10, higher = less sensitive) |
-| `pinchToZoomOutSensitivity` | `number` | `1` | Resistance to zoom out (0-10, higher = less sensitive) |
+| `pinchToZoomInSensitivity` | `number` | `1` | Resistance to zoom in (0-10, higher = less sensitive). **`null` silently disables pinch zoom-in** — the `== null` guard in `_handlePinching` returns early AFTER `onZoomBefore` has already fired, so every zoom-in pinch frame fires `onZoomBefore` without a matching `onZoomAfter`, breaking matched-pair state machines |
+| `pinchToZoomOutSensitivity` | `number` | `1` | Resistance to zoom out (0-10, higher = less sensitive). **`null` silently disables pinch zoom-out** — same early-return pattern as `pinchToZoomInSensitivity=null`: `onZoomBefore` fires, then sensitivity null-guard returns, `onZoomAfter` never fires for affected frames |
 | `movementSensibility` | `number` | `1` | Pan movement resistance (0.5-5, higher = less sensitive). **`0` or any falsy value silently disables panning entirely** — a truthy guard in `_calcOffsetShiftSinceLastGestureState` short-circuits (also prevents division-by-zero). Same falsy-guard trap pattern as `doubleTapDelay=0`, `zoomBy(0)`, and `maxZoom=null` |
 | `disablePanOnInitialZoom` | `boolean` | `false` | Block panning when at initial zoom level |
 | `doubleTapDelay` | `number` | `300` | Max ms between taps for double-tap detection |
@@ -113,7 +113,7 @@ Most callbacks receive `(event, gestureState, zoomableViewEventObject)`. Excepti
 | `onPanResponderTerminate` | Responder taken by another component. **Not** mutually exclusive with `onPanResponderEnd`: on termination, `onPanResponderEnd` (plus `onZoomEnd`/`onShiftingEnd` based on gestureType) fires first, then `onPanResponderTerminate` fires. Three callbacks total per termination event | |
 | `onPanResponderTerminationRequest` | Another component wants responder. Return `true` to allow. **Default when not provided: deny (`false`)** — component never yields to another responder. To allow embedding in `ScrollView` or React Navigation, provide this callback returning `true` | |
 | `onShouldBlockNativeResponder` | Block native responder. Default: `true` | |
-| `onStartShouldSetPanResponder` | Before gesture responder is set | `(event, gestureState, zoomableViewEventObject, baseComponentResult)` — 4 args; return value is ignored (component always claims responder) |
+| `onStartShouldSetPanResponder` | Before gesture responder is set | `(event, gestureState, zoomableViewEventObject, alwaysFalse)` — 4 args; **the 4th arg is hardcoded `false`** (not computed from any internal state or base-component result — misleadingly named historically) and the return value is ignored (component always claims responder) |
 | `onStartShouldSetPanResponderCapture` | Capture phase for start | `(event, gestureState)` — no zoomableViewEventObject; returns boolean |
 | `onMoveShouldSetPanResponderCapture` | Capture phase for move | `(event, gestureState)` — no zoomableViewEventObject; returns boolean |
 
@@ -166,7 +166,7 @@ Uses `PanResponder` with `onStartShouldSetPanResponder: true` (always claims the
 - **No movement**: `gestureType` stays `null` → treated as tap on release
 
 ### Gesture Lifecycle
-1. `onPanResponderGrant` → Start long-press timer (only if `onLongPress` prop is provided), fire consumer `onPanResponderGrant` callback (`gestureStarted` is still `false` at this point), then stop in-flight animations (capturing final values via `stopAnimation` callback) and set `gestureStarted = true`. **This step can also be triggered mid-drag from the StaticPin drag-to-parent handoff** (not only from a fresh PanResponder grant) — see Static Pin § Drag-to-parent handoff for the non-zero `gestureState` and mid-drag long-press caveats.
+1. `onPanResponderGrant` → Start long-press timer (only if `onLongPress` prop is provided), fire consumer `onPanResponderGrant` callback (`gestureStarted` is still `false` at this point), then stop in-flight animations (capturing final values via `stopAnimation` callback) and set `gestureStarted = true`. **This step can also be triggered mid-drag from the StaticPin drag-to-parent handoff** (not only from a fresh PanResponder grant) — see Static Pin § Drag-to-parent handoff for the non-zero `gestureState.dx`/`dy` caveat. (The long-press timer is also set in the mid-drag case but is immediately cleared in the same call, so no stray `onLongPress` fires during StaticPin drags.)
 2. `onPanResponderMove` → Classify gesture, dispatch to `_handlePinching` or `_handleShifting`
 3. `onPanResponderEnd` → If no gesture type, resolve as tap. Fire end callbacks (including `onZoomEnd`/`onShiftingEnd` based on gestureType). Update static pin position. Reset state. On termination the same handler runs first, then `onPanResponderTerminate` fires additionally (both callbacks fire on termination — they are not alternatives).
 
@@ -182,6 +182,7 @@ When switching from pinch to shift (or vice versa), `lastGestureCenterPosition` 
 - Sensitivity formula: `deltaGrowth * (1 - sensitivity * 9 / 100)` where `sensitivity` is 0-10
 - Offset recalculated each frame to keep the zoom center visually stable
 - Min/max zoom enforced per frame
+- **When `zoomEnabled` is `false`:** `_handlePinching` returns immediately before any callback fires — **no** `onZoomBefore`, `onZoomAfter`, or other zoom callback runs for pinch gestures. This is asymmetric with double-tap (see Double-Tap Zoom § zoomEnabled=false, where both callbacks fire with a synthetic payload). Consumers using `onZoomBefore` for analytics during a locked period will see double-tap attempts logged but pinch attempts silently swallowed.
 
 ### Double-Tap Zoom
 - Advances zoom level as `currentLevel × (1 + zoomStep)` (multiplicative — e.g., `zoomStep=0.5` zooms 50% above current level), with three possible return paths in `_getNextZoomStep()`:
@@ -229,14 +230,14 @@ StaticPin has its own `PanResponder` that intercepts touches on the pin before t
 - `onStartShouldSetPanResponder` → always `true` (pin claims all touches)
 - Resets `hasDragged` and `parentNotified` refs on each new touch
 
-**Drag threshold:** 5px in either axis (`dx > 5 || dy > 5`, using OR not AND)
+**Drag threshold:** 5px in either axis (`Math.abs(dx) > 5 || Math.abs(dy) > 5`, using OR not AND; absolute displacement so leftward/upward drags trigger symmetrically with rightward/downward)
 
 **Drag-to-parent handoff:**
 1. Once threshold crossed, `hasDragged = true`, calls `onParentMove` (parent's `_handlePanResponderMove`)
 2. If parent returns `undefined` (normal 1-2 finger handling), sets `parentNotified = true`
 3. If parent returns `true` (3+ finger branch that internally called `_handlePanResponderEnd`), `parentNotified = false` — prevents spurious `onParentRelease` on finger lift
 
-**Mid-drag re-grant caveat:** When the parent's `_handlePanResponderMove` runs via this handoff path, it checks `!this.gestureStarted` and calls `_handlePanResponderGrant` mid-drag (the original PanResponder grant never fired because StaticPin consumed the initial touch). This has two consumer-visible consequences: (a) the consumer's `onPanResponderGrant` callback fires with **non-zero `gestureState.dx`/`dy`** (the 5px threshold guarantees at least one axis has moved) — not the dx=0/dy=0 typical at a fresh gesture start; (b) if `onLongPress` is provided, the `longPressTimeout` starts mid-drag and may fire up to `longPressDuration` ms later during active pin dragging, invoking `onLongPress` while the user is still moving.
+**Mid-drag re-grant caveat:** When the parent's `_handlePanResponderMove` runs via this handoff path, it checks `!this.gestureStarted` and calls `_handlePanResponderGrant` mid-drag (the original PanResponder grant never fired because StaticPin consumed the initial touch). The consumer-visible consequence is that the consumer's `onPanResponderGrant` callback fires with **non-zero `gestureState.dx`/`dy`** (the 5px threshold guarantees at least one axis has moved) — not the `dx=0`/`dy=0` typical at a fresh gesture start. The `longPressTimeout` is set by `_handlePanResponderGrant` but immediately cleared in the same synchronous `_handlePanResponderMove` call (the 1-finger branch's `Math.abs(dx) > 5 || Math.abs(dy) > 5` guard fires on the same gestureState that triggered the handoff), so `onLongPress` does NOT fire during active pin dragging.
 
 **Release behavior:**
 - If `parentNotified`: calls `onParentRelease` (parent's `_handlePanResponderEnd`) — completes the pan gesture properly
@@ -383,7 +384,7 @@ Previously `offsetX`/`offsetY` were stored in a `__offsets` object with `boundar
 - `onParentTerminate` prop added — StaticPin handles responder termination correctly
 - `longPressDuration` prop added — uses parent's duration instead of hardcoded 500ms
 - `pinProps.style` is now extracted and applied as a separate style layer (previously spread as-is)
-- Drag threshold changed from `dx > 5 AND dy > 5` to `dx > 5 OR dy > 5` — drags are detected earlier (on any single axis exceeding 5px, not both)
+- Drag threshold changed from `Math.abs(dx) > 5 AND Math.abs(dy) > 5` to `Math.abs(dx) > 5 OR Math.abs(dy) > 5` — drags are detected earlier (on any single axis exceeding 5px absolute, not both)
 
 ### Behavior Changes
 - `stopAnimation` on gesture start now uses callbacks to capture final values — prevents offset drift that could occur when animations were stopped without reading their final state
