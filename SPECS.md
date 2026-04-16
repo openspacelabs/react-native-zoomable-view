@@ -102,7 +102,7 @@ Most callbacks receive `(event, gestureState, zoomableViewEventObject)`. Excepti
 | `onDoubleTapAfter` | After double-tap zoom executes (fires synchronously before animation runs). `zoomLevel` in the event is overridden to the TARGET zoom level, not the current pre-animation level; `offsetX`/`offsetY` still reflect pre-animation state | `(event, zoomableViewEventObject)` — no gestureState |
 | `onLongPress` | Long press detected | |
 | `onShiftingBefore` | Before pan frame applies. Return `true` to block | `event` and `gestureState` are `null` — null-guard required |
-| `onShiftingAfter` | After pan frame applies | `event` and `gestureState` are `null` — null-guard required |
+| `onShiftingAfter` | After pan frame applies. **Return value is ignored** — unlike `onShiftingBefore` (where returning `true` blocks the frame), `onShiftingAfter`'s declared `boolean` return type is misleading; the call site does not capture it, so returning `true` has no effect | `event` and `gestureState` are `null` — null-guard required |
 | `onShiftingEnd` | Pan gesture ends | |
 | `onZoomBefore` | Fires on every pinch frame (real event/gestureState) AND at start of `zoomTo()` (null, null). Return `true` blocks pinch frames only — ignored during `zoomTo()` | During `zoomTo()`: `event` and `gestureState` are `null` — null-guard required |
 | `onZoomAfter` | After each pinch frame (real event/gestureState) AND synchronously at end of `zoomTo()` invocation before animation frames run (null, null) — `zoomLevel` in the event reflects the pre-animation value, not the target | During `zoomTo()`: `event` and `gestureState` are `null` — null-guard required |
@@ -136,7 +136,7 @@ Most callbacks receive `(event, gestureState, zoomableViewEventObject)`. Excepti
 ## Public Methods
 
 ### `zoomTo(newZoomLevel: number, zoomCenter?: Vec2D): boolean`
-Animate to a specific zoom level. `zoomCenter` specifies the point in top-left-relative viewport coordinates (`{x:0,y:0}` = top-left corner; `{x:w/2,y:h/2}` = center) that stays fixed on screen during the zoom. Returns `false` if zoom is disabled or level is out of bounds.
+Animate to a specific zoom level. `zoomCenter` specifies the point in top-left-relative viewport coordinates (`{x:0,y:0}` = top-left corner; `{x:w/2,y:h/2}` = center) that stays fixed on screen during the zoom. Returns `false` if zoom is disabled or level is out of bounds. **Animation duration is the React Native `Animated.timing` default of 500ms**, with `Easing.out(Easing.ease)` — `getZoomToAnimation` (`src/animations/index.ts`) passes no explicit `duration`, so any future RN default change would propagate silently.
 
 ### `zoomBy(zoomLevelChange: number): boolean`
 Zoom by a delta from current level. Defaults to `zoomStep` if delta is `0`, `null`, or `undefined` (uses `||=`, so any falsy value triggers the default). If `zoomStep` is also falsy, the call is a no-op.
@@ -148,7 +148,7 @@ Move the viewport so a specific position in the zoom subject is centered. **Requ
 Shift the viewport by a pixel offset. Unlike `moveTo()`, has no layout-measurement prerequisite — works immediately on mount because it operates on current offset values, not measured dimensions. Fires `onShiftingBefore`/`onShiftingAfter` via `_setNewOffsetPosition`, and fires `onTransform` **twice per call** (same dual-listener path). **Not gated by `panEnabled` or `disablePanOnInitialZoom`** — same caveat as `moveTo()`. **Cancels in-flight `zoomTo()` animations silently** — same `zoomAnim.setValue()` side effect as `moveTo()`.
 
 ### `moveStaticPinTo(position: Vec2D, duration?: number): void`
-Pan the view so the static pin points at `position` in content coordinates. Requires `staticPinPosition`, `contentWidth`, and `contentHeight` to be set. If `duration` is truthy, animates the pan via `Animated.timing`; **any falsy `duration` (`0`, `undefined`, `null`) takes the instant `panAnim.setValue()` path** — the code uses a plain `if (duration)` guard, so `duration=0` does NOT produce a 0ms animated path, it takes the synchronous path. Same falsy-guard trap pattern as `doubleTapDelay=0` and `movementSensibility=0`. **Does not fire `onShiftingBefore`/`onShiftingAfter`** — sets offsets directly without routing through `_setNewOffsetPosition`, bypassing the onShifting gate entirely. Unlike `moveTo()`/`moveBy()`, consumers' `onShiftingBefore` gate cannot block this method. **Still fires `onTransform` once per instant call, or once per animation frame for the animated path** (via the direct `panAnim.setValue()` call).
+Pan the view so the static pin points at `position` in content coordinates. Requires `staticPinPosition`, `contentWidth`, and `contentHeight` to be set. If `duration` is truthy, animates the pan via `Animated.timing`; **any falsy `duration` (`0`, `undefined`, `null`) takes the instant `panAnim.setValue()` path** — the code uses a plain `if (duration)` guard, so `duration=0` does NOT produce a 0ms animated path, it takes the synchronous path. Same falsy-guard trap pattern as `doubleTapDelay=0` and `movementSensibility=0`. **Does not fire `onShiftingBefore`/`onShiftingAfter`** — sets offsets directly without routing through `_setNewOffsetPosition`, bypassing the onShifting gate entirely. Unlike `moveTo()`/`moveBy()`, consumers' `onShiftingBefore` gate cannot block this method. **Still fires `onTransform` once per instant call, or once per animation frame for the animated path** (via the direct `panAnim.setValue()` call). **Not gated by `panEnabled` or `disablePanOnInitialZoom`** — bypasses both flags via direct `panAnim` manipulation without routing through `_handleShifting`.
 
 ### `gestureStarted: boolean` (read-only)
 Whether a gesture is currently in progress. Useful for consumers to suppress their own updates during active interaction.
@@ -205,7 +205,7 @@ When `zoomTo` is called with a `zoomCenter`, a listener on `zoomAnim` dynamicall
 
 ## Pan / Shift Behavior
 
-- Gesture panning is disabled when `panEnabled = false` or when `disablePanOnInitialZoom = true` and zoom is at `initialZoom`. **These flags only gate gesture-driven panning via `_handleShifting`** — programmatic `moveTo()` and `moveBy()` bypass both flags entirely (they route through `_setNewOffsetPosition` which has no `panEnabled`/`disablePanOnInitialZoom` check), gated only by `onShiftingBefore`
+- Gesture panning is disabled when `panEnabled = false` or when `disablePanOnInitialZoom = true` and zoom is at `initialZoom`. **These flags only gate gesture-driven panning via `_handleShifting`** — all three programmatic pan methods (`moveTo`, `moveBy`, `moveStaticPinTo`) bypass both flags entirely (`moveTo`/`moveBy` route through `_setNewOffsetPosition` which has no `panEnabled`/`disablePanOnInitialZoom` check, gated only by `onShiftingBefore`; `moveStaticPinTo` manipulates `panAnim` directly and has no gates at all)
 - Movement is scaled by `1 / zoomLevel / movementSensibility` — at higher zoom, the same finger movement produces less content shift
 - No momentum/decay — pan stops immediately when finger lifts
 - No boundary clamping — content can be panned freely without bounds
@@ -246,8 +246,10 @@ StaticPin has its own `PanResponder` that intercepts touches on the pin before t
 - If `hasDragged` but NOT `parentNotified`: silently drops (drag was handled by 3+ finger path)
 - If no drag: evaluates as tap or long press based on `Date.now() - tapTime` vs `longPressDuration`
 
-**Terminate behavior:**
-- If `parentNotified`: calls `onParentTerminate` (parent's `_handlePanResponderEnd` + `onPanResponderTerminate` callback)
+**Terminate behavior:** three cases based on drag state:
+- If `parentNotified === true`: calls `onParentTerminate` (parent's `_handlePanResponderEnd` + `onPanResponderTerminate` callback)
+- If `hasDragged === true` but `parentNotified === false` (3+-finger path consumed the drag): silent drop — no callback fires
+- If `hasDragged === false` (brief touch, no movement): **nothing fires** — asymmetric with release behavior, which would have evaluated the same brief touch as tap/long-press and fired `onStaticPinPress`/`onStaticPinLongPress`. Consumers relying on `onStaticPinPress` to observe every brief touch will silently miss termination-path taps
 
 ### Pin Position Updates
 - `onStaticPinPositionMove`: fires on every `onTransform` frame with the pin's content-space position (via `viewportPositionToImagePosition`). **Inherits `onTransform`'s trigger caveats:** fires twice per pan/pinch frame during active gestures (dual `panAnim`/`zoomAnim` listeners), also fires from `componentDidUpdate` on layout measurement changes (first layout, rotation) and programmatic `staticPinPosition` prop changes, and fires from programmatic `moveTo()`/`moveBy()` (twice per call) and `moveStaticPinTo()` (once per instant call, or per animation frame)
@@ -328,7 +330,7 @@ This captures the final animated value into the JS-side mirrors, preventing drif
 `staticPinPosition` operates in viewport/component coordinates — component-relative pixels, the same space as CSS `left`/`top` on the pin View. It is used directly as the pinch zoom center and passed as the `viewportPosition` input to `viewportPositionToImagePosition`. The viewport space and content space are only the same when the content is rendered unscaled and un-offset at the component's top-left.
 
 ### Viewport-to-Image Conversion
-`viewportPositionToImagePosition` converts a viewport pixel position to content coordinates, accounting for current zoom, offset, and measured dimensions. Used to compute the pin's logical position after every transform.
+`viewportPositionToImagePosition` converts a viewport pixel position to content coordinates, accounting for current zoom, offset, and measured dimensions. Used to compute the pin's logical position after every transform. **Assumes the content is rendered with `contain` resize-mode semantics** (aspect-ratio-preserving, letterboxed): internally calls `applyContainResizeMode(imageSize, viewportSize)` which computes the content's on-container origin assuming it was scaled to fit entirely within the viewport while preserving aspect ratio. Consumers whose content uses `cover`, `fill`, `stretch`, or absolute positioning will receive systematically wrong values from `onStaticPinPositionChange`/`onStaticPinPositionMove` with no error or warning.
 
 ### Zoom Center Coordinates
 In `zoomTo()` and double-tap, zoom center is in component viewport space with top-left origin: `{ x: 0, y: 0 }` = top-left corner of the zoom subject; `{ x: originalWidth/2, y: originalHeight/2 }` = true center. Computed as `pageX - originalPageX` / `pageY - originalPageY`.
