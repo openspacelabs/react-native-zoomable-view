@@ -1122,7 +1122,7 @@ class ReactNativeZoomableView extends Component<
           this.zoomToListenerId = undefined;
         }
       }
-      if (finished) {
+      if (finished && this.mounted) {
         this.props.onZoomAfter?.(
           null,
           null,

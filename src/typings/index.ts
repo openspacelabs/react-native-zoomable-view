@@ -35,8 +35,8 @@ export interface ReactNativeZoomableViewProps {
   initialOffsetY?: number;
   contentWidth?: number;
   contentHeight?: number;
-  maxZoom?: number;
-  minZoom?: number;
+  maxZoom?: number | null;
+  minZoom?: number | null;
   doubleTapDelay?: number;
   doubleTapZoomToCenter?: boolean;
   zoomStep?: number;
