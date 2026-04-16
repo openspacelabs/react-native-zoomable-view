@@ -261,7 +261,7 @@ Taps are resolved after `onPanResponderEnd` when no gesture type was classified 
 
 1. **First tap:** Records timestamp (`doubleTapFirstTapReleaseTimestamp`) and tap position (`doubleTapFirstTap`). Starts a `setTimeout` of `doubleTapDelay` ms.
 2. **Second tap within `doubleTapDelay`:** Cancels the pending timeout (`singleTapTimeoutId`), clears saved state, calls `_handleDoubleTap`.
-3. **No second tap (timeout fires):** Clears saved state, fires `onSingleTap` callback, and if `staticPinPosition` is set, animates a 200ms pan toward the tap position relative to the pin.
+3. **No second tap (timeout fires):** Clears saved state. If `staticPinPosition` is set, starts a 200ms pan animation toward the tap position relative to the pin. Then fires `onSingleTap` callback (animation is already in progress when callback runs).
 
 ### Timeout Cleanup
 - `singleTapTimeoutId` is cleared on: double-tap detection and `componentWillUnmount` (not cleared on new gesture start — a tap followed by immediate pan within `doubleTapDelay` will fire `onSingleTap` mid-gesture)
