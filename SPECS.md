@@ -104,8 +104,8 @@ Most callbacks receive `(event, gestureState, zoomableViewEventObject)`. Excepti
 | `onShiftingBefore` | Before pan frame applies. Return `true` to block | `event` and `gestureState` are `null` — null-guard required |
 | `onShiftingAfter` | After pan frame applies | `event` and `gestureState` are `null` — null-guard required |
 | `onShiftingEnd` | Pan gesture ends | |
-| `onZoomBefore` | Before programmatic zoom frame (via `zoomTo`). Return `true` to block | `event` and `gestureState` are `null` — null-guard required |
-| `onZoomAfter` | After programmatic zoom frame | `event` and `gestureState` are `null` — null-guard required |
+| `onZoomBefore` | Fires on every pinch frame (real event/gestureState) AND at start of `zoomTo()` (null, null). Return `true` blocks pinch frames only — ignored during `zoomTo()` | During `zoomTo()`: `event` and `gestureState` are `null` — null-guard required |
+| `onZoomAfter` | After each pinch frame (real event/gestureState) AND after `zoomTo()` animation frame (null, null) | During `zoomTo()`: `event` and `gestureState` are `null` — null-guard required |
 | `onZoomEnd` | Pinch gesture ends | |
 | `onPanResponderGrant` | Gesture responder acquired | |
 | `onPanResponderEnd` | Gesture responder released | |
@@ -139,7 +139,7 @@ Most callbacks receive `(event, gestureState, zoomableViewEventObject)`. Excepti
 Animate to a specific zoom level. `zoomCenter` specifies the point (relative to zoom subject center) that stays fixed on screen during the zoom. Returns `false` if zoom is disabled or level is out of bounds.
 
 ### `zoomBy(zoomLevelChange: number): boolean`
-Zoom by a delta from current level. Defaults to `zoomStep` if no delta given.
+Zoom by a delta from current level. Defaults to `zoomStep` if delta is `0`, `null`, or `undefined` (uses `||=`, so any falsy value triggers the default). If `zoomStep` is also falsy, the call is a no-op.
 
 ### `moveTo(newOffsetX: number, newOffsetY: number): void`
 Move the viewport so a specific position in the zoom subject is centered.
@@ -166,7 +166,7 @@ Uses `PanResponder` with `onStartShouldSetPanResponder: true` (always claims the
 - **No movement**: `gestureType` stays `null` → treated as tap on release
 
 ### Gesture Lifecycle
-1. `onPanResponderGrant` → Stop all in-flight animations (capturing final values via `stopAnimation` callback), set `gestureStarted = true`, start long-press timer
+1. `onPanResponderGrant` → Stop all in-flight animations (capturing final values via `stopAnimation` callback), set `gestureStarted = true`, start long-press timer (only if `onLongPress` prop is provided)
 2. `onPanResponderMove` → Classify gesture, dispatch to `_handlePinching` or `_handleShifting`
 3. `onPanResponderEnd` / `onPanResponderTerminate` → If no gesture type, resolve as tap. Fire end callbacks. Update static pin position. Reset state.
 
@@ -301,7 +301,9 @@ This captures the final animated value into the JS-side mirrors, preventing drif
 `viewportPositionToImagePosition` converts a viewport pixel position to content coordinates, accounting for current zoom, offset, and measured dimensions. Used to compute the pin's logical position after every transform.
 
 ### Zoom Center Coordinates
-In `zoomTo()` and double-tap, zoom center is relative to the zoom subject's center: `{ x: 0, y: 0 }` = dead center of the zoom subject.
+In `zoomTo()` and double-tap, zoom center is in component viewport space with top-left origin: `{ x: 0, y: 0 }` = top-left corner of the zoom subject; `{ x: originalWidth/2, y: originalHeight/2 }` = true center. Computed as `pageX - originalPageX` / `pageY - originalPageY`.
+
+**Known issue:** `doubleTapZoomToCenter` passes `{ x: 0, y: 0 }` intending to mean "center", but this actually anchors the zoom to the top-left corner. This is a pre-existing code bug.
 
 ### moveStaticPinTo Math
 ```
