@@ -1019,15 +1019,33 @@ class ReactNativeZoomableView extends Component<
     const { zoomStep, maxZoom, initialZoom } = this.props;
     const { zoomLevel } = this;
 
-    if (zoomStep == null) return;
-
+    // Cycle-back when at a configured maxZoom must be checked BEFORE
+    // the zoomStep guard — otherwise users with zoomStep={null} and
+    // a configured maxZoom lose the reset-to-initialZoom behavior on
+    // double-tap at max zoom.
     if (maxZoom != null && zoomLevel.toFixed(2) === maxZoom.toFixed(2)) {
       return initialZoom;
     }
 
+    // If no zoomStep is configured, there is no increment to compute.
+    if (zoomStep == null) return;
+
+    // Determine the effective ceiling for double-tap cycling.
+    // When maxZoom is null (unlimited zoom), use a default of 3 zoom
+    // steps from initialZoom so double-tap still cycles back — otherwise
+    // every tap would grow zoom indefinitely with no reset path.
+    const effectiveMax =
+      maxZoom != null
+        ? maxZoom
+        : (initialZoom ?? 1) * Math.pow(1 + zoomStep, 3);
+
+    if (zoomLevel.toFixed(2) === effectiveMax.toFixed(2)) {
+      return initialZoom;
+    }
+
     const nextZoomStep = zoomLevel * (1 + zoomStep);
-    if (maxZoom != null && nextZoomStep > maxZoom) {
-      return maxZoom;
+    if (nextZoomStep > effectiveMax) {
+      return effectiveMax;
     }
 
     return nextZoomStep;
@@ -1101,6 +1119,13 @@ class ReactNativeZoomableView extends Component<
         }
       }
       if (finished) {
+        // Flush any pending debounced static-pin position change so
+        // consumers observing pin position in onZoomAfter see the final
+        // post-animation value, matching the pattern in
+        // _handlePanResponderEnd.
+        if (this.props.staticPinPosition) {
+          this.debouncedOnStaticPinPositionChange.flush();
+        }
         this.props.onZoomAfter?.(
           null,
           null,
