@@ -1026,13 +1026,21 @@ class ReactNativeZoomableView extends Component<
 
     if (zoomStep == null) return;
 
-    if (maxZoom != null && zoomLevel.toFixed(2) === maxZoom.toFixed(2)) {
+    // Determine the effective ceiling for double-tap cycling.
+    // When maxZoom is null (unlimited), use a default of 3 zoom steps
+    // from initialZoom so double-tap still cycles back.
+    const effectiveMax =
+      maxZoom != null
+        ? maxZoom
+        : (initialZoom ?? 1) * Math.pow(1 + zoomStep, 3);
+
+    if (zoomLevel.toFixed(2) === effectiveMax.toFixed(2)) {
       return initialZoom;
     }
 
     const nextZoomStep = zoomLevel * (1 + zoomStep);
-    if (maxZoom != null && nextZoomStep > maxZoom) {
-      return maxZoom;
+    if (nextZoomStep > effectiveMax) {
+      return effectiveMax;
     }
 
     return nextZoomStep;
@@ -1041,8 +1049,9 @@ class ReactNativeZoomableView extends Component<
   /**
    * Zooms to a specific level. A "zoom center" can be provided, which specifies
    * the point that will remain in the same position on the screen after the zoom.
-   * The coordinates of the zoom center is relative to the zoom subject.
-   * { x: 0, y: 0 } is the very center of the zoom subject.
+   * The coordinates of the zoom center are viewport-relative.
+   * { x: 0, y: 0 } is the top-left corner of the zoom subject.
+   * The center is { x: originalWidth/2, y: originalHeight/2 }.
    *
    * @param newZoomLevel
    * @param zoomCenter - If not supplied, the container's center is the zoom center
