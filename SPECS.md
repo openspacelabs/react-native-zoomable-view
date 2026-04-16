@@ -44,7 +44,7 @@ Class component (`React.Component`) using React Native's `PanResponder` and `Ani
 | `zoomEnabled` | `boolean` | `true` | Enable/disable zooming dynamically |
 | `panEnabled` | `boolean` | `true` | Enable/disable panning dynamically |
 | `initialZoom` | `number` | `1` | Zoom level on startup |
-| `maxZoom` | `number` | `1.5` | Maximum zoom level. `null` = unlimited |
+| `maxZoom` | `number` | `1.5` | Maximum zoom level. `null` = unlimited pinch zoom, but disables double-tap zoom entirely (see Double-Tap Zoom section) |
 | `minZoom` | `number` | `0.5` | Minimum zoom level |
 | `initialOffsetX` | `number` | `0` | Starting horizontal offset |
 | `initialOffsetY` | `number` | `0` | Starting vertical offset |
@@ -101,11 +101,11 @@ Most callbacks receive `(event, gestureState, zoomableViewEventObject)`. Excepti
 | `onDoubleTapBefore` | Before double-tap zoom executes | `(event, zoomableViewEventObject)` — no gestureState |
 | `onDoubleTapAfter` | After double-tap zoom executes | `(event, zoomableViewEventObject)` — no gestureState |
 | `onLongPress` | Long press detected | |
-| `onShiftingBefore` | Before pan frame applies. Return `true` to block | |
-| `onShiftingAfter` | After pan frame applies | |
+| `onShiftingBefore` | Before pan frame applies. Return `true` to block | `event` and `gestureState` are `null` — null-guard required |
+| `onShiftingAfter` | After pan frame applies | `event` and `gestureState` are `null` — null-guard required |
 | `onShiftingEnd` | Pan gesture ends | |
-| `onZoomBefore` | Before pinch-zoom frame. Return `true` to block | |
-| `onZoomAfter` | After pinch-zoom frame | |
+| `onZoomBefore` | Before programmatic zoom frame (via `zoomTo`). Return `true` to block | `event` and `gestureState` are `null` — null-guard required |
+| `onZoomAfter` | After programmatic zoom frame | `event` and `gestureState` are `null` — null-guard required |
 | `onZoomEnd` | Pinch gesture ends | |
 | `onPanResponderGrant` | Gesture responder acquired | |
 | `onPanResponderEnd` | Gesture responder released | |
@@ -113,6 +113,7 @@ Most callbacks receive `(event, gestureState, zoomableViewEventObject)`. Excepti
 | `onPanResponderTerminate` | Responder taken by another component | |
 | `onPanResponderTerminationRequest` | Another component wants responder. Return `true` to allow | |
 | `onShouldBlockNativeResponder` | Block native responder. Default: `true` | |
+| `onStartShouldSetPanResponder` | Before gesture responder is set | `(event, gestureState, zoomableViewEventObject, baseComponentResult)` — 4 args; return value is ignored (component always claims responder) |
 | `onStartShouldSetPanResponderCapture` | Capture phase for start | `(event, gestureState)` — no zoomableViewEventObject; returns boolean |
 | `onMoveShouldSetPanResponderCapture` | Capture phase for move | `(event, gestureState)` — no zoomableViewEventObject; returns boolean |
 
@@ -185,6 +186,7 @@ When switching from pinch to shift (or vice versa), `lastGestureCenterPosition` 
 ### Double-Tap Zoom
 - Cycles between current level x (1 + `zoomStep`) and `initialZoom` (multiplicative — e.g., zoomStep=0.5 zooms 50% above current level)
 - When at `maxZoom`, returns to `initialZoom`
+- **When `maxZoom` is `null`:** double-tap zoom is disabled entirely. `onDoubleTapBefore` fires but no zoom occurs and `onDoubleTapAfter` is never called (because `_getNextZoomStep()` returns `undefined` when `maxZoom == null`). Pinch zoom is unaffected.
 - Zoom center = tap position (or view center if `doubleTapZoomToCenter`)
 - Uses `zoomTo()` internally
 
