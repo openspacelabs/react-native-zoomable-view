@@ -51,6 +51,8 @@ export const StaticPin = ({
   const parentNotified = React.useRef(false);
   const { style: pinStyle, ...restPinProps } = pinProps;
   const pressDuration = longPressDuration ?? 500;
+  const pressDurationRef = React.useRef(pressDuration);
+  pressDurationRef.current = pressDuration;
   const transform = [
     { translateY: -pinSize.height },
     { translateX: -pinSize.width / 2 },
@@ -76,6 +78,11 @@ export const StaticPin = ({
           const accepted = onParentMove(evt, gestureState);
           if (accepted === undefined) {
             parentNotified.current = true;
+          } else if (accepted) {
+            // Parent handled it internally (e.g. 3-touch branch) —
+            // clear parentNotified so release doesn't fire a spurious
+            // onParentRelease → _resolveAndHandleTap.
+            parentNotified.current = false;
           }
         }
       },
@@ -91,10 +98,10 @@ export const StaticPin = ({
           return;
         }
         const dt = Date.now() - tapTime.current;
-        if (onPress && dt < pressDuration) {
+        if (onPress && dt < pressDurationRef.current) {
           onPress(evt);
         }
-        if (onLongPress && dt >= pressDuration) {
+        if (onLongPress && dt >= pressDurationRef.current) {
           onLongPress(evt);
         }
       },

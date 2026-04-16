@@ -336,10 +336,12 @@ class ReactNativeZoomableView extends Component<
   private measureZoomSubject = () => {
     // make sure we measure after animations are complete
     requestAnimationFrame(() => {
+      if (!this.mounted) return;
       // this setTimeout is here to fix a weird issue on iOS where the measurements are all `0`
       // when navigating back (react-navigation stack) from another view
       // while closing the keyboard at the same time
       setTimeout(() => {
+        if (!this.mounted) return;
         // In normal conditions, we're supposed to measure zoomSubject instead of its wrapper.
         // However, our zoomSubject may have been transformed by an initial zoomLevel or offset,
         // in which case these measurements will not represent the true "original" measurements.
