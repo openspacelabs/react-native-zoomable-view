@@ -424,11 +424,11 @@ class ReactNativeZoomableView extends Component<
     if (this.singleTapTimeoutId) {
       clearTimeout(this.singleTapTimeoutId);
       this.singleTapTimeoutId = undefined;
-      // Clear stale double-tap state that the cancelled timeout callback
-      // would have cleaned up -- without this, a tap-pan-tap sequence
-      // within doubleTapDelay spuriously triggers onDoubleTap.
-      delete this.doubleTapFirstTapReleaseTimestamp;
-      delete this.doubleTapFirstTap;
+      // Note: we intentionally do NOT clear doubleTapFirstTapReleaseTimestamp
+      // or doubleTapFirstTap here. For a genuine double-tap, the second tap
+      // touches down while singleTapTimeoutId is still set, and we need that
+      // state preserved. Stale double-tap state is instead cleared when the
+      // gesture transitions to a drag (shift) -- see _handlePanResponderMove.
     }
 
     if (this.props.onLongPress) {
@@ -566,6 +566,9 @@ class ReactNativeZoomableView extends Component<
           e,
           gestureState
         );
+        // Clear stale double-tap state on pinch start (same rationale as shift)
+        delete this.doubleTapFirstTapReleaseTimestamp;
+        delete this.doubleTapFirstTap;
       }
       this.gestureType = 'pinch';
       this._handlePinching(e, gestureState);
@@ -588,6 +591,14 @@ class ReactNativeZoomableView extends Component<
       const { dx, dy } = gestureState;
       const isShiftGesture = Math.abs(dx) > 2 || Math.abs(dy) > 2;
       if (isShiftGesture) {
+        // Clear stale double-tap state when a drag actually starts.
+        // Without this, a tap-pan-tap sequence within doubleTapDelay
+        // spuriously triggers onDoubleTap (the first tap's state
+        // persists through the pan and the second tap matches it).
+        if (this.gestureType !== 'shift') {
+          delete this.doubleTapFirstTapReleaseTimestamp;
+          delete this.doubleTapFirstTap;
+        }
         this.gestureType = 'shift';
         this._handleShifting(gestureState);
       }
