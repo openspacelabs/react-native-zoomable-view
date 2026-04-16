@@ -501,7 +501,7 @@ class ReactNativeZoomableView extends Component<
     }
 
     if (this.props.staticPinPosition) {
-      this._updateStaticPin();
+      this.debouncedOnStaticPinPositionChange.flush();
     }
 
     this.gestureType = null;
@@ -836,7 +836,6 @@ class ReactNativeZoomableView extends Component<
     this.offsetY = newOffsetY;
 
     this.panAnim.setValue({ x: this.offsetX, y: this.offsetY });
-    this.zoomAnim.setValue(this.zoomLevel);
 
     onShiftingAfter?.(null, null, this._getZoomableViewEventObject());
   }
@@ -996,9 +995,10 @@ class ReactNativeZoomableView extends Component<
     };
 
     // if doubleTapZoomToCenter enabled -> always zoom to center instead
+    // zoomTo uses viewport-relative coordinates where center = originalWidth/2, originalHeight/2
     if (doubleTapZoomToCenter) {
-      zoomPositionCoordinates.x = 0;
-      zoomPositionCoordinates.y = 0;
+      zoomPositionCoordinates.x = this.state.originalWidth / 2;
+      zoomPositionCoordinates.y = this.state.originalHeight / 2;
     }
 
     this.zoomTo(nextZoomStep, zoomPositionCoordinates);
@@ -1019,16 +1019,14 @@ class ReactNativeZoomableView extends Component<
     const { zoomStep, maxZoom, initialZoom } = this.props;
     const { zoomLevel } = this;
 
-    if (maxZoom == null) return;
+    if (zoomStep == null) return;
 
-    if (zoomLevel.toFixed(2) === maxZoom.toFixed(2)) {
+    if (maxZoom != null && zoomLevel.toFixed(2) === maxZoom.toFixed(2)) {
       return initialZoom;
     }
 
-    if (zoomStep == null) return;
-
     const nextZoomStep = zoomLevel * (1 + zoomStep);
-    if (nextZoomStep > maxZoom) {
+    if (maxZoom != null && nextZoomStep > maxZoom) {
       return maxZoom;
     }
 
@@ -1046,8 +1044,10 @@ class ReactNativeZoomableView extends Component<
    */
   zoomTo(newZoomLevel: number, zoomCenter?: Vec2D) {
     if (!this.props.zoomEnabled) return false;
-    if (this.props.maxZoom && newZoomLevel > this.props.maxZoom) return false;
-    if (this.props.minZoom && newZoomLevel < this.props.minZoom) return false;
+    if (this.props.maxZoom != null && newZoomLevel > this.props.maxZoom)
+      return false;
+    if (this.props.minZoom != null && newZoomLevel < this.props.minZoom)
+      return false;
 
     this.props.onZoomBefore?.(null, null, this._getZoomableViewEventObject());
 
@@ -1097,10 +1097,10 @@ class ReactNativeZoomableView extends Component<
           this.zoomToListenerId = undefined;
         }
       }
+      this.props.onZoomAfter?.(null, null, this._getZoomableViewEventObject());
     });
     // == Zoom Animation Ends ==
 
-    this.props.onZoomAfter?.(null, null, this._getZoomableViewEventObject());
     return true;
   }
 
