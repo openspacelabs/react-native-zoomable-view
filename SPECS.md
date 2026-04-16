@@ -76,7 +76,7 @@ Class component (`React.Component`) using React Native's `PanResponder` and `Ani
 |------|------|---------|-------------|
 | `staticPinPosition` | `Vec2D` | `undefined` | Pin position in content coordinates. Enables the pin when set |
 | `staticPinIcon` | `ReactElement` | built-in pin image | Custom pin icon |
-| `onStaticPinPositionChange` | `(pos: Vec2D) => void` | - | Debounced (100ms) callback when pin's content position changes after gestures |
+| `onStaticPinPositionChange` | `(pos: Vec2D) => void` | - | Fires when pin's content position changes. Debounced (100ms) during active gestures; fires immediately at gesture end and after single-tap animation (may double-fire if a debounced call is pending) |
 | `onStaticPinPositionMove` | `(pos: Vec2D) => void` | - | Fires on every transform frame with pin's current content position |
 | `onStaticPinPress` | `(evt) => void` | - | Tap on the pin (short press, under `longPressDuration`) |
 | `onStaticPinLongPress` | `(evt) => void` | - | Long press on the pin |
@@ -91,30 +91,30 @@ Class component (`React.Component`) using React Native's `PanResponder` and `Ani
 
 ### Callbacks
 
-All callbacks receive `(event, gestureState, zoomableViewEventObject)` unless noted:
+Most callbacks receive `(event, gestureState, zoomableViewEventObject)`. Exceptions noted per row:
 
-| Callback | When |
-|----------|------|
-| `onTransform` | Every pan/zoom frame. Receives only `ZoomableViewEvent` |
-| `onLayout` | Internal measurements change. Receives `{ nativeEvent: { layout } }` |
-| `onSingleTap` | Single tap confirmed (after double-tap delay) |
-| `onDoubleTapBefore` | Before double-tap zoom executes |
-| `onDoubleTapAfter` | After double-tap zoom executes |
-| `onLongPress` | Long press detected |
-| `onShiftingBefore` | Before pan frame applies. Return `true` to block |
-| `onShiftingAfter` | After pan frame applies |
-| `onShiftingEnd` | Pan gesture ends |
-| `onZoomBefore` | Before pinch-zoom frame. Return `true` to block |
-| `onZoomAfter` | After pinch-zoom frame |
-| `onZoomEnd` | Pinch gesture ends |
-| `onPanResponderGrant` | Gesture responder acquired |
-| `onPanResponderEnd` | Gesture responder released |
-| `onPanResponderMove` | Every move frame. Return `true` to intercept (prevents default handling) |
-| `onPanResponderTerminate` | Responder taken by another component |
-| `onPanResponderTerminationRequest` | Another component wants responder. Return `true` to allow |
-| `onShouldBlockNativeResponder` | Block native responder. Default: `true` |
-| `onStartShouldSetPanResponderCapture` | Capture phase for start |
-| `onMoveShouldSetPanResponderCapture` | Capture phase for move |
+| Callback | When | Signature exception |
+|----------|------|---------------------|
+| `onTransform` | Every pan/zoom frame | Receives only `ZoomableViewEvent` (no event/gestureState) |
+| `onLayout` | Internal measurements change | Receives `{ nativeEvent: { layout } }` |
+| `onSingleTap` | Single tap confirmed (after double-tap delay) | `(event, zoomableViewEventObject)` — no gestureState |
+| `onDoubleTapBefore` | Before double-tap zoom executes | `(event, zoomableViewEventObject)` — no gestureState |
+| `onDoubleTapAfter` | After double-tap zoom executes | `(event, zoomableViewEventObject)` — no gestureState |
+| `onLongPress` | Long press detected | |
+| `onShiftingBefore` | Before pan frame applies. Return `true` to block | |
+| `onShiftingAfter` | After pan frame applies | |
+| `onShiftingEnd` | Pan gesture ends | |
+| `onZoomBefore` | Before pinch-zoom frame. Return `true` to block | |
+| `onZoomAfter` | After pinch-zoom frame | |
+| `onZoomEnd` | Pinch gesture ends | |
+| `onPanResponderGrant` | Gesture responder acquired | |
+| `onPanResponderEnd` | Gesture responder released | |
+| `onPanResponderMove` | Every move frame. Return `true` to intercept (prevents default handling) | |
+| `onPanResponderTerminate` | Responder taken by another component | |
+| `onPanResponderTerminationRequest` | Another component wants responder. Return `true` to allow | |
+| `onShouldBlockNativeResponder` | Block native responder. Default: `true` | |
+| `onStartShouldSetPanResponderCapture` | Capture phase for start | `(event, gestureState)` — no zoomableViewEventObject; returns boolean |
+| `onMoveShouldSetPanResponderCapture` | Capture phase for move | `(event, gestureState)` — no zoomableViewEventObject; returns boolean |
 
 ### ZoomableViewEvent Shape
 
@@ -183,7 +183,7 @@ When switching from pinch to shift (or vice versa), `lastGestureCenterPosition` 
 - Min/max zoom enforced per frame
 
 ### Double-Tap Zoom
-- Cycles between current level + `zoomStep` and `initialZoom`
+- Cycles between current level x (1 + `zoomStep`) and `initialZoom` (multiplicative — e.g., zoomStep=0.5 zooms 50% above current level)
 - When at `maxZoom`, returns to `initialZoom`
 - Zoom center = tap position (or view center if `doubleTapZoomToCenter`)
 - Uses `zoomTo()` internally
@@ -239,8 +239,11 @@ StaticPin has its own `PanResponder` that intercepts touches on the pin before t
 
 ### Pin Position Updates
 - `onStaticPinPositionMove`: fires on every `onTransform` frame with the pin's content-space position (via `viewportPositionToImagePosition`)
-- `onStaticPinPositionChange`: same calculation but debounced at 100ms (lodash `debounce`, cancelled on unmount)
-- Both require `contentWidth` and `contentHeight` to be set
+- `onStaticPinPositionChange`: has two call paths:
+  - **Debounced (100ms):** Fired via `_invokeOnTransform` during active panning/pinching — lodash `debounce`, cancelled on unmount
+  - **Immediate:** Fired directly via `_updateStaticPin` at gesture end and after single-tap animation completion — no rate limiting
+  - **Double-fire risk:** At gesture end, if a debounced call is pending from the last transform frame, the consumer receives one immediate call followed by a second debounced call ~100ms later
+- Both callbacks require `contentWidth` and `contentHeight` to be set
 
 ### Single-Tap Pan-to-Pin
 When `staticPinPosition` is set and user single-taps the content (not the pin), the view animates (200ms) to center on the tap position relative to the pin. The `_updateStaticPin` callback only fires if the animation completes (`finished === true`) and the component is still mounted.
