@@ -424,11 +424,6 @@ class ReactNativeZoomableView extends Component<
     if (this.singleTapTimeoutId) {
       clearTimeout(this.singleTapTimeoutId);
       this.singleTapTimeoutId = undefined;
-      // Note: we intentionally do NOT clear doubleTapFirstTapReleaseTimestamp
-      // or doubleTapFirstTap here. For a genuine double-tap, the second tap
-      // touches down while singleTapTimeoutId is still set, and we need that
-      // state preserved. Stale double-tap state is instead cleared when the
-      // gesture transitions to a drag (shift) -- see _handlePanResponderMove.
     }
 
     if (this.props.onLongPress) {
@@ -440,11 +435,6 @@ class ReactNativeZoomableView extends Component<
           this._getZoomableViewEventObject()
         );
         this.longPressTimeout = null;
-        // Clear double-tap state after a confirmed long press so that the
-        // subsequent release doesn't spuriously trigger onDoubleTap. This
-        // matters when longPressDuration < doubleTapDelay.
-        delete this.doubleTapFirstTapReleaseTimestamp;
-        delete this.doubleTapFirstTap;
       }, this.props.longPressDuration);
     }
 
@@ -511,7 +501,7 @@ class ReactNativeZoomableView extends Component<
     }
 
     if (this.props.staticPinPosition) {
-      this.debouncedOnStaticPinPositionChange.flush();
+      this._updateStaticPin();
     }
 
     this.gestureType = null;
@@ -571,9 +561,6 @@ class ReactNativeZoomableView extends Component<
           e,
           gestureState
         );
-        // Clear stale double-tap state on pinch start (same rationale as shift)
-        delete this.doubleTapFirstTapReleaseTimestamp;
-        delete this.doubleTapFirstTap;
       }
       this.gestureType = 'pinch';
       this._handlePinching(e, gestureState);
@@ -596,14 +583,6 @@ class ReactNativeZoomableView extends Component<
       const { dx, dy } = gestureState;
       const isShiftGesture = Math.abs(dx) > 2 || Math.abs(dy) > 2;
       if (isShiftGesture) {
-        // Clear stale double-tap state when a drag actually starts.
-        // Without this, a tap-pan-tap sequence within doubleTapDelay
-        // spuriously triggers onDoubleTap (the first tap's state
-        // persists through the pan and the second tap matches it).
-        if (this.gestureType !== 'shift') {
-          delete this.doubleTapFirstTapReleaseTimestamp;
-          delete this.doubleTapFirstTap;
-        }
         this.gestureType = 'shift';
         this._handleShifting(gestureState);
       }
@@ -857,6 +836,7 @@ class ReactNativeZoomableView extends Component<
     this.offsetY = newOffsetY;
 
     this.panAnim.setValue({ x: this.offsetX, y: this.offsetY });
+    this.zoomAnim.setValue(this.zoomLevel);
 
     onShiftingAfter?.(null, null, this._getZoomableViewEventObject());
   }
@@ -1016,10 +996,9 @@ class ReactNativeZoomableView extends Component<
     };
 
     // if doubleTapZoomToCenter enabled -> always zoom to center instead
-    // zoomTo uses viewport-relative coordinates where center = originalWidth/2, originalHeight/2
     if (doubleTapZoomToCenter) {
-      zoomPositionCoordinates.x = this.state.originalWidth / 2;
-      zoomPositionCoordinates.y = this.state.originalHeight / 2;
+      zoomPositionCoordinates.x = 0;
+      zoomPositionCoordinates.y = 0;
     }
 
     this.zoomTo(nextZoomStep, zoomPositionCoordinates);
@@ -1040,23 +1019,17 @@ class ReactNativeZoomableView extends Component<
     const { zoomStep, maxZoom, initialZoom } = this.props;
     const { zoomLevel } = this;
 
-    if (zoomStep == null) return;
+    if (maxZoom == null) return;
 
-    // Determine the effective ceiling for double-tap cycling.
-    // When maxZoom is null (unlimited), use a default of 3 zoom steps
-    // from initialZoom so double-tap still cycles back.
-    const effectiveMax =
-      maxZoom != null
-        ? maxZoom
-        : (initialZoom ?? 1) * Math.pow(1 + zoomStep, 3);
-
-    if (zoomLevel.toFixed(2) === effectiveMax.toFixed(2)) {
+    if (zoomLevel.toFixed(2) === maxZoom.toFixed(2)) {
       return initialZoom;
     }
 
+    if (zoomStep == null) return;
+
     const nextZoomStep = zoomLevel * (1 + zoomStep);
-    if (nextZoomStep > effectiveMax) {
-      return effectiveMax;
+    if (nextZoomStep > maxZoom) {
+      return maxZoom;
     }
 
     return nextZoomStep;
@@ -1065,19 +1038,16 @@ class ReactNativeZoomableView extends Component<
   /**
    * Zooms to a specific level. A "zoom center" can be provided, which specifies
    * the point that will remain in the same position on the screen after the zoom.
-   * The coordinates of the zoom center are viewport-relative.
-   * { x: 0, y: 0 } is the top-left corner of the zoom subject.
-   * The center is { x: originalWidth/2, y: originalHeight/2 }.
+   * The coordinates of the zoom center is relative to the zoom subject.
+   * { x: 0, y: 0 } is the very center of the zoom subject.
    *
    * @param newZoomLevel
    * @param zoomCenter - If not supplied, the container's center is the zoom center
    */
   zoomTo(newZoomLevel: number, zoomCenter?: Vec2D) {
     if (!this.props.zoomEnabled) return false;
-    if (this.props.maxZoom != null && newZoomLevel > this.props.maxZoom)
-      return false;
-    if (this.props.minZoom != null && newZoomLevel < this.props.minZoom)
-      return false;
+    if (this.props.maxZoom && newZoomLevel > this.props.maxZoom) return false;
+    if (this.props.minZoom && newZoomLevel < this.props.minZoom) return false;
 
     this.props.onZoomBefore?.(null, null, this._getZoomableViewEventObject());
 
@@ -1120,23 +1090,17 @@ class ReactNativeZoomableView extends Component<
 
     // == Perform Zoom Animation ==
     const listenerId = this.zoomToListenerId;
-    getZoomToAnimation(this.zoomAnim, newZoomLevel).start(({ finished }) => {
+    getZoomToAnimation(this.zoomAnim, newZoomLevel).start(() => {
       if (listenerId) {
         this.zoomAnim.removeListener(listenerId);
         if (this.zoomToListenerId === listenerId) {
           this.zoomToListenerId = undefined;
         }
       }
-      if (finished && this.mounted) {
-        this.props.onZoomAfter?.(
-          null,
-          null,
-          this._getZoomableViewEventObject()
-        );
-      }
     });
     // == Zoom Animation Ends ==
 
+    this.props.onZoomAfter?.(null, null, this._getZoomableViewEventObject());
     return true;
   }
 
