@@ -51,7 +51,7 @@ Class component (`React.Component`) using React Native's `PanResponder` and `Ani
 | `zoomStep` | `number` | `0.5` | Zoom increment on double tap |
 | `pinchToZoomInSensitivity` | `number` | `1` | Resistance to zoom in (0-10, higher = less sensitive) |
 | `pinchToZoomOutSensitivity` | `number` | `1` | Resistance to zoom out (0-10, higher = less sensitive) |
-| `movementSensibility` | `number` | `1` | Pan movement resistance (0.5-5, higher = less sensitive) |
+| `movementSensibility` | `number` | `1` | Pan movement resistance (0.5-5, higher = less sensitive). **`0` or any falsy value silently disables panning entirely** — a truthy guard in `_calcOffsetShiftSinceLastGestureState` short-circuits (also prevents division-by-zero). Same falsy-guard trap pattern as `doubleTapDelay=0`, `zoomBy(0)`, and `maxZoom=null` |
 | `disablePanOnInitialZoom` | `boolean` | `false` | Block panning when at initial zoom level |
 | `doubleTapDelay` | `number` | `300` | Max ms between taps for double-tap detection |
 | `doubleTapZoomToCenter` | `boolean` | - | Double tap always zooms to view center instead of tap point. **Known bug:** currently passes `{x:0,y:0}` which anchors to top-left, not center (see Coordinate System § Known Issue) |
@@ -111,7 +111,7 @@ Most callbacks receive `(event, gestureState, zoomableViewEventObject)`. Excepti
 | `onPanResponderEnd` | Gesture responder released | |
 | `onPanResponderMove` | Every move frame. Return `true` to intercept (prevents default handling) | |
 | `onPanResponderTerminate` | Responder taken by another component | |
-| `onPanResponderTerminationRequest` | Another component wants responder. Return `true` to allow | |
+| `onPanResponderTerminationRequest` | Another component wants responder. Return `true` to allow. **Default when not provided: deny (`false`)** — component never yields to another responder. To allow embedding in `ScrollView` or React Navigation, provide this callback returning `true` | |
 | `onShouldBlockNativeResponder` | Block native responder. Default: `true` | |
 | `onStartShouldSetPanResponder` | Before gesture responder is set | `(event, gestureState, zoomableViewEventObject, baseComponentResult)` — 4 args; return value is ignored (component always claims responder) |
 | `onStartShouldSetPanResponderCapture` | Capture phase for start | `(event, gestureState)` — no zoomableViewEventObject; returns boolean |
@@ -148,7 +148,7 @@ Move the viewport so a specific position in the zoom subject is centered.
 Shift the viewport by a pixel offset.
 
 ### `moveStaticPinTo(position: Vec2D, duration?: number): void`
-Pan the view so the static pin points at `position` in content coordinates. Requires `staticPinPosition`, `contentWidth`, and `contentHeight` to be set. If `duration` is provided, animates the pan; otherwise instant.
+Pan the view so the static pin points at `position` in content coordinates. Requires `staticPinPosition`, `contentWidth`, and `contentHeight` to be set. If `duration` is provided, animates the pan; otherwise instant. **Does not fire `onShiftingBefore`/`onShiftingAfter`** — sets offsets directly without routing through `_setNewOffsetPosition`, bypassing the onShifting gate entirely. Unlike `moveTo()`/`moveBy()`, consumers' `onShiftingBefore` gate cannot block this method.
 
 ### `gestureStarted: boolean` (read-only)
 Whether a gesture is currently in progress. Useful for consumers to suppress their own updates during active interaction.
@@ -187,6 +187,7 @@ When switching from pinch to shift (or vice versa), `lastGestureCenterPosition` 
 - Cycles between current level x (1 + `zoomStep`) and `initialZoom` (multiplicative — e.g., zoomStep=0.5 zooms 50% above current level)
 - When at `maxZoom`, returns to `initialZoom`
 - **When `maxZoom` is `null`:** double-tap zoom is disabled entirely. `onDoubleTapBefore` fires but no zoom occurs and `onDoubleTapAfter` is never called (because `_getNextZoomStep()` returns `undefined` when `maxZoom == null`). Pinch zoom is unaffected. `zoomStep=null` has the identical effect via the same `undefined`-return path in `_getNextZoomStep()`.
+- **When `zoomEnabled` is `false`:** BOTH `onDoubleTapBefore` AND `onDoubleTapAfter` fire despite no zoom animation running. `_getNextZoomStep()` does not check `zoomEnabled`, so it returns a valid next step; `zoomTo()` is then called, bails out early (`!this.props.zoomEnabled` returns `false`), but `_handleDoubleTap` does not check the return value and fires `onDoubleTapAfter` unconditionally with a synthetic `zoomLevel` override equal to the would-be target. Consumers relying on the Before/After pair as a state-change signal will see a matched pair indistinguishable from a successful zoom even though the view did not change. Unlike the `maxZoom`/`zoomStep=null` cases (where only `onDoubleTapBefore` fires), there is no observable signal to distinguish this from a real zoom.
 - Zoom center = tap position (or view center if `doubleTapZoomToCenter`)
 - Uses `zoomTo()` internally
 
@@ -363,7 +364,9 @@ Previously `offsetX`/`offsetY` were stored in a `__offsets` object with `boundar
 - `getBoundaryCrossedAnim` from `./animations`
 - `getPanMomentumDecayAnim` from `./animations`
 - `applyPanBoundariesToOffset` from `./helper/applyPanBoundariesToOffset`
-- `Vec2D` type removed from internal usage (still exported from typings)
+
+### Internal Changes (No Public API Impact)
+- `Vec2D` type is no longer used in internal gesture/pan math, but remains publicly exported from `src/typings` — consumers importing `Vec2D` are unaffected
 
 ### StaticPin API Changes
 - `pinAnim` prop removed — no longer needed
