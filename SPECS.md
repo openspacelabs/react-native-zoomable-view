@@ -105,7 +105,7 @@ Most callbacks receive `(event, gestureState, zoomableViewEventObject)`. Excepti
 | `onShiftingAfter` | After pan frame applies | `event` and `gestureState` are `null` — null-guard required |
 | `onShiftingEnd` | Pan gesture ends | |
 | `onZoomBefore` | Fires on every pinch frame (real event/gestureState) AND at start of `zoomTo()` (null, null). Return `true` blocks pinch frames only — ignored during `zoomTo()` | During `zoomTo()`: `event` and `gestureState` are `null` — null-guard required |
-| `onZoomAfter` | After each pinch frame (real event/gestureState) AND after `zoomTo()` animation frame (null, null) | During `zoomTo()`: `event` and `gestureState` are `null` — null-guard required |
+| `onZoomAfter` | After each pinch frame (real event/gestureState) AND synchronously at end of `zoomTo()` invocation before animation frames run (null, null) — `zoomLevel` in the event reflects the pre-animation value, not the target | During `zoomTo()`: `event` and `gestureState` are `null` — null-guard required |
 | `onZoomEnd` | Pinch gesture ends | |
 | `onPanResponderGrant` | Gesture responder acquired | |
 | `onPanResponderEnd` | Gesture responder released | |
@@ -136,7 +136,7 @@ Most callbacks receive `(event, gestureState, zoomableViewEventObject)`. Excepti
 ## Public Methods
 
 ### `zoomTo(newZoomLevel: number, zoomCenter?: Vec2D): boolean`
-Animate to a specific zoom level. `zoomCenter` specifies the point (relative to zoom subject center) that stays fixed on screen during the zoom. Returns `false` if zoom is disabled or level is out of bounds.
+Animate to a specific zoom level. `zoomCenter` specifies the point in top-left-relative viewport coordinates (`{x:0,y:0}` = top-left corner; `{x:w/2,y:h/2}` = center) that stays fixed on screen during the zoom. Returns `false` if zoom is disabled or level is out of bounds.
 
 ### `zoomBy(zoomLevelChange: number): boolean`
 Zoom by a delta from current level. Defaults to `zoomStep` if delta is `0`, `null`, or `undefined` (uses `||=`, so any falsy value triggers the default). If `zoomStep` is also falsy, the call is a no-op.
@@ -186,7 +186,7 @@ When switching from pinch to shift (or vice versa), `lastGestureCenterPosition` 
 ### Double-Tap Zoom
 - Cycles between current level x (1 + `zoomStep`) and `initialZoom` (multiplicative — e.g., zoomStep=0.5 zooms 50% above current level)
 - When at `maxZoom`, returns to `initialZoom`
-- **When `maxZoom` is `null`:** double-tap zoom is disabled entirely. `onDoubleTapBefore` fires but no zoom occurs and `onDoubleTapAfter` is never called (because `_getNextZoomStep()` returns `undefined` when `maxZoom == null`). Pinch zoom is unaffected.
+- **When `maxZoom` is `null`:** double-tap zoom is disabled entirely. `onDoubleTapBefore` fires but no zoom occurs and `onDoubleTapAfter` is never called (because `_getNextZoomStep()` returns `undefined` when `maxZoom == null`). Pinch zoom is unaffected. `zoomStep=null` has the identical effect via the same `undefined`-return path in `_getNextZoomStep()`.
 - Zoom center = tap position (or view center if `doubleTapZoomToCenter`)
 - Uses `zoomTo()` internally
 
@@ -249,6 +249,23 @@ StaticPin has its own `PanResponder` that intercepts touches on the pin before t
 
 ### Single-Tap Pan-to-Pin
 When `staticPinPosition` is set and user single-taps the content (not the pin), the view animates (200ms) to center on the tap position relative to the pin. The `_updateStaticPin` callback only fires if the animation completes (`finished === true`) and the component is still mounted.
+
+---
+
+## Tap Handling
+
+Taps are resolved after `onPanResponderEnd` when no gesture type was classified (no movement detected).
+
+### Single vs Double-Tap Disambiguation
+`_resolveAndHandleTap` uses a delayed-resolution pattern:
+
+1. **First tap:** Records timestamp (`doubleTapFirstTapReleaseTimestamp`) and tap position (`doubleTapFirstTap`). Starts a `setTimeout` of `doubleTapDelay` ms.
+2. **Second tap within `doubleTapDelay`:** Cancels the pending timeout (`singleTapTimeoutId`), clears saved state, calls `_handleDoubleTap`.
+3. **No second tap (timeout fires):** Clears saved state, fires `onSingleTap` callback, and if `staticPinPosition` is set, animates a 200ms pan toward the tap position relative to the pin.
+
+### Timeout Cleanup
+- `singleTapTimeoutId` is cleared on: double-tap detection, `onPanResponderGrant` (new gesture starts), and `componentWillUnmount`
+- `doubleTapFirstTapReleaseTimestamp` is cleared on: double-tap detection and single-tap timeout fire
 
 ---
 
