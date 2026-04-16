@@ -424,6 +424,11 @@ class ReactNativeZoomableView extends Component<
     if (this.singleTapTimeoutId) {
       clearTimeout(this.singleTapTimeoutId);
       this.singleTapTimeoutId = undefined;
+      // Clear stale double-tap state that the cancelled timeout callback
+      // would have cleaned up -- without this, a tap-pan-tap sequence
+      // within doubleTapDelay spuriously triggers onDoubleTap.
+      delete this.doubleTapFirstTapReleaseTimestamp;
+      delete this.doubleTapFirstTap;
     }
 
     if (this.props.onLongPress) {
