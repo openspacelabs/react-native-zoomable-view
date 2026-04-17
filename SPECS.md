@@ -68,7 +68,7 @@ Class component (`React.Component`) using React Native's `PanResponder` and `Ani
 | Prop | Type | Default | Description |
 |------|------|---------|-------------|
 | `longPressDuration` | `number` | `700` | ms until press becomes long press |
-| `visualTouchFeedbackEnabled` | `boolean` | `true` | Show animated circle on tap |
+| `visualTouchFeedbackEnabled` | `boolean` | `true` | Show animated circle on tap. **Setting this to `false` causes an unbounded memory leak** — `_addTouch()` runs on every tap regardless of this prop, appending a `TouchPoint` to the internal `touches` state array and firing a `setState()`. The only cleanup path is `_removeTouch()`, called exclusively from `AnimatedTouchFeedback.onAnimationDone`, which never mounts when this prop is `false` (the render path `visualTouchFeedbackEnabled && touches?.map(...)` short-circuits). There is no `componentWillUnmount` cleanup of `touches`. Consumer impact: (1) the `touches` array grows by one entry per tap for the component's lifetime, (2) a `setState()` fires on every tap even though nothing visible renders, (3) each `setState()` spreads the growing array, making per-tap cost grow linearly. Applications that disable touch feedback while handling many taps — including the recommended `doubleTapDelay={0}` + `visualTouchFeedbackEnabled={false}` workaround in the `doubleTapDelay` row — will observe progressive memory growth and re-render cost. There is no prop-level workaround; the leak is unconditional when the prop is `false` |
 
 ### Static Pin
 
