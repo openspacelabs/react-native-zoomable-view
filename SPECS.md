@@ -267,7 +267,7 @@ When `staticPinPosition` is set and user single-taps the content (not the pin), 
 
 ## Tap Handling
 
-Taps are resolved after `onPanResponderEnd` when no gesture type was classified (no movement detected).
+Tap resolution runs when no gesture type was classified (no movement detected). **Ordering:** `_resolveAndHandleTap` is called synchronously inside `_handlePanResponderEnd` *before* the `onPanResponderEnd` consumer callback fires. For a double-tap, all tap callbacks (`onDoubleTapBefore`, `onZoomBefore`, `onZoomAfter`, `onDoubleTapAfter`) complete synchronously before `onPanResponderEnd` — consistent with the `gestureStarted` section above. For a single-tap, the `singleTapTimeoutId` is *scheduled* before `onPanResponderEnd` fires, but the actual `onSingleTap` callback arrives asynchronously after `doubleTapDelay` ms. Consumers cannot use `onPanResponderEnd` as a pre-tap hook.
 
 ### Single vs Double-Tap Disambiguation
 `_resolveAndHandleTap` uses a delayed-resolution pattern:
