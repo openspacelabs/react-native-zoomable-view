@@ -1043,6 +1043,16 @@ const ReactNativeZoomableView: ForwardRefRenderFunction<
           onPress={onStaticPinPress}
           onLongPress={onStaticPinLongPress}
           onParentMove={_handlePanResponderMove}
+          onParentRelease={_handlePanResponderEnd}
+          onParentTerminate={(evt, gestureState) => {
+            _handlePanResponderEnd(evt, gestureState);
+            props.onPanResponderTerminate?.(
+              evt,
+              gestureState,
+              _getZoomableViewEventObject()
+            );
+          }}
+          longPressDuration={props.longPressDuration}
           setPinSize={setPinSize}
           pinProps={pinProps}
         />
