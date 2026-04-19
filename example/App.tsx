@@ -46,7 +46,6 @@ export default function App() {
         }}
       >
         <ReactNativeZoomableView
-          disableMomentum
           // Where to put the pin in the content view
           staticPinPosition={staticPinPosition}
           // Callback that returns the position of the pin
@@ -59,7 +58,6 @@ export default function App() {
           // measured when it's rendered naturally. Not the intrinsic sizes.
           contentWidth={contentSize?.width ?? 0}
           contentHeight={contentSize?.height ?? 0}
-          panBoundaryPadding={500}
           zoomAnimatedValue={zoomAnimatedValue}
         >
           <View style={styles.contents}>
