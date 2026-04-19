@@ -840,6 +840,25 @@ class ReactNativeZoomableView extends Component<
     onShiftingAfter?.(null, null, this._getZoomableViewEventObject());
   }
 
+  private _cancelInFlightZoomToAnimation() {
+    let stoppedZoomLevel = this.zoomLevel;
+
+    // Programmatic pan should win over any active zoomTo animation.
+    // Stop the zoom first and remove its temporary pan-sync listener
+    // so the next zoom frame cannot overwrite the requested offset.
+    this.zoomAnim.stopAnimation((value) => {
+      stoppedZoomLevel = value;
+      this.zoomLevel = value;
+    });
+
+    if (this.zoomToListenerId) {
+      this.zoomAnim.removeListener(this.zoomToListenerId);
+      this.zoomToListenerId = undefined;
+    }
+
+    return stoppedZoomLevel;
+  }
+
   /**
    * Check whether the press event is double tap
    * or single tap and handle the event accordingly
@@ -1177,8 +1196,9 @@ class ReactNativeZoomableView extends Component<
     const { originalWidth, originalHeight } = this.state;
     if (!originalWidth || !originalHeight) return;
 
-    const offsetX = (newOffsetX - originalWidth / 2) / this.zoomLevel;
-    const offsetY = (newOffsetY - originalHeight / 2) / this.zoomLevel;
+    const zoomLevel = this._cancelInFlightZoomToAnimation();
+    const offsetX = (newOffsetX - originalWidth / 2) / zoomLevel;
+    const offsetY = (newOffsetY - originalHeight / 2) / zoomLevel;
 
     this._setNewOffsetPosition(-offsetX, -offsetY);
   }
@@ -1194,10 +1214,9 @@ class ReactNativeZoomableView extends Component<
    * @return {bool}
    */
   moveBy(offsetChangeX: number, offsetChangeY: number) {
-    const offsetX =
-      (this.offsetX * this.zoomLevel - offsetChangeX) / this.zoomLevel;
-    const offsetY =
-      (this.offsetY * this.zoomLevel - offsetChangeY) / this.zoomLevel;
+    const zoomLevel = this._cancelInFlightZoomToAnimation();
+    const offsetX = (this.offsetX * zoomLevel - offsetChangeX) / zoomLevel;
+    const offsetY = (this.offsetY * zoomLevel - offsetChangeY) / zoomLevel;
 
     this._setNewOffsetPosition(offsetX, offsetY);
   }
