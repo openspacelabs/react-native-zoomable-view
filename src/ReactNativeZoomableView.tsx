@@ -349,6 +349,7 @@ class ReactNativeZoomableView extends Component<
         // (no border, space, or anything between them)
         this.zoomSubjectWrapperRef.current?.measure(
           (x, y, width, height, pageX, pageY) => {
+            if (!this.mounted) return;
             // When the component is off-screen, these become all 0s, so we don't set them
             // to avoid messing up calculations, especially ones that are done right after
             // the component transitions from hidden to visible.
@@ -420,6 +421,11 @@ class ReactNativeZoomableView extends Component<
   _handlePanResponderGrant: NonNullable<
     PanResponderCallbacks['onPanResponderGrant']
   > = (e, gestureState) => {
+    if (this.singleTapTimeoutId) {
+      clearTimeout(this.singleTapTimeoutId);
+      this.singleTapTimeoutId = undefined;
+    }
+
     if (this.props.onLongPress) {
       e.persist();
       this.longPressTimeout = setTimeout(() => {

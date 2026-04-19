@@ -10,7 +10,7 @@ We've rewritten most of the logic in the original library to address the followi
 - [x] Fixed incorrect zoom center (happens during pinching and double tapping)
 - [x] Fixed incorrect pan boundaries
 - [x] Added the ability to zoom and pan at the same time (before you can only perform 1 of these 2 at a time)
-- [x] Added “pan momentum”, “zoom to”, and “boundaries-crossed” animations
+- [x] Added “zoom to” animations
 - [x] Added onSingleTap (besides the existing onDoubleTap)
 - [x] Added animated touch feedback when the zoom subject is tapped on
 - [x] Added "react-native-builder-bob" as a framework for library management/maintenance
@@ -50,6 +50,10 @@ Check out this [Expo Snack](https://snack.expo.dev/@thomasttvo/eaf257)
 ### Installation
 
 We are working with the original maintainers of this library to transfer the NPM alias for `react-native-zoomable-view`. In the meantime, you will want to use `@openspacelabs/react-native-zoomable-view` as the package identifier.
+
+**Requirements:**
+- React Native >= 0.79.0
+- React >= 16.8.0
 
 To add this package, run
 
