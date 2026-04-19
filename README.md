@@ -10,7 +10,7 @@ We've rewritten most of the logic in the original library to address the followi
 - [x] Fixed incorrect zoom center (happens during pinching and double tapping)
 - [x] Fixed incorrect pan boundaries
 - [x] Added the ability to zoom and pan at the same time (before you can only perform 1 of these 2 at a time)
-- [x] Added “pan momentum”, “zoom to”, and “boundaries-crossed” animations
+- [x] Added “zoom to” animations
 - [x] Added onSingleTap (besides the existing onDoubleTap)
 - [x] Added animated touch feedback when the zoom subject is tapped on
 - [x] Added "react-native-builder-bob" as a framework for library management/maintenance
@@ -50,6 +50,10 @@ Check out this [Expo Snack](https://snack.expo.dev/@thomasttvo/eaf257)
 ### Installation
 
 We are working with the original maintainers of this library to transfer the NPM alias for `react-native-zoomable-view`. In the meantime, you will want to use `@openspacelabs/react-native-zoomable-view` as the package identifier.
+
+**Requirements:**
+- React Native >= 0.79.0
+- React >= 16.8.0
 
 To add this package, run
 
@@ -157,9 +161,9 @@ These options can be used to limit and change the zoom behavior.
 | doubleTapDelay             | number  | How much delay will still be recognized as double press (ms)                                                             | 300       |
 | doubleTapZoomToCenter      | boolean | If true, double tapping will always zoom to center of View instead of the direction it was double tapped in              |
 | zoomStep                   | number  | How much zoom should be applied on double tap                                                                            | 0.5       |
-| pinchToZoomInSensitivity   | number  | the level of resistance (sensitivity) to zoom in (0 - 10) - higher is less sensitive                                     | 3         |
+| pinchToZoomInSensitivity   | number  | the level of resistance (sensitivity) to zoom in (0 - 10) - higher is less sensitive                                     | 1         |
 | pinchToZoomOutSensitivity  | number  | the level of resistance (sensitivity) to zoom out (0 - 10) - higher is less sensitive                                    | 1         |
-| movementSensibility        | number  | how resistant should shifting the view around be? (0.5 - 5) - higher is less sensitive                                   | 1.9       |
+| movementSensibility        | number  | how resistant should shifting the view around be? (0.5 - 5) - higher is less sensitive                                   | 1         |
 | initialOffsetX             | number  | The horizontal offset the image should start at                                                                          | 0         |
 | initialOffsetY             | number  | The vertical offset the image should start at                                                                            | 0         |
 | contentHeight              | number  | Specify if you want to treat the height of the **centered** content inside the zoom subject as the zoom subject's height | undefined |
@@ -175,8 +179,11 @@ These optional props can be used to keep a "static" pin in the centre of the scr
 | ------------------------- | ------------------------- | -------------------------------------- |
 | staticPinPosition         | Vec2D                     | Where in the viewport to put the pin   |
 | staticPinIcon             | Element                   | The pin icon itself                    |
+| onStaticPinPress          | (event) => void           | Callback when the pin is pressed       |
+| onStaticPinLongPress      | (event) => void           | Callback when the pin is long pressed  |
 | onStaticPinPositionChange | (position: Vec2D) => void | Callback every time the pin is at rest |
 | onStaticPinPositionMove   | (position: Vec2D) => void | Callback live while the pin is moving  |
+| pinProps                  | ViewProps                 | Props forwarded to the pin wrapper     |
 
 #### Callbacks
 
@@ -203,10 +210,10 @@ The following methods allow you to control the ZoomableView zoom level & positio
 
 | name   | description                                                                                                          | params                                 | expected return |
 | ------ | -------------------------------------------------------------------------------------------------------------------- | -------------------------------------- | --------------- |
-| zoomTo | Changes the zoom level to a specific number                                                                          | newZoomLevel: number                   | Promise<bool>   |
-| zoomBy | Changes the zoom level relative to the current level (use positive numbers to zoom in, negative numbers to zoom out) | zoomLevelChange: number                | Promise<bool>   |
-| moveTo | Shifts the zoomed part to a specific point (in px relative to x: 0, y: 0)                                            | newOffsetX: number, newOffsetY: number | Promise<void>   |
-| moveBy | Shifts the zoomed part by a specific pixel number                                                                    | newOffsetX: number, newOffsetY: number | Promise<void>   |
+| zoomTo | Changes the zoom level to a specific number                                                                          | newZoomLevel: number                   | boolean         |
+| zoomBy | Changes the zoom level relative to the current level (use positive numbers to zoom in, negative numbers to zoom out) | zoomLevelChange: number                | boolean         |
+| moveTo | Shifts the zoomed part to a specific point (in px relative to x: 0, y: 0)                                            | newOffsetX: number, newOffsetY: number | void            |
+| moveBy | Shifts the zoomed part by a specific pixel number                                                                    | newOffsetX: number, newOffsetY: number | void            |
 
 #### Properties
 
