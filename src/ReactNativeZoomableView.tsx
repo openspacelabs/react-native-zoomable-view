@@ -161,6 +161,18 @@ const ReactNativeZoomableView: ForwardRefRenderFunction<
   const zoomAnimLevelListenerId = useRef<string>();
   const panAnimTransformListenerId = useRef<string>();
   const zoomAnimTransformListenerId = useRef<string>();
+  // Tracks the in-flight publicZoomTo zoomAnim listener. The class component
+  // tracked this as `zoomToListenerId` so componentWillUnmount could clean up
+  // a mid-animation listener. With a function-local `let listenerId`, the only
+  // removal path is the animation's start() completion callback — but when the
+  // consumer owns zoomAnim, unmount cleanup correctly skips stopAnimation()
+  // (per SPECS.md "External Animated Values"), so the in-flight Animated.timing
+  // continues running on the consumer's value to natural completion (~500ms),
+  // and this listener fires for every remaining frame, calling
+  // panAnim.setValue(...) — contaminating the consumer's external panAnim with
+  // phantom updates from stale geometry. Capturing in a ref lets the unmount
+  // cleanup remove it before those frames fire.
+  const zoomToListenerId = useRef<string>();
 
   useLayoutEffect(() => {
     // panAnim/zoomAnim refs are already initialized to the consumer-provided
@@ -233,22 +245,23 @@ const ReactNativeZoomableView: ForwardRefRenderFunction<
   const originalHeightRef = useRef(originalHeight);
   originalHeightRef.current = originalHeight;
 
-  // Mirrors the class's componentDidUpdate semantics: the class did NOT run
-  // componentDidUpdate on initial mount, so onLayout was not fired with the
-  // all-zero initial state. A useLayoutEffect with measurement deps would fire
-  // unconditionally on first mount and call onLayout({width:0,height:0,x:0,y:0})
-  // before measureZoomSubject resolves the real values, producing a duplicate
-  // first-mount onLayout fire (zeros, then actuals) — breaking consumers that
-  // use onLayout as a layout-ready signal and violating the SPECS.md
-  // first-layout ordering "onTransform #1 → onLayout → onTransform #2".
-  const isFirstLayoutEffect = useRef(true);
-
   // Handle original measurements changed
   useLayoutEffect(() => {
-    if (isFirstLayoutEffect.current) {
-      isFirstLayoutEffect.current = false;
-      return;
-    }
+    // Mirrors the class's componentDidUpdate semantics: the class did NOT run
+    // componentDidUpdate on initial mount, so onLayout was not fired with the
+    // all-zero initial state. A useLayoutEffect with measurement deps would
+    // fire unconditionally on first mount and call onLayout(width:0,height:0)
+    // before measureZoomSubject resolves the real values, producing a
+    // duplicate first-mount onLayout fire (zeros, then actuals) — breaking
+    // consumers that use onLayout as a layout-ready signal and violating the
+    // SPECS.md first-layout ordering "onTransform #1 → onLayout → onTransform
+    // #2". Data-driven guard (rather than a ref-based one-shot flag) survives
+    // React 18 StrictMode dev's mount→unmount→remount cycle: a ref initialized
+    // to true would be permanently false after the first effect run, so the
+    // second mount would fire the zero-state onLayout we're trying to avoid.
+    // measureZoomSubject's own all-zero early-return guard prevents legitimate
+    // updates from reverting state to zeros, so this check is safe.
+    if (!originalWidth || !originalHeight) return;
     // We use a custom `onLayout` event, so the clients can stay in-sync
     // with when the internal measurements are actually saved to the state,
     // thus helping them apply transformations at more accurate timings
@@ -276,6 +289,16 @@ const ReactNativeZoomableView: ForwardRefRenderFunction<
   }, [props.staticPinPosition?.x, props.staticPinPosition?.y]);
 
   useEffect(() => {
+    // Restore mounted flag at the top of every (re)mount. React 18 StrictMode
+    // dev simulates mount → unmount → remount during development; the cleanup
+    // below sets isMounted.current = false on the simulated unmount, so without
+    // this re-set the second mount would observe the ref as permanently false
+    // for the lifetime of the component — silently dropping the
+    // _updateStaticPin call inside _fireSingleTapTimerBody and breaking
+    // onStaticPinPositionChange after a single-tap pan. Mirrors the class
+    // component's `this.mounted = true` in componentDidMount.
+    isMounted.current = true;
+
     measureZoomSubject();
     // We've already run `grabZoomSubjectOriginalMeasurements` at various events
     // to make sure the measurements are promptly updated.
@@ -317,6 +340,17 @@ const ReactNativeZoomableView: ForwardRefRenderFunction<
       }
       if (zoomAnimTransformListenerId.current) {
         zoomAnim.current.removeListener(zoomAnimTransformListenerId.current);
+      }
+      // Clean up an in-flight publicZoomTo listener if mid-animation at unmount.
+      // When the consumer owns zoomAnim, the cleanup below skips
+      // stopAnimation() per SPECS.md, so the timing animation continues to
+      // natural completion on the consumer's value — without this removal, the
+      // listener fires for each remaining frame and calls panAnim.setValue(...)
+      // on the (also consumer-owned) panAnim, contaminating it with phantom
+      // updates from stale geometry.
+      if (zoomToListenerId.current) {
+        zoomAnim.current.removeListener(zoomToListenerId.current);
+        zoomToListenerId.current = undefined;
       }
 
       // Stop any in-flight pan/zoom animations so their step callbacks don't
@@ -1100,7 +1134,14 @@ const ReactNativeZoomableView: ForwardRefRenderFunction<
       props.onZoomBefore?.(null, null, _getZoomableViewEventObject());
 
       // == Perform Pan Animation to preserve the zoom center while zooming ==
-      let listenerId = '';
+      // Defensive removal: if a previous publicZoomTo is still mid-animation
+      // and the consumer triggers another, the prior listener would be
+      // orphaned (its ID overwritten below) and continue firing for the rest
+      // of its animation's lifetime.
+      if (zoomToListenerId.current) {
+        zoomAnim.current.removeListener(zoomToListenerId.current);
+        zoomToListenerId.current = undefined;
+      }
       if (zoomCenter) {
         // Calculates panAnim values based on changes in zoomAnim.
         let prevScale = zoomLevel.current;
@@ -1108,30 +1149,35 @@ const ReactNativeZoomableView: ForwardRefRenderFunction<
         //  it will jitter panAnim once in a while,
         //  because here panAnim is being calculated in js.
         // However the jittering should mostly occur in simulator.
-        listenerId = zoomAnim.current.addListener(({ value: newScale }) => {
-          panAnim.current.setValue({
-            x: calcNewScaledOffsetForZoomCentering(
-              offsetX.current,
-              originalWidthRef.current,
-              prevScale,
-              newScale,
-              zoomCenter.x
-            ),
-            y: calcNewScaledOffsetForZoomCentering(
-              offsetY.current,
-              originalHeightRef.current,
-              prevScale,
-              newScale,
-              zoomCenter.y
-            ),
-          });
-          prevScale = newScale;
-        });
+        zoomToListenerId.current = zoomAnim.current.addListener(
+          ({ value: newScale }) => {
+            panAnim.current.setValue({
+              x: calcNewScaledOffsetForZoomCentering(
+                offsetX.current,
+                originalWidthRef.current,
+                prevScale,
+                newScale,
+                zoomCenter.x
+              ),
+              y: calcNewScaledOffsetForZoomCentering(
+                offsetY.current,
+                originalHeightRef.current,
+                prevScale,
+                newScale,
+                zoomCenter.y
+              ),
+            });
+            prevScale = newScale;
+          }
+        );
       }
 
       // == Perform Zoom Animation ==
       getZoomToAnimation(zoomAnim.current, newZoomLevel).start(() => {
-        zoomAnim.current.removeListener(listenerId);
+        if (zoomToListenerId.current) {
+          zoomAnim.current.removeListener(zoomToListenerId.current);
+          zoomToListenerId.current = undefined;
+        }
       });
       // == Zoom Animation Ends ==
 
