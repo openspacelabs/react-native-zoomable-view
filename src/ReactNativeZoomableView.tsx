@@ -87,17 +87,33 @@ const ReactNativeZoomableView: ForwardRefRenderFunction<
     disablePanOnInitialZoom: false,
   });
 
-  // Lazy init considers the consumer-provided animated values on first render so
-  // the Animated.View transform binds to the correct value before commit. If we
-  // assigned consumer values inside useLayoutEffect, the first JSX evaluation
-  // would already have subscribed the View to the dormant internal Animated
-  // object — gesture writes would update the consumer's value but the View
-  // would stay bound to the internal one until something else triggered a
-  // re-render, breaking the External Animated Values contract (SPECS.md).
+  // Lazy init binds the Animated.View transform to the correct value before the
+  // first commit. Two reasons this must seed initialZoom / initialOffsetX/Y:
+  // (1) Consumer-provided animated values: assigning them inside useLayoutEffect
+  //     would let the first JSX evaluation subscribe the View to the dormant
+  //     internal Animated object — gesture writes would update the consumer's
+  //     value but the View would stay bound to the internal one until something
+  //     else triggered a re-render, breaking the External Animated Values
+  //     contract (SPECS.md).
+  // (2) Initial transform values: the class constructor applied initialZoom /
+  //     initialOffsetX/Y BEFORE first render, so the first paint already showed
+  //     the configured transform. setValue() inside useLayoutEffect runs AFTER
+  //     the first commit, so the Animated.View would commit subscribed to the
+  //     defaults (1, 0, 0) and then snap to the configured values. Seeding the
+  //     internally-owned Animated value at construction restores the class's
+  //     pre-render application; the useLayoutEffect setValue calls below remain
+  //     correct for consumer-provided animated values per SPECS.md "Mount-time
+  //     reset".
   const panAnim = useRef(
-    props.panAnimatedValueXY ?? new Animated.ValueXY({ x: 0, y: 0 })
+    props.panAnimatedValueXY ??
+      new Animated.ValueXY({
+        x: props.initialOffsetX ?? 0,
+        y: props.initialOffsetY ?? 0,
+      })
   );
-  const zoomAnim = useRef(props.zoomAnimatedValue ?? new Animated.Value(1));
+  const zoomAnim = useRef(
+    props.zoomAnimatedValue ?? new Animated.Value(props.initialZoom ?? 1)
+  );
 
   // Capture ownership at mount: if the consumer passed an external animated
   // value, they own its lifecycle and we must not stopAnimation() on unmount
@@ -194,8 +210,22 @@ const ReactNativeZoomableView: ForwardRefRenderFunction<
   const onLayout = useRef(props.onLayout);
   onLayout.current = props.onLayout;
 
+  // Mirrors the class's componentDidUpdate semantics: the class did NOT run
+  // componentDidUpdate on initial mount, so onLayout was not fired with the
+  // all-zero initial state. A useLayoutEffect with measurement deps would fire
+  // unconditionally on first mount and call onLayout({width:0,height:0,x:0,y:0})
+  // before measureZoomSubject resolves the real values, producing a duplicate
+  // first-mount onLayout fire (zeros, then actuals) — breaking consumers that
+  // use onLayout as a layout-ready signal and violating the SPECS.md
+  // first-layout ordering "onTransform #1 → onLayout → onTransform #2".
+  const isFirstLayoutEffect = useRef(true);
+
   // Handle original measurements changed
   useLayoutEffect(() => {
+    if (isFirstLayoutEffect.current) {
+      isFirstLayoutEffect.current = false;
+      return;
+    }
     // We use a custom `onLayout` event, so the clients can stay in-sync
     // with when the internal measurements are actually saved to the state,
     // thus helping them apply transformations at more accurate timings
@@ -401,6 +431,18 @@ const ReactNativeZoomableView: ForwardRefRenderFunction<
    * @param gestureState
    * @private
    */
+  // Read props.onLongPress at fire time, not at schedule time. The setTimeout
+  // body is inside _handlePanResponderGrant's closure, so a bare
+  // props.onLongPress?.(...) inside the timer would call the version captured
+  // when the gesture started — a parent re-render during the 700ms window would
+  // be ignored. The class component used this.props.onLongPress which React
+  // updates on every render; useLatestCallback restores that semantic.
+  const _fireOnLongPress = useLatestCallback(
+    (e: GestureResponderEvent, gestureState: PanResponderGestureState) => {
+      props.onLongPress?.(e, gestureState, _getZoomableViewEventObject());
+    }
+  );
+
   const _handlePanResponderGrant: NonNullable<
     PanResponderCallbacks['onPanResponderGrant']
   > = useLatestCallback((e, gestureState) => {
@@ -415,7 +457,7 @@ const ReactNativeZoomableView: ForwardRefRenderFunction<
     if (props.onLongPress) {
       e.persist();
       longPressTimeout.current = setTimeout(() => {
-        props.onLongPress?.(e, gestureState, _getZoomableViewEventObject());
+        _fireOnLongPress(e, gestureState);
         longPressTimeout.current = undefined;
       }, props.longPressDuration);
     }
@@ -812,6 +854,41 @@ const ReactNativeZoomableView: ForwardRefRenderFunction<
    *
    * @private
    */
+  // Read props.staticPinPosition / props.onSingleTap at fire time, not at
+  // schedule time. The setTimeout body in _resolveAndHandleTap below captures
+  // props lexically; a parent re-render during the doubleTapDelay window would
+  // be ignored without this wrapper. The class component used this.props.X
+  // which React updates on every render; useLatestCallback restores that
+  // semantic. Note: props.doubleTapDelay used as the setTimeout delay argument
+  // is read at scheduling time — that's intrinsic to setTimeout, not stale-prop.
+  const _fireSingleTapTimerBody = useLatestCallback(
+    (e: GestureResponderEvent) => {
+      // Pan to the tapped location
+      if (props.staticPinPosition && doubleTapFirstTap.current) {
+        const tapX = props.staticPinPosition.x - doubleTapFirstTap.current.x;
+        const tapY = props.staticPinPosition.y - doubleTapFirstTap.current.y;
+
+        Animated.timing(panAnim.current, {
+          toValue: {
+            x: offsetX.current + tapX / zoomLevel.current,
+            y: offsetY.current + tapY / zoomLevel.current,
+          },
+          useNativeDriver: true,
+          duration: 200,
+        }).start(({ finished }) => {
+          // Only commit the static pin position when the animation actually
+          // completed. If a new gesture interrupted the animation,
+          // _handlePanResponderGrant called stopAnimation() and the callback
+          // fires with finished=false at an intermediate offset — reporting
+          // that midpoint as the final pin position would be wrong.
+          if (finished) _updateStaticPin();
+        });
+      }
+
+      props.onSingleTap?.(e, _getZoomableViewEventObject());
+    }
+  );
+
   const _resolveAndHandleTap = useLatestCallback((e: GestureResponderEvent) => {
     const now = Date.now();
     if (
@@ -844,30 +921,7 @@ const ReactNativeZoomableView: ForwardRefRenderFunction<
       singleTapTimeoutId.current = setTimeout(() => {
         delete doubleTapFirstTapReleaseTimestamp.current;
         delete singleTapTimeoutId.current;
-
-        // Pan to the tapped location
-        if (props.staticPinPosition && doubleTapFirstTap.current) {
-          const tapX = props.staticPinPosition.x - doubleTapFirstTap.current.x;
-          const tapY = props.staticPinPosition.y - doubleTapFirstTap.current.y;
-
-          Animated.timing(panAnim.current, {
-            toValue: {
-              x: offsetX.current + tapX / zoomLevel.current,
-              y: offsetY.current + tapY / zoomLevel.current,
-            },
-            useNativeDriver: true,
-            duration: 200,
-          }).start(({ finished }) => {
-            // Only commit the static pin position when the animation actually
-            // completed. If a new gesture interrupted the animation,
-            // _handlePanResponderGrant called stopAnimation() and the callback
-            // fires with finished=false at an intermediate offset — reporting
-            // that midpoint as the final pin position would be wrong.
-            if (finished) _updateStaticPin();
-          });
-        }
-
-        props.onSingleTap?.(e, _getZoomableViewEventObject());
+        _fireSingleTapTimerBody(e);
       }, props.doubleTapDelay);
     }
   });
