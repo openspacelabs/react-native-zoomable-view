@@ -104,16 +104,28 @@ const ReactNativeZoomableView: ForwardRefRenderFunction<
   //     pre-render application; the useLayoutEffect setValue calls below remain
   //     correct for consumer-provided animated values per SPECS.md "Mount-time
   //     reset".
-  const panAnim = useRef(
-    props.panAnimatedValueXY ??
+  // useRef(expr) is NOT lazy — it evaluates `expr` every render but only keeps
+  // the first call's result, allocating a fresh Animated value per render that
+  // is immediately discarded. The React-canonical lazy pattern below
+  // (useRef<T | null>(null) + null-check assignment) evaluates the initializer
+  // exactly once, matching the class constructor's one-time allocation.
+  const panAnimRef = useRef<Animated.ValueXY | null>(null);
+  if (panAnimRef.current === null) {
+    panAnimRef.current =
+      props.panAnimatedValueXY ??
       new Animated.ValueXY({
         x: props.initialOffsetX ?? 0,
         y: props.initialOffsetY ?? 0,
-      })
-  );
-  const zoomAnim = useRef(
-    props.zoomAnimatedValue ?? new Animated.Value(props.initialZoom ?? 1)
-  );
+      });
+  }
+  const panAnim = panAnimRef as React.MutableRefObject<Animated.ValueXY>;
+
+  const zoomAnimRef = useRef<Animated.Value | null>(null);
+  if (zoomAnimRef.current === null) {
+    zoomAnimRef.current =
+      props.zoomAnimatedValue ?? new Animated.Value(props.initialZoom ?? 1);
+  }
+  const zoomAnim = zoomAnimRef as React.MutableRefObject<Animated.Value>;
 
   // Capture ownership at mount: if the consumer passed an external animated
   // value, they own its lifecycle and we must not stopAnimation() on unmount
