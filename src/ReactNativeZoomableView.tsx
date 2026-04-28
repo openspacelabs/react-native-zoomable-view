@@ -427,10 +427,14 @@ const ReactNativeZoomableView: ForwardRefRenderFunction<
   const measureZoomSubject = useLatestCallback(() => {
     // make sure we measure after animations are complete
     requestAnimationFrame(() => {
+      // SPECS.md "Mounted Guards": skip measurement work after unmount so
+      // we don't fire setState on a dead component (dev warning in React 17).
+      if (!isMounted.current) return;
       // this setTimeout is here to fix a weird issue on iOS where the measurements are all `0`
       // when navigating back (react-navigation stack) from another view
       // while closing the keyboard at the same time
       setTimeout(() => {
+        if (!isMounted.current) return;
         // In normal conditions, we're supposed to measure zoomSubject instead of its wrapper.
         // However, our zoomSubject may have been transformed by an initial zoomLevel or offset,
         // in which case these measurements will not represent the true "original" measurements.
@@ -438,6 +442,7 @@ const ReactNativeZoomableView: ForwardRefRenderFunction<
         // (no border, space, or anything between them)
         zoomSubjectWrapperRef.current?.measure(
           (x, y, width, height, pageX, pageY) => {
+            if (!isMounted.current) return;
             // When the component is off-screen, these become all 0s, so we don't set them
             // to avoid messing up calculations, especially ones that are done right after
             // the component transitions from hidden to visible.
@@ -1051,6 +1056,10 @@ const ReactNativeZoomableView: ForwardRefRenderFunction<
   });
 
   const _removeTouch = useLatestCallback((touch: TouchPoint) => {
+    // SPECS.md "Mounted Guards": touch-removal callbacks can fire after
+    // unmount via the underlying GestureResponder pipeline; skip the
+    // setState to avoid dev warnings in React 17.
+    if (!isMounted.current) return;
     touches.current.splice(touches.current.indexOf(touch), 1);
     setStateTouches([...touches.current]);
   });
@@ -1173,10 +1182,21 @@ const ReactNativeZoomableView: ForwardRefRenderFunction<
       }
 
       // == Perform Zoom Animation ==
+      // Capture listenerId locally so an interrupting zoomTo (rapid double
+      // taps, programmatic chained zoomTo, zoom-slider ramps) cannot make
+      // this start() callback clean up the SECOND call's listener. RN's
+      // Animated.Value.animate stops a prior animation synchronously, firing
+      // this callback with finished=false AFTER the ref has already been
+      // overwritten — so reading the ref at fire time would read listener2.
+      // Mirrors the class component's local-capture + identity-equality
+      // pattern.
+      const listenerId = zoomToListenerId.current;
       getZoomToAnimation(zoomAnim.current, newZoomLevel).start(() => {
-        if (zoomToListenerId.current) {
-          zoomAnim.current.removeListener(zoomToListenerId.current);
-          zoomToListenerId.current = undefined;
+        if (listenerId) {
+          zoomAnim.current.removeListener(listenerId);
+          if (zoomToListenerId.current === listenerId) {
+            zoomToListenerId.current = undefined;
+          }
         }
       });
       // == Zoom Animation Ends ==
