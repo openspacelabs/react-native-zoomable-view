@@ -14,7 +14,6 @@ import {
   PanResponder,
   PanResponderCallbacks,
   PanResponderGestureState,
-  PanResponderInstance,
   StyleSheet,
   View,
 } from 'react-native';
@@ -61,7 +60,6 @@ const ReactNativeZoomableView: ForwardRefRenderFunction<
   const [stateTouches, setStateTouches] = useState<TouchPoint[]>([]);
 
   const zoomSubjectWrapperRef = useRef<View>(null);
-  const gestureHandlers = useRef<PanResponderInstance>();
   const doubleTapFirstTapReleaseTimestamp = useRef<number>();
 
   props = defaults({}, props, {
@@ -114,45 +112,15 @@ const ReactNativeZoomableView: ForwardRefRenderFunction<
   const doubleTapFirstTap = useRef<TouchPoint>();
   const measureZoomSubjectInterval = useRef<NodeJS.Timer>();
 
-  useLayoutEffect(() => {
-    gestureHandlers.current = PanResponder.create({
-      onStartShouldSetPanResponder: _handleStartShouldSetPanResponder,
-      onPanResponderGrant: _handlePanResponderGrant,
-      onPanResponderMove: _handlePanResponderMove,
-      onPanResponderRelease: _handlePanResponderEnd,
-      onPanResponderTerminate: (evt, gestureState) => {
-        // We should also call _handlePanResponderEnd
-        // to properly perform cleanups when the gesture is terminated
-        // (aka gesture handling responsibility is taken over by another component).
-        // This also fixes a weird issue where
-        // on real device, sometimes onPanResponderRelease is not called when you lift 2 fingers up,
-        // but onPanResponderTerminate is called instead for no apparent reason.
-        _handlePanResponderEnd(evt, gestureState);
-        props.onPanResponderTerminate?.(
-          evt,
-          gestureState,
-          _getZoomableViewEventObject()
-        );
-      },
-      onPanResponderTerminationRequest: (evt, gestureState) =>
-        !!props.onPanResponderTerminationRequest?.(
-          evt,
-          gestureState,
-          _getZoomableViewEventObject()
-        ),
-      // Defaults to true to prevent parent components, such as React Navigation's tab view, from taking over as responder.
-      onShouldBlockNativeResponder: (evt, gestureState) =>
-        props.onShouldBlockNativeResponder?.(
-          evt,
-          gestureState,
-          _getZoomableViewEventObject()
-        ) ?? true,
-      onStartShouldSetPanResponderCapture: (evt, gestureState) =>
-        !!props.onStartShouldSetPanResponderCapture?.(evt, gestureState),
-      onMoveShouldSetPanResponderCapture: (evt, gestureState) =>
-        !!props.onMoveShouldSetPanResponderCapture?.(evt, gestureState),
-    });
+  // Listener IDs captured at registration so we can removeListener on unmount.
+  // Without these, listeners attached to panAnim/zoomAnim leak past unmount and
+  // continue mutating refs / firing callbacks on a dead component.
+  const panAnimOffsetListenerId = useRef<string>();
+  const zoomAnimLevelListenerId = useRef<string>();
+  const panAnimTransformListenerId = useRef<string>();
+  const zoomAnimTransformListenerId = useRef<string>();
 
+  useLayoutEffect(() => {
     if (props.zoomAnimatedValue) zoomAnim.current = props.zoomAnimatedValue;
     if (props.panAnimatedValueXY) panAnim.current = props.panAnimatedValueXY;
 
@@ -162,13 +130,17 @@ const ReactNativeZoomableView: ForwardRefRenderFunction<
 
     panAnim.current.setValue({ x: offsetX.current, y: offsetY.current });
     zoomAnim.current.setValue(zoomLevel.current);
-    panAnim.current.addListener(({ x, y }) => {
-      offsetX.current = x;
-      offsetY.current = y;
-    });
-    zoomAnim.current.addListener(({ value }) => {
-      zoomLevel.current = value;
-    });
+    panAnimOffsetListenerId.current = panAnim.current.addListener(
+      ({ x, y }) => {
+        offsetX.current = x;
+        offsetY.current = y;
+      }
+    );
+    zoomAnimLevelListenerId.current = zoomAnim.current.addListener(
+      ({ value }) => {
+        zoomLevel.current = value;
+      }
+    );
   }, []);
 
   const { zoomEnabled } = props;
@@ -187,8 +159,12 @@ const ReactNativeZoomableView: ForwardRefRenderFunction<
         !onTransformInvocationInitialized.current &&
         _invokeOnTransform().successful
       ) {
-        panAnim.current.addListener(() => _invokeOnTransform());
-        zoomAnim.current.addListener(() => _invokeOnTransform());
+        panAnimTransformListenerId.current = panAnim.current.addListener(() =>
+          _invokeOnTransform()
+        );
+        zoomAnimTransformListenerId.current = zoomAnim.current.addListener(() =>
+          _invokeOnTransform()
+        );
         onTransformInvocationInitialized.current = true;
       }
     },
@@ -241,6 +217,40 @@ const ReactNativeZoomableView: ForwardRefRenderFunction<
     return () => {
       measureZoomSubjectInterval.current &&
         clearInterval(measureZoomSubjectInterval.current);
+
+      // Cancel pending debounced static-pin callback so it cannot fire after unmount.
+      debouncedOnStaticPinPositionChange.cancel();
+
+      // Clear pending tap/long-press timeouts so their callbacks (which call
+      // user-provided onSingleTap / onLongPress) cannot fire after unmount.
+      if (singleTapTimeoutId.current) {
+        clearTimeout(singleTapTimeoutId.current);
+        singleTapTimeoutId.current = undefined;
+      }
+      if (longPressTimeout.current) {
+        clearTimeout(longPressTimeout.current);
+        longPressTimeout.current = undefined;
+      }
+
+      // Remove listeners attached to panAnim/zoomAnim so they don't keep
+      // mutating refs or invoking _invokeOnTransform on a dead component.
+      if (panAnimOffsetListenerId.current) {
+        panAnim.current.removeListener(panAnimOffsetListenerId.current);
+      }
+      if (zoomAnimLevelListenerId.current) {
+        zoomAnim.current.removeListener(zoomAnimLevelListenerId.current);
+      }
+      if (panAnimTransformListenerId.current) {
+        panAnim.current.removeListener(panAnimTransformListenerId.current);
+      }
+      if (zoomAnimTransformListenerId.current) {
+        zoomAnim.current.removeListener(zoomAnimTransformListenerId.current);
+      }
+
+      // Stop any in-flight pan/zoom animations so their step callbacks don't
+      // fire on unmounted state.
+      panAnim.current.stopAnimation();
+      zoomAnim.current.stopAnimation();
     };
   }, []);
 
@@ -370,6 +380,14 @@ const ReactNativeZoomableView: ForwardRefRenderFunction<
   const _handlePanResponderGrant: NonNullable<
     PanResponderCallbacks['onPanResponderGrant']
   > = useLatestCallback((e, gestureState) => {
+    // Cancel any pending single-tap timer when a new gesture starts. Without this,
+    // a tap-then-long-press sequence fires both onSingleTap (from the prior tap's
+    // pending timer) and onLongPress for what should be a single long-press.
+    if (singleTapTimeoutId.current) {
+      clearTimeout(singleTapTimeoutId.current);
+      singleTapTimeoutId.current = undefined;
+    }
+
     if (props.onLongPress) {
       e.persist();
       longPressTimeout.current = setTimeout(() => {
@@ -801,8 +819,13 @@ const ReactNativeZoomableView: ForwardRefRenderFunction<
             },
             useNativeDriver: true,
             duration: 200,
-          }).start(() => {
-            _updateStaticPin();
+          }).start(({ finished }) => {
+            // Only commit the static pin position when the animation actually
+            // completed. If a new gesture interrupted the animation,
+            // _handlePanResponderGrant called stopAnimation() and the callback
+            // fires with finished=false at an intermediate offset — reporting
+            // that midpoint as the final pin position would be wrong.
+            if (finished) _updateStaticPin();
           });
         }
 
@@ -1057,6 +1080,86 @@ const ReactNativeZoomableView: ForwardRefRenderFunction<
     }
   );
 
+  // The five PanResponder callbacks below are wrapped in useLatestCallback so
+  // they always invoke the latest props, matching the four already-wrapped
+  // handlers above. Without this, PanResponder.create runs once with the
+  // first-render props and these callbacks would silently call stale prop
+  // references for the lifetime of the component.
+  const _handlePanResponderTerminate = useLatestCallback(
+    (
+      e: GestureResponderEvent,
+      gestureState: PanResponderGestureState
+    ): void => {
+      // We should also call _handlePanResponderEnd
+      // to properly perform cleanups when the gesture is terminated
+      // (aka gesture handling responsibility is taken over by another component).
+      // This also fixes a weird issue where
+      // on real device, sometimes onPanResponderRelease is not called when you lift 2 fingers up,
+      // but onPanResponderTerminate is called instead for no apparent reason.
+      _handlePanResponderEnd(e, gestureState);
+      props.onPanResponderTerminate?.(
+        e,
+        gestureState,
+        _getZoomableViewEventObject()
+      );
+    }
+  );
+
+  const _handlePanResponderTerminationRequest = useLatestCallback(
+    (e: GestureResponderEvent, gestureState: PanResponderGestureState) =>
+      !!props.onPanResponderTerminationRequest?.(
+        e,
+        gestureState,
+        _getZoomableViewEventObject()
+      )
+  );
+
+  // Defaults to true to prevent parent components, such as React Navigation's tab view, from taking over as responder.
+  const _handleShouldBlockNativeResponder = useLatestCallback(
+    (e: GestureResponderEvent, gestureState: PanResponderGestureState) =>
+      props.onShouldBlockNativeResponder?.(
+        e,
+        gestureState,
+        _getZoomableViewEventObject()
+      ) ?? true
+  );
+
+  const _handleStartShouldSetPanResponderCapture = useLatestCallback(
+    (e: GestureResponderEvent, gestureState: PanResponderGestureState) =>
+      !!props.onStartShouldSetPanResponderCapture?.(e, gestureState)
+  );
+
+  const _handleMoveShouldSetPanResponderCapture = useLatestCallback(
+    (e: GestureResponderEvent, gestureState: PanResponderGestureState) =>
+      !!props.onMoveShouldSetPanResponderCapture?.(e, gestureState)
+  );
+
+  // Build the PanResponder synchronously during the first render so that
+  // gesture handlers are attached on the very first commit. A previous
+  // implementation deferred PanResponder.create to a useLayoutEffect, which
+  // left the View with no pan handlers until the next state-triggered
+  // re-render. Because every callback here is the stable wrapper returned by
+  // useLatestCallback, a one-shot create is correct and the closure stays
+  // up-to-date with the latest props.
+  const gestureHandlers = useMemo(
+    () =>
+      PanResponder.create({
+        onStartShouldSetPanResponder: _handleStartShouldSetPanResponder,
+        onPanResponderGrant: _handlePanResponderGrant,
+        onPanResponderMove: _handlePanResponderMove,
+        onPanResponderRelease: _handlePanResponderEnd,
+        onPanResponderTerminate: _handlePanResponderTerminate,
+        onPanResponderTerminationRequest: _handlePanResponderTerminationRequest,
+        onShouldBlockNativeResponder: _handleShouldBlockNativeResponder,
+        onStartShouldSetPanResponderCapture:
+          _handleStartShouldSetPanResponderCapture,
+        onMoveShouldSetPanResponderCapture:
+          _handleMoveShouldSetPanResponderCapture,
+      }),
+    // Stable wrappers — created once for the lifetime of the component.
+    []
+  );
+
   useImperativeHandle(ref, () => ({
     zoomTo: publicZoomTo,
     zoomBy: publicZoomBy,
@@ -1082,7 +1185,7 @@ const ReactNativeZoomableView: ForwardRefRenderFunction<
   return (
     <View
       style={styles.container}
-      {...gestureHandlers.current?.panHandlers}
+      {...gestureHandlers.panHandlers}
       ref={zoomSubjectWrapperRef}
       onLayout={measureZoomSubject}
     >
@@ -1167,6 +1270,10 @@ const styles = StyleSheet.create({
   },
 });
 
-export default ReactNativeZoomableView;
+// Wrap with forwardRef so the ref argument actually reaches
+// useImperativeHandle. Without this wrapper, ref={...} from consumers is
+// dropped and every method exposed by useImperativeHandle (zoomTo, zoomBy,
+// moveTo, moveBy, moveStaticPinTo, gestureStarted) is unreachable.
+export default React.forwardRef(ReactNativeZoomableView);
 
 export { ReactNativeZoomableView };
