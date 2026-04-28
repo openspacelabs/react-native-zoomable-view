@@ -87,8 +87,25 @@ const ReactNativeZoomableView: ForwardRefRenderFunction<
     disablePanOnInitialZoom: false,
   });
 
-  const panAnim = useRef(new Animated.ValueXY({ x: 0, y: 0 }));
-  const zoomAnim = useRef(new Animated.Value(1));
+  // Lazy init considers the consumer-provided animated values on first render so
+  // the Animated.View transform binds to the correct value before commit. If we
+  // assigned consumer values inside useLayoutEffect, the first JSX evaluation
+  // would already have subscribed the View to the dormant internal Animated
+  // object — gesture writes would update the consumer's value but the View
+  // would stay bound to the internal one until something else triggered a
+  // re-render, breaking the External Animated Values contract (SPECS.md).
+  const panAnim = useRef(
+    props.panAnimatedValueXY ?? new Animated.ValueXY({ x: 0, y: 0 })
+  );
+  const zoomAnim = useRef(props.zoomAnimatedValue ?? new Animated.Value(1));
+
+  // Capture ownership at mount: if the consumer passed an external animated
+  // value, they own its lifecycle and we must not stopAnimation() on unmount
+  // (per SPECS.md "External Animated Values" — "component won't stop its
+  // animation on unmount"). Captured once so later prop changes can't flip
+  // ownership mid-life and leave us stopping a value we don't own.
+  const ownsPanAnim = useRef(props.panAnimatedValueXY == null);
+  const ownsZoomAnim = useRef(props.zoomAnimatedValue == null);
 
   const offsetX = useRef(0);
   const offsetY = useRef(0);
@@ -121,8 +138,10 @@ const ReactNativeZoomableView: ForwardRefRenderFunction<
   const zoomAnimTransformListenerId = useRef<string>();
 
   useLayoutEffect(() => {
-    if (props.zoomAnimatedValue) zoomAnim.current = props.zoomAnimatedValue;
-    if (props.panAnimatedValueXY) panAnim.current = props.panAnimatedValueXY;
+    // panAnim/zoomAnim refs are already initialized to the consumer-provided
+    // animated values via lazy useRef above — assigning them here would be
+    // redundant and could not run early enough anyway (this effect fires after
+    // the first commit, by which time the Animated.View is already bound).
 
     if (props.initialZoom) zoomLevel.current = props.initialZoom;
     if (props.initialOffsetX != null) offsetX.current = props.initialOffsetX;
@@ -248,9 +267,14 @@ const ReactNativeZoomableView: ForwardRefRenderFunction<
       }
 
       // Stop any in-flight pan/zoom animations so their step callbacks don't
-      // fire on unmounted state.
-      panAnim.current.stopAnimation();
-      zoomAnim.current.stopAnimation();
+      // fire on unmounted state. Guarded by ownership: when the consumer
+      // provided an external animated value (panAnimatedValueXY /
+      // zoomAnimatedValue), they own its lifecycle and the SPECS.md "External
+      // Animated Values" contract states the component won't stop their
+      // animation on unmount. Calling stopAnimation here would kill an
+      // in-flight animation the consumer is driving externally.
+      if (ownsPanAnim.current) panAnim.current.stopAnimation();
+      if (ownsZoomAnim.current) zoomAnim.current.stopAnimation();
     };
   }, []);
 
@@ -398,8 +422,22 @@ const ReactNativeZoomableView: ForwardRefRenderFunction<
 
     props.onPanResponderGrant?.(e, gestureState, _getZoomableViewEventObject());
 
-    panAnim.current.stopAnimation();
-    zoomAnim.current.stopAnimation();
+    // Capture the final animated value into the JS-side mirrors when stopping.
+    // For native-driven animations the JS-side `offsetX`/`offsetY`/`zoomLevel`
+    // refs are only written via the panAnim/zoomAnim listeners on JS-thread
+    // ticks, which can lag the native value. Without the callback form, a new
+    // gesture starting mid-animation would compute its first frame against a
+    // stale JS mirror and produce a visible offset/zoom drift (SPECS.md
+    // "stopAnimation with Callback").
+    panAnim.current.x.stopAnimation((x) => {
+      offsetX.current = x;
+    });
+    panAnim.current.y.stopAnimation((y) => {
+      offsetY.current = y;
+    });
+    zoomAnim.current.stopAnimation((zoom) => {
+      zoomLevel.current = zoom;
+    });
     gestureStarted.current = true;
   });
 
