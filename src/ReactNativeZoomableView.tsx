@@ -123,6 +123,15 @@ const ReactNativeZoomableView: ForwardRefRenderFunction<
   const ownsPanAnim = useRef(props.panAnimatedValueXY == null);
   const ownsZoomAnim = useRef(props.zoomAnimatedValue == null);
 
+  // Mirrors the class component's `this.mounted` guard. When the consumer owns
+  // panAnim (External Animated Values per SPECS.md), the unmount cleanup
+  // intentionally skips stopAnimation() — so an in-flight tap animation runs
+  // to natural completion on the consumer's value and fires its callback with
+  // finished=true after unmount. Without this guard, that post-unmount fire
+  // would invoke onStaticPinPositionChange on a dead component with a stale
+  // offset (the offset listener was removed during cleanup).
+  const isMounted = useRef(true);
+
   const offsetX = useRef(0);
   const offsetY = useRef(0);
 
@@ -209,6 +218,20 @@ const ReactNativeZoomableView: ForwardRefRenderFunction<
 
   const onLayout = useRef(props.onLayout);
   onLayout.current = props.onLayout;
+
+  // Mirror the latest layout dimensions into refs so async callbacks (e.g. the
+  // zoomAnim listener inside publicZoomTo) read the current values rather than
+  // the values captured when the callback was created. The class component
+  // read this.state.originalWidth/Height inside listener bodies, so each
+  // animation frame saw the freshest layout — if a layout change (rotation,
+  // parent resize, or measureZoomSubject's 1Hz interval) lands during a
+  // ~500ms zoomTo animation, calcNewScaledOffsetForZoomCentering must use the
+  // updated dimensions or it will compute panAnim offsets against stale
+  // values for the rest of the animation.
+  const originalWidthRef = useRef(originalWidth);
+  originalWidthRef.current = originalWidth;
+  const originalHeightRef = useRef(originalHeight);
+  originalHeightRef.current = originalHeight;
 
   // Mirrors the class's componentDidUpdate semantics: the class did NOT run
   // componentDidUpdate on initial mount, so onLayout was not fired with the
@@ -305,6 +328,8 @@ const ReactNativeZoomableView: ForwardRefRenderFunction<
       // in-flight animation the consumer is driving externally.
       if (ownsPanAnim.current) panAnim.current.stopAnimation();
       if (ownsZoomAnim.current) zoomAnim.current.stopAnimation();
+
+      isMounted.current = false;
     };
   }, []);
 
@@ -880,8 +905,11 @@ const ReactNativeZoomableView: ForwardRefRenderFunction<
           // completed. If a new gesture interrupted the animation,
           // _handlePanResponderGrant called stopAnimation() and the callback
           // fires with finished=false at an intermediate offset — reporting
-          // that midpoint as the final pin position would be wrong.
-          if (finished) _updateStaticPin();
+          // that midpoint as the final pin position would be wrong. The
+          // isMounted guard mirrors the class's `this.mounted` check: when the
+          // consumer owns panAnim, unmount cleanup skips stopAnimation() so
+          // the animation can complete with finished=true post-unmount.
+          if (finished && isMounted.current) _updateStaticPin();
         });
       }
 
@@ -1084,14 +1112,14 @@ const ReactNativeZoomableView: ForwardRefRenderFunction<
           panAnim.current.setValue({
             x: calcNewScaledOffsetForZoomCentering(
               offsetX.current,
-              originalWidth,
+              originalWidthRef.current,
               prevScale,
               newScale,
               zoomCenter.x
             ),
             y: calcNewScaledOffsetForZoomCentering(
               offsetY.current,
-              originalHeight,
+              originalHeightRef.current,
               prevScale,
               newScale,
               zoomCenter.y
@@ -1252,16 +1280,23 @@ const ReactNativeZoomableView: ForwardRefRenderFunction<
     []
   );
 
-  useImperativeHandle(ref, () => ({
-    zoomTo: publicZoomTo,
-    zoomBy: publicZoomBy,
-    moveTo: publicMoveTo,
-    moveBy: publicMoveBy,
-    moveStaticPinTo: publicMoveStaticPinTo,
-    get gestureStarted() {
-      return gestureStarted.current;
-    },
-  }));
+  useImperativeHandle(
+    ref,
+    () => ({
+      zoomTo: publicZoomTo,
+      zoomBy: publicZoomBy,
+      moveTo: publicMoveTo,
+      moveBy: publicMoveBy,
+      moveStaticPinTo: publicMoveStaticPinTo,
+      get gestureStarted() {
+        return gestureStarted.current;
+      },
+    }),
+    // All five method wrappers are stable useLatestCallback refs and
+    // gestureStarted is a ref accessed via getter, so the imperative handle
+    // never needs to change identity for the lifetime of the component.
+    []
+  );
 
   const {
     staticPinIcon,
@@ -1329,14 +1364,7 @@ const ReactNativeZoomableView: ForwardRefRenderFunction<
           onLongPress={onStaticPinLongPress}
           onParentMove={_handlePanResponderMove}
           onParentRelease={_handlePanResponderEnd}
-          onParentTerminate={(evt, gestureState) => {
-            _handlePanResponderEnd(evt, gestureState);
-            props.onPanResponderTerminate?.(
-              evt,
-              gestureState,
-              _getZoomableViewEventObject()
-            );
-          }}
+          onParentTerminate={_handlePanResponderTerminate}
           longPressDuration={props.longPressDuration}
           setPinSize={setPinSize}
           pinProps={pinProps}
