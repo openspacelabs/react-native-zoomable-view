@@ -400,6 +400,18 @@ const ReactNativeZoomableView: ForwardRefRenderFunction<
     }
   );
 
+  // Read props.onLongPress at fire time, not at schedule time. The setTimeout
+  // body is inside _handlePanResponderGrant's closure, so a bare
+  // props.onLongPress?.(...) inside the timer would call the version captured
+  // when the gesture started — a parent re-render during the 700ms window would
+  // be ignored. The class component used this.props.onLongPress which React
+  // updates on every render; useLatestCallback restores that semantic.
+  const _fireOnLongPress = useLatestCallback(
+    (e: GestureResponderEvent, gestureState: PanResponderGestureState) => {
+      props.onLongPress?.(e, gestureState, _getZoomableViewEventObject());
+    }
+  );
+
   /**
    * Calculates pinch distance
    *
@@ -410,18 +422,40 @@ const ReactNativeZoomableView: ForwardRefRenderFunction<
   const _handlePanResponderGrant: NonNullable<
     PanResponderCallbacks['onPanResponderGrant']
   > = useLatestCallback((e, gestureState) => {
+    // Cancel any pending single-tap timer when a new gesture starts. Without this,
+    // a tap-then-long-press sequence fires both onSingleTap (from the prior tap's
+    // pending timer) and onLongPress for what should be a single long-press.
+    if (singleTapTimeoutId.current) {
+      clearTimeout(singleTapTimeoutId.current);
+      singleTapTimeoutId.current = undefined;
+    }
+
     if (props.onLongPress) {
       e.persist();
       longPressTimeout.current = setTimeout(() => {
-        props.onLongPress?.(e, gestureState, _getZoomableViewEventObject());
+        _fireOnLongPress(e, gestureState);
         longPressTimeout.current = undefined;
       }, props.longPressDuration);
     }
 
     props.onPanResponderGrant?.(e, gestureState, _getZoomableViewEventObject());
 
-    panAnim.current.stopAnimation();
-    zoomAnim.current.stopAnimation();
+    // Capture the final animated value into the JS-side mirrors when stopping.
+    // For native-driven animations the JS-side `offsetX`/`offsetY`/`zoomLevel`
+    // refs are only written via the panAnim/zoomAnim listeners on JS-thread
+    // ticks, which can lag the native value. Without the callback form, a new
+    // gesture starting mid-animation would compute its first frame against a
+    // stale JS mirror and produce a visible offset/zoom drift (SPECS.md
+    // "stopAnimation with Callback").
+    panAnim.current.x.stopAnimation((x) => {
+      offsetX.current = x;
+    });
+    panAnim.current.y.stopAnimation((y) => {
+      offsetY.current = y;
+    });
+    zoomAnim.current.stopAnimation((zoom) => {
+      zoomLevel.current = zoom;
+    });
     gestureStarted.current = true;
   });
 
