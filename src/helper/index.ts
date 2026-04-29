@@ -42,7 +42,16 @@ export function calcGestureTouchDistance(e: GestureTouchEvent): number | null {
   if (e.numberOfTouches !== 2 || !touches[0] || !touches[1]) return null;
 
   const dx = Math.abs(touches[0].x - touches[1].x);
-  const dy = Math.abs(touches[0].x - touches[1].x);
+  const dy = Math.abs(touches[0].y - touches[1].y);
 
   return Math.sqrt(dx * dx + dy * dy);
+}
+
+export function calcGestureTouchAngle(e: GestureTouchEvent): number | null {
+  'worklet';
+
+  const touches = e.allTouches;
+  if (e.numberOfTouches !== 2 || !touches[0] || !touches[1]) return null;
+
+  return Math.atan2(touches[1].y - touches[0].y, touches[1].x - touches[0].x);
 }

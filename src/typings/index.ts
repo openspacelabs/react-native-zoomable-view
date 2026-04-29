@@ -1,6 +1,7 @@
 import { ReactNode } from 'react';
 import { LayoutChangeEvent, ViewProps } from 'react-native';
 import { GestureTouchEvent } from 'react-native-gesture-handler';
+import type { SharedValue } from 'react-native-reanimated';
 
 export interface ZoomableViewEvent {
   zoomLevel: number;
@@ -8,10 +9,11 @@ export interface ZoomableViewEvent {
   offsetY: number;
   originalHeight: number;
   originalWidth: number;
+  gestureType?: 'shift' | 'pinch';
 }
 
 export type ReactNativeZoomableViewRef = {
-  moveTo(newOffsetX: number, newOffsetY: number): void;
+  moveTo(newOffsetX: number, newOffsetY: number, zoomOverride?: number): void;
   moveBy(offsetChangeX: number, offsetChangeY: number): void;
   zoomTo(newZoomLevel: number, zoomCenter?: Vec2D): boolean;
   zoomBy(zoomLevelChange: number): boolean;
@@ -26,6 +28,8 @@ export interface ReactNativeZoomableViewProps {
   // options
   style?: ViewProps['style'];
   children?: ReactNode;
+  /** Content rendered as a sibling overlay (outside the zoom transform). */
+  overlayContent?: ReactNode;
   zoomEnabled?: boolean;
   panEnabled?: boolean;
   initialZoom?: number;
@@ -44,6 +48,9 @@ export interface ReactNativeZoomableViewProps {
   longPressDuration?: number;
   visualTouchFeedbackEnabled?: boolean;
   disablePanOnInitialZoom?: boolean;
+  /** When false, pinch gestures only zoom without panning. Default true. */
+  pinchPanEnabled?: boolean;
+  contentRotation?: SharedValue<number>;
 
   // debug
   debug?: boolean;
@@ -58,7 +65,7 @@ export interface ReactNativeZoomableViewProps {
   onSingleTap?: (
     event: GestureTouchEvent,
     zoomableViewEventObject: ZoomableViewEvent
-  ) => void;
+  ) => boolean | undefined;
   onDoubleTapBefore?: (
     event: GestureTouchEvent,
     zoomableViewEventObject: ZoomableViewEvent
@@ -71,6 +78,7 @@ export interface ReactNativeZoomableViewProps {
     event: GestureTouchEvent,
     zoomableViewEventObject: ZoomableViewEvent
   ) => void;
+  onMomentumEnd?: () => void;
   onZoomEnd?: (
     event: GestureTouchEvent | undefined,
     zoomableViewEventObject: ZoomableViewEvent
@@ -103,6 +111,8 @@ export interface ReactNativeZoomableViewProps {
    * Called on the UI thread.
    * Must be a worklet.
    */
+  /** Called on the UI thread with rotation delta in radians during two-finger gestures. */
+  onRotation?: Worklet<(deltaRadians: number, fingerDist: number) => void>;
   onStaticPinPositionChange?: Worklet<(position: Vec2D) => void>;
   /**
    * Called on the UI thread.

@@ -84,10 +84,12 @@ export function viewportPositionToImagePosition({
   viewportPosition,
   imageSize,
   zoomableEvent,
+  contentRotation,
 }: {
   viewportPosition: Vec2D;
   imageSize: Size2D;
   zoomableEvent: ZoomableViewEvent;
+  contentRotation?: number;
 }): Vec2D | null {
   'worklet';
 
@@ -99,21 +101,36 @@ export function viewportPositionToImagePosition({
 
   if (resizedImgScale == null) return null;
 
+  // Counter-rotate the viewport position around the viewport center before
+  // converting to image coordinates. The transform chain is rotate, scale,
+  // translate, so inversion must undo rotation first in viewport space.
+  let vp = viewportPosition;
+  if (contentRotation) {
+    const cx = zoomableEvent.originalWidth / 2;
+    const cy = zoomableEvent.originalHeight / 2;
+    const dx = viewportPosition.x - cx;
+    const dy = viewportPosition.y - cy;
+    const cos = Math.cos(-contentRotation);
+    const sin = Math.sin(-contentRotation);
+    vp = {
+      x: dx * cos - dy * sin + cx,
+      y: dx * sin + dy * cos + cy,
+    };
+  }
+
   const sheetOriginOnContainer = getImageOriginOnTransformSubject(
     resizedImgSize,
     zoomableEvent
   );
 
-  const pointOnSheet = {
+  return {
     x:
-      (viewportPosition.x - sheetOriginOnContainer.x) /
+      (vp.x - sheetOriginOnContainer.x) /
       zoomableEvent.zoomLevel /
       resizedImgScale,
     y:
-      (viewportPosition.y - sheetOriginOnContainer.y) /
+      (vp.y - sheetOriginOnContainer.y) /
       zoomableEvent.zoomLevel /
       resizedImgScale,
   };
-
-  return pointOnSheet;
 }
