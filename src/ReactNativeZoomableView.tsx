@@ -1315,13 +1315,13 @@ const ReactNativeZoomableView: ForwardRefRenderFunction<
   });
 
   /**
-   * Moves the zoomed view to a specified position
-   * Returns a promise when finished
+   * Cancels any in-flight zoomTo() animation: stops zoomAnim and removes the
+   * pan-sync listener registered inside zoomTo(zoomCenter). Called by
+   * publicMoveTo / publicMoveBy / _handlePanResponderGrant before applying
+   * a programmatic pan or starting a new gesture so the cancelled zoomTo
+   * cannot overwrite the new offset on its next animation frame.
    *
-   * @param {number} newOffsetX the new position we want to move it to (x-axis)
-   * @param {number} newOffsetY the new position we want to move it to (y-axis)
-   *
-   * @return {bool}
+   * @return {number} the zoom level at the moment of cancellation
    */
   const _cancelInFlightZoomToAnimation = useLatestCallback(() => {
     let stoppedZoomLevel = zoomLevel.current;
@@ -1342,6 +1342,15 @@ const ReactNativeZoomableView: ForwardRefRenderFunction<
     return stoppedZoomLevel;
   });
 
+  /**
+   * Moves the zoomed view to a specified position
+   * Returns a promise when finished
+   *
+   * @param {number} newOffsetX the new position we want to move it to (x-axis)
+   * @param {number} newOffsetY the new position we want to move it to (y-axis)
+   *
+   * @return {bool}
+   */
   const publicMoveTo = useLatestCallback(
     (newOffsetX: number, newOffsetY: number) => {
       if (!originalWidth || !originalHeight) return;
