@@ -18,7 +18,7 @@ Reject any PR that adds files which are local agent state, scratch notes, or per
 
 **Reviewer action:** comment "remove agent artifacts (see REVIEW.md §1)" and request changes. Do not merge until the offending paths are deleted from the diff. If the author needs them tracked, they should be added to `.gitignore` instead.
 
-**Why:** these files capture one developer's local agent session — they have no value to other contributors, leak internal workflow noise into git history, and inflate review surface (PR #150 added 86 lines of pure session metadata to a refactor diff).
+**Why:** these files capture one developer's local agent session — they have no value to other contributors, leak internal workflow noise into git history, and inflate review surface.
 
 ## 2. PR scope matches title
 
