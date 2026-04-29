@@ -6,19 +6,15 @@ Rules a reviewer (human or bot) must enforce on every PR to this repo. These com
 
 ## 1. No agent/tooling artifacts in the diff
 
-Reject any PR that adds files which are local agent state, scratch notes, or per-developer tooling config. These belong on disk, not in the repo.
+Reject any PR that adds files which are local agent state, scratch notes, or per-developer tooling config. A file qualifies as an artifact when **all** of the following are true:
 
-**Hard-block paths and patterns:**
+- It is generated or maintained by an AI assistant, IDE plugin, or other per-developer tool — not authored as a deliverable.
+- It is not consumed by the build, the tests, the published package, or another contributor's workflow.
+- It would differ machine-to-machine or session-to-session if a different contributor produced the same change.
 
-- `.claude/` (any file under it, including `settings.local.json`, `scheduled_tasks.lock`, `worktrees/`)
-- `.claude-work/` (session state directories, `_session-state.md`, any `<uuid>/` subtree)
-- `SHARED_TASK_NOTES.md`, `TASK_NOTES.md`, `NOTES.md` at repo root
-- `.cursor/`, `.aider*`, `.continue/`, `.windsurf/`
-- Any file matching `*-session-state.md`, `*-task-notes.md`, `*-shared-notes.md`
+**Reviewer action:** comment "remove agent artifacts (see REVIEW.md §1)" and request changes. Do not merge until the offending paths are deleted from the diff. If the author needs them tracked locally, they belong in `.gitignore`, not in the repo.
 
-**Reviewer action:** comment "remove agent artifacts (see REVIEW.md §1)" and request changes. Do not merge until the offending paths are deleted from the diff. If the author needs them tracked, they should be added to `.gitignore` instead.
-
-**Why:** these files capture one developer's local agent session — they have no value to other contributors, leak internal workflow noise into git history, and inflate review surface.
+**Why:** these files capture one developer's local session — they have no value to other contributors, leak internal workflow noise into git history, and inflate review surface.
 
 ## 2. PR scope matches title
 
