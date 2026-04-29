@@ -27,6 +27,11 @@ export const useDebugPoints = ({
     ) => {
       const { touches } = gestureResponderEvent.nativeEvent;
 
+      // numberActiveTouches in the gesture responder system can lag
+      // nativeEvent.touches when a finger lifts mid-gesture; guard prevents
+      // a TypeError reading touches[1] in debug builds.
+      if (touches.length < 2) return;
+
       setDebugPoints([
         {
           x: touches[0].pageX - originalPageX,
