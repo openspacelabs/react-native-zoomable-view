@@ -535,6 +535,12 @@ const ReactNativeZoomableView: ForwardRefRenderFunction<
       longPressTimeout.current = setTimeout(() => {
         _fireOnLongPress(e, gestureState);
         longPressTimeout.current = undefined;
+        // After a confirmed long-press, clear pending double-tap state so the
+        // subsequent release does not match the prior tap's timestamp and
+        // spuriously fire onDoubleTap. Matters when longPressDuration <
+        // doubleTapDelay.
+        delete doubleTapFirstTapReleaseTimestamp.current;
+        delete doubleTapFirstTap.current;
       }, props.longPressDuration);
     }
 
@@ -657,6 +663,11 @@ const ReactNativeZoomableView: ForwardRefRenderFunction<
             e,
             gestureState
           );
+          // Clear stale double-tap state on pinch start. Without this, a
+          // tap-then-pinch-then-tap sequence within doubleTapDelay can match
+          // the first tap's timestamp and spuriously fire onDoubleTap.
+          delete doubleTapFirstTapReleaseTimestamp.current;
+          delete doubleTapFirstTap.current;
         }
         gestureType.current = 'pinch';
         _handlePinching(e, gestureState);
@@ -679,6 +690,13 @@ const ReactNativeZoomableView: ForwardRefRenderFunction<
         const { dx, dy } = gestureState;
         const isShiftGesture = Math.abs(dx) > 2 || Math.abs(dy) > 2;
         if (isShiftGesture) {
+          // Clear stale double-tap state when a drag actually starts. Without
+          // this, a tap-pan-tap sequence within doubleTapDelay would match
+          // the first tap's timestamp and spuriously fire onDoubleTap.
+          if (gestureType.current !== 'shift') {
+            delete doubleTapFirstTapReleaseTimestamp.current;
+            delete doubleTapFirstTap.current;
+          }
           gestureType.current = 'shift';
           _handleShifting(gestureState);
         }
