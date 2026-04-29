@@ -305,8 +305,8 @@ const ReactNativeZoomableView: ForwardRefRenderFunction<
     // dev simulates mount → unmount → remount during development; the cleanup
     // below sets isMounted.current = false on the simulated unmount, so without
     // this re-set the second mount would observe the ref as permanently false
-    // for the lifetime of the component — silently dropping the
-    // _updateStaticPin call inside _fireSingleTapTimerBody and breaking
+    // for the lifetime of the component — silently dropping the debounced
+    // pin flush inside _fireSingleTapTimerBody and breaking
     // onStaticPinPositionChange after a single-tap pan. Mirrors the class
     // component's `this.mounted = true` in componentDidMount.
     isMounted.current = true;
@@ -535,6 +535,12 @@ const ReactNativeZoomableView: ForwardRefRenderFunction<
       longPressTimeout.current = setTimeout(() => {
         _fireOnLongPress(e, gestureState);
         longPressTimeout.current = undefined;
+        // After a confirmed long-press, clear pending double-tap state so the
+        // subsequent release does not match the prior tap's timestamp and
+        // spuriously fire onDoubleTap. Matters when longPressDuration <
+        // doubleTapDelay.
+        delete doubleTapFirstTapReleaseTimestamp.current;
+        delete doubleTapFirstTap.current;
       }, props.longPressDuration);
     }
 
@@ -546,16 +552,19 @@ const ReactNativeZoomableView: ForwardRefRenderFunction<
     // ticks, which can lag the native value. Without the callback form, a new
     // gesture starting mid-animation would compute its first frame against a
     // stale JS mirror and produce a visible offset/zoom drift (SPECS.md
-    // "stopAnimation with Callback").
+    // "stopAnimation with Callback"). For zoom we route through
+    // `_cancelInFlightZoomToAnimation()` so any in-flight `zoomTo(zoomCenter)`
+    // also has its temporary pan-sync listener removed — without that, the
+    // listener keeps firing on every `zoomAnim.setValue()` in `_handlePinching`
+    // and overwrites the gesture-computed offset with one anchored at the
+    // cancelled zoomTo's center.
     panAnim.current.x.stopAnimation((x) => {
       offsetX.current = x;
     });
     panAnim.current.y.stopAnimation((y) => {
       offsetY.current = y;
     });
-    zoomAnim.current.stopAnimation((zoom) => {
-      zoomLevel.current = zoom;
-    });
+    _cancelInFlightZoomToAnimation();
     gestureStarted.current = true;
   });
 
@@ -592,7 +601,11 @@ const ReactNativeZoomableView: ForwardRefRenderFunction<
     }
 
     if (props.staticPinPosition) {
-      _updateStaticPin();
+      // Flush the pending debounced onStaticPinPositionChange so the final
+      // post-gesture pin position is delivered synchronously. A direct
+      // (non-debounced) call here would double-fire (immediate + debounce
+      // timer ~100ms later).
+      debouncedOnStaticPinPositionChange.flush();
     }
 
     gestureType.current = undefined;
@@ -650,6 +663,11 @@ const ReactNativeZoomableView: ForwardRefRenderFunction<
             e,
             gestureState
           );
+          // Clear stale double-tap state on pinch start. Without this, a
+          // tap-then-pinch-then-tap sequence within doubleTapDelay can match
+          // the first tap's timestamp and spuriously fire onDoubleTap.
+          delete doubleTapFirstTapReleaseTimestamp.current;
+          delete doubleTapFirstTap.current;
         }
         gestureType.current = 'pinch';
         _handlePinching(e, gestureState);
@@ -672,6 +690,13 @@ const ReactNativeZoomableView: ForwardRefRenderFunction<
         const { dx, dy } = gestureState;
         const isShiftGesture = Math.abs(dx) > 2 || Math.abs(dy) > 2;
         if (isShiftGesture) {
+          // Clear stale double-tap state when a drag actually starts. Without
+          // this, a tap-pan-tap sequence within doubleTapDelay would match
+          // the first tap's timestamp and spuriously fire onDoubleTap.
+          if (gestureType.current !== 'shift') {
+            delete doubleTapFirstTapReleaseTimestamp.current;
+            delete doubleTapFirstTap.current;
+          }
           gestureType.current = 'shift';
           _handleShifting(gestureState);
         }
@@ -916,7 +941,6 @@ const ReactNativeZoomableView: ForwardRefRenderFunction<
       offsetY.current = newOffsetY;
 
       panAnim.current.setValue({ x: offsetX.current, y: offsetY.current });
-      zoomAnim.current.setValue(zoomLevel.current);
 
       onShiftingAfter?.(null, null, _getZoomableViewEventObject());
     }
@@ -960,7 +984,13 @@ const ReactNativeZoomableView: ForwardRefRenderFunction<
           // isMounted guard mirrors the class's `this.mounted` check: when the
           // consumer owns panAnim, unmount cleanup skips stopAnimation() so
           // the animation can complete with finished=true post-unmount.
-          if (finished && isMounted.current) _updateStaticPin();
+          if (finished && isMounted.current) {
+            // Flush the pending debounced onStaticPinPositionChange so the
+            // final post-animation pin position is delivered synchronously.
+            // A direct (non-debounced) call here caused a double-fire
+            // (immediate + debounce timer ~100ms later).
+            debouncedOnStaticPinPositionChange.flush();
+          }
         });
       }
 
@@ -1056,12 +1086,6 @@ const ReactNativeZoomableView: ForwardRefRenderFunction<
     });
   });
 
-  const _updateStaticPin = useLatestCallback(() => {
-    const position = _staticPinPosition();
-    if (!position) return;
-    props.onStaticPinPositionChange?.(position);
-  });
-
   const _addTouch = useLatestCallback((touch: TouchPoint) => {
     touches.current.push(touch);
     setStateTouches([...touches.current]);
@@ -1098,10 +1122,12 @@ const ReactNativeZoomableView: ForwardRefRenderFunction<
       y: e.nativeEvent.pageY - originalPageY,
     };
 
-    // if doubleTapZoomToCenter enabled -> always zoom to center instead
+    // if doubleTapZoomToCenter enabled -> always zoom to center instead.
+    // publicZoomTo expects viewport-relative coordinates where center is
+    // (originalWidth/2, originalHeight/2) — not (0,0). See publicZoomTo JSDoc.
     if (doubleTapZoomToCenter) {
-      zoomPositionCoordinates.x = 0;
-      zoomPositionCoordinates.y = 0;
+      zoomPositionCoordinates.x = originalWidth / 2;
+      zoomPositionCoordinates.y = originalHeight / 2;
     }
 
     publicZoomTo(nextZoomStep, zoomPositionCoordinates);
@@ -1121,27 +1147,84 @@ const ReactNativeZoomableView: ForwardRefRenderFunction<
   const _getNextZoomStep = useLatestCallback(() => {
     const { zoomStep, maxZoom, initialZoom } = props;
 
-    if (maxZoom == null) return;
-
-    if (zoomLevel.current.toFixed(2) === maxZoom.toFixed(2)) {
+    // Cycle-back when at a configured maxZoom must be checked BEFORE
+    // the zoomStep guard — otherwise users with zoomStep={null} and
+    // a configured maxZoom lose the reset-to-initialZoom behavior on
+    // double-tap at max zoom.
+    if (
+      maxZoom != null &&
+      zoomLevel.current.toFixed(2) === maxZoom.toFixed(2)
+    ) {
       return initialZoom;
     }
 
+    // If no zoomStep is configured, there is no increment to compute.
     if (zoomStep == null) return;
 
+    // Determine the effective ceiling for double-tap cycling.
+    // When maxZoom is null (unlimited zoom), use a default of 3 zoom
+    // steps from initialZoom so double-tap still cycles back — otherwise
+    // every tap would grow zoom indefinitely with no reset path.
+    const effectiveMax =
+      maxZoom != null
+        ? maxZoom
+        : (initialZoom ?? 1) * Math.pow(1 + zoomStep, 3);
+
+    // This cycle-back is only reachable when maxZoom == null; when
+    // maxZoom != null the equivalent check above already returned.
+    if (zoomLevel.current.toFixed(2) === effectiveMax.toFixed(2)) {
+      return initialZoom;
+    }
+
     const nextZoomStep = zoomLevel.current * (1 + zoomStep);
-    if (nextZoomStep > maxZoom) {
-      return maxZoom;
+    if (nextZoomStep > effectiveMax) {
+      return effectiveMax;
     }
 
     return nextZoomStep;
   });
 
+  // Read props.staticPinPosition / props.onZoomAfter at fire time, not at
+  // schedule time. The .start() completion callback below runs ~animation
+  // duration after publicZoomTo is invoked; without this wrapper the inner
+  // lambda would close over the props snapshot at schedule time and miss
+  // any parent re-render during the animation. Mirrors the pattern in
+  // _fireSingleTapTimerBody and StaticPin's onPress/onLongPress refs.
+  const _onPublicZoomToAnimationComplete = useLatestCallback(
+    ({
+      finished,
+      capturedListenerId,
+    }: {
+      finished: boolean;
+      capturedListenerId?: string;
+    }) => {
+      if (!isMounted.current) return;
+      if (capturedListenerId) {
+        zoomAnim.current.removeListener(capturedListenerId);
+        if (zoomToListenerId.current === capturedListenerId) {
+          zoomToListenerId.current = undefined;
+        }
+      }
+      if (finished) {
+        // Flush any pending debounced static-pin position change so
+        // consumers observing pin position in onZoomAfter see the final
+        // post-animation value, matching the pattern in
+        // _handlePanResponderEnd.
+        if (props.staticPinPosition) {
+          debouncedOnStaticPinPositionChange.flush();
+        }
+        props.onZoomAfter?.(null, null, _getZoomableViewEventObject());
+      }
+    }
+  );
+
   /**
    * Zooms to a specific level. A "zoom center" can be provided, which specifies
    * the point that will remain in the same position on the screen after the zoom.
-   * The coordinates of the zoom center is relative to the zoom subject.
-   * { x: 0, y: 0 } is the very center of the zoom subject.
+   * The coordinates of the zoom center are viewport-relative (in pixels).
+   * { x: 0, y: 0 } is the top-left corner of the viewport.
+   * To zoom to the center of the viewport, use
+   * { x: originalWidth / 2, y: originalHeight / 2 }.
    *
    * @param newZoomLevel
    * @param zoomCenter - If not supplied, the container's center is the zoom center
@@ -1149,8 +1232,8 @@ const ReactNativeZoomableView: ForwardRefRenderFunction<
   const publicZoomTo = useLatestCallback(
     (newZoomLevel: number, zoomCenter?: Vec2D) => {
       if (!props.zoomEnabled) return false;
-      if (props.maxZoom && newZoomLevel > props.maxZoom) return false;
-      if (props.minZoom && newZoomLevel < props.minZoom) return false;
+      if (props.maxZoom != null && newZoomLevel > props.maxZoom) return false;
+      if (props.minZoom != null && newZoomLevel < props.minZoom) return false;
 
       props.onZoomBefore?.(null, null, _getZoomableViewEventObject());
 
@@ -1202,18 +1285,14 @@ const ReactNativeZoomableView: ForwardRefRenderFunction<
       // overwritten — so reading the ref at fire time would read listener2.
       // Mirrors the class component's local-capture + identity-equality
       // pattern.
-      const listenerId = zoomToListenerId.current;
-      getZoomToAnimation(zoomAnim.current, newZoomLevel).start(() => {
-        if (listenerId) {
-          zoomAnim.current.removeListener(listenerId);
-          if (zoomToListenerId.current === listenerId) {
-            zoomToListenerId.current = undefined;
-          }
+      const capturedListenerId = zoomToListenerId.current;
+      getZoomToAnimation(zoomAnim.current, newZoomLevel).start(
+        ({ finished }) => {
+          _onPublicZoomToAnimationComplete({ finished, capturedListenerId });
         }
-      });
+      );
       // == Zoom Animation Ends ==
 
-      props.onZoomAfter?.(null, null, _getZoomableViewEventObject());
       return true;
     }
   );
@@ -1236,6 +1315,34 @@ const ReactNativeZoomableView: ForwardRefRenderFunction<
   });
 
   /**
+   * Cancels any in-flight zoomTo() animation: stops zoomAnim and removes the
+   * pan-sync listener registered inside zoomTo(zoomCenter). Called by
+   * publicMoveTo / publicMoveBy / _handlePanResponderGrant before applying
+   * a programmatic pan or starting a new gesture so the cancelled zoomTo
+   * cannot overwrite the new offset on its next animation frame.
+   *
+   * @return {number} the zoom level at the moment of cancellation
+   */
+  const _cancelInFlightZoomToAnimation = useLatestCallback(() => {
+    let stoppedZoomLevel = zoomLevel.current;
+
+    // Programmatic pan should win over any active zoomTo animation.
+    // Stop the zoom first and remove its temporary pan-sync listener
+    // so the next zoom frame cannot overwrite the requested offset.
+    zoomAnim.current.stopAnimation((value) => {
+      stoppedZoomLevel = value;
+      zoomLevel.current = value;
+    });
+
+    if (zoomToListenerId.current) {
+      zoomAnim.current.removeListener(zoomToListenerId.current);
+      zoomToListenerId.current = undefined;
+    }
+
+    return stoppedZoomLevel;
+  });
+
+  /**
    * Moves the zoomed view to a specified position
    * Returns a promise when finished
    *
@@ -1248,8 +1355,9 @@ const ReactNativeZoomableView: ForwardRefRenderFunction<
     (newOffsetX: number, newOffsetY: number) => {
       if (!originalWidth || !originalHeight) return;
 
-      const offsetX = (newOffsetX - originalWidth / 2) / zoomLevel.current;
-      const offsetY = (newOffsetY - originalHeight / 2) / zoomLevel.current;
+      const stoppedZoomLevel = _cancelInFlightZoomToAnimation();
+      const offsetX = (newOffsetX - originalWidth / 2) / stoppedZoomLevel;
+      const offsetY = (newOffsetY - originalHeight / 2) / stoppedZoomLevel;
 
       _setNewOffsetPosition(-offsetX, -offsetY);
     }
@@ -1267,12 +1375,11 @@ const ReactNativeZoomableView: ForwardRefRenderFunction<
    */
   const publicMoveBy = useLatestCallback(
     (offsetChangeX: number, offsetChangeY: number) => {
+      const stoppedZoomLevel = _cancelInFlightZoomToAnimation();
       const newOffsetX =
-        (offsetX.current * zoomLevel.current - offsetChangeX) /
-        zoomLevel.current;
+        (offsetX.current * stoppedZoomLevel - offsetChangeX) / stoppedZoomLevel;
       const newOffsetY =
-        (offsetY.current * zoomLevel.current - offsetChangeY) /
-        zoomLevel.current;
+        (offsetY.current * stoppedZoomLevel - offsetChangeY) / stoppedZoomLevel;
 
       _setNewOffsetPosition(newOffsetX, newOffsetY);
     }
