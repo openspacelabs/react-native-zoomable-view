@@ -1185,21 +1185,18 @@ const ReactNativeZoomableViewInner: ForwardRefRenderFunction<
             </Animated.View>
             {overlayContent}
 
-            {visualTouchFeedbackEnabled
-              ? stateTouches.map(
-                  (touch) =>
-                    doubleTapDelay && (
-                      <AnimatedTouchFeedback
-                        x={touch.x}
-                        y={touch.y}
-                        key={touch.id}
-                        animationDuration={doubleTapDelay}
-                        onAnimationDone={() => {
-                          _removeTouch(touch);
-                        }}
-                      />
-                    )
-                )
+            {visualTouchFeedbackEnabled && doubleTapDelay
+              ? stateTouches.map((touch) => (
+                  <AnimatedTouchFeedback
+                    x={touch.x}
+                    y={touch.y}
+                    key={touch.id}
+                    animationDuration={doubleTapDelay}
+                    onAnimationDone={() => {
+                      _removeTouch(touch);
+                    }}
+                  />
+                ))
               : null}
 
             {/* For Debugging Only */}
