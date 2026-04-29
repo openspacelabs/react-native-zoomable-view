@@ -2,9 +2,9 @@
   "name": "@openspacelabs/react-native-zoomable-view",
   "version": "2.4.3",
   "description": "A view component for react-native with pinch to zoom, tap to move and double tap to zoom capability.",
-  "main": "lib/commonjs/index",
-  "module": "lib/module/index",
-  "types": "lib/typescript/index.d.ts",
+  "main": "src/index",
+  "module": "src/index",
+  "types": "src/index",
   "react-native": "src/index",
   "source": "src/index",
   "files": [

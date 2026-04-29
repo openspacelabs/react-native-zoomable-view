@@ -23,6 +23,7 @@ import Animated, {
   useAnimatedStyle,
   useDerivedValue,
   useSharedValue,
+  withDecay,
   withTiming,
 } from 'react-native-reanimated';
 
@@ -32,6 +33,7 @@ import { StaticPin } from './components/StaticPin';
 import { DebugTouchPoint } from './debugHelper';
 import {
   calcGestureCenterPoint,
+  calcGestureTouchAngle,
   calcGestureTouchDistance,
   calcNewScaledOffsetForZoomCentering,
 } from './helper';
@@ -95,12 +97,14 @@ const ReactNativeZoomableViewInner: ForwardRefRenderFunction<
     onStaticPinPositionChange: undefined,
     onStaticPinPositionMove: undefined,
     disablePanOnInitialZoom: false,
+    pinchPanEnabled: true,
   });
 
   const {
     debug,
     staticPinIcon,
     children,
+    overlayContent,
     visualTouchFeedbackEnabled,
     doubleTapDelay,
     staticPinPosition: propStaticPinPosition,
@@ -109,6 +113,7 @@ const ReactNativeZoomableViewInner: ForwardRefRenderFunction<
     onTransform,
     onStaticPinPositionMove,
     onPanResponderMove,
+    onRotation,
     zoomEnabled: propZoomEnabled,
     maxZoom: propMaxZoom,
     minZoom: propMinZoom,
@@ -117,6 +122,8 @@ const ReactNativeZoomableViewInner: ForwardRefRenderFunction<
     movementSensitivity: propMovementSensitivity,
     panEnabled: propPanEnabled,
     disablePanOnInitialZoom: propDisablePanOnInitialZoom,
+    pinchPanEnabled: propPinchPanEnabled,
+    contentRotation: propContentRotation,
     initialZoom: propsInitialZoom,
     pinProps,
   } = props;
@@ -140,7 +147,7 @@ const ReactNativeZoomableViewInner: ForwardRefRenderFunction<
     undefined
   );
   const onTransformInvocationInitialized = useSharedValue(false);
-  const singleTapTimeoutId = useRef<NodeJS.Timeout>();
+  const singleTapTimeoutId = useRef<NodeJS.Timeout | undefined>(undefined);
   const touches = useSharedValue<TouchPoint[]>([]);
   const doubleTapFirstTap = useSharedValue<TouchPoint | undefined>(undefined);
   const gestureType = useSharedValue<'shift' | 'pinch' | undefined>(undefined);
@@ -163,6 +170,15 @@ const ReactNativeZoomableViewInner: ForwardRefRenderFunction<
   );
   const initialZoom = useDerivedValue(() => propsInitialZoom);
   const movementSensitivity = useDerivedValue(() => propMovementSensitivity);
+  const pinchPanEnabled = useDerivedValue(() => propPinchPanEnabled);
+  const lastGestureTouchAngle = useSharedValue<number | null>(null);
+  const lastTouchTimestamp = useSharedValue<number>(0);
+  const velocityX = useSharedValue<number>(0);
+  const velocityY = useSharedValue<number>(0);
+  const onMomentumEnd = useLatestCallback(
+    props.onMomentumEnd || (() => undefined)
+  );
+  const lastPinBridgeTimestamp = useSharedValue<number>(0);
   const onPanResponderGrant = useLatestCallback(
     props.onPanResponderGrant || (() => undefined)
   );
@@ -195,6 +211,7 @@ const ReactNativeZoomableViewInner: ForwardRefRenderFunction<
         offsetY: offsetY.value,
         originalHeight: originalHeight.value,
         originalWidth: originalWidth.value,
+        gestureType: gestureType.value,
       },
       overwriteObj
     );
@@ -220,6 +237,7 @@ const ReactNativeZoomableViewInner: ForwardRefRenderFunction<
         offsetY: offsetY.value,
         zoomLevel: zoom.value,
       }),
+      contentRotation: propContentRotation?.value,
     });
   };
 
@@ -263,9 +281,15 @@ const ReactNativeZoomableViewInner: ForwardRefRenderFunction<
 
     onTransform?.(zoomableViewEvent);
 
-    if (position) {
-      onStaticPinPositionMove?.(position);
-      runOnJS(debouncedOnStaticPinPositionChange)(position);
+    if (position && gestureStarted.value) {
+      // Throttle JS bridge calls for pin position to avoid per-frame overhead
+      // Only bridge during active gestures; skip during decay/animation.
+      const now = Date.now();
+      if (now - lastPinBridgeTimestamp.value > 200) {
+        lastPinBridgeTimestamp.value = now;
+        onStaticPinPositionMove?.(position);
+        runOnJS(debouncedOnStaticPinPositionChange)(position);
+      }
     }
 
     return { successful: true };
@@ -348,7 +372,6 @@ const ReactNativeZoomableViewInner: ForwardRefRenderFunction<
 
   const _handlePanResponderGrant = (e: GestureTouchEvent) => {
     'worklet';
-
     runOnJS(scheduleLongPressTimeout)(e);
 
     runOnJS(onPanResponderGrant)(e, _getZoomableViewEventObject());
@@ -372,8 +395,19 @@ const ReactNativeZoomableViewInner: ForwardRefRenderFunction<
     let shift = null;
 
     if (lastGestureCenterPosition.value && movementSensitivity.value) {
-      const dx = gestureCenterPoint.x - lastGestureCenterPosition.value.x;
-      const dy = gestureCenterPoint.y - lastGestureCenterPosition.value.y;
+      let dx = gestureCenterPoint.x - lastGestureCenterPosition.value.x;
+      let dy = gestureCenterPoint.y - lastGestureCenterPosition.value.y;
+
+      // Counter-rotate screen-space delta into content-space when content is rotated
+      if (propContentRotation) {
+        const angle = propContentRotation.value;
+        const cos = Math.cos(angle);
+        const sin = Math.sin(angle);
+        const rx = dx * cos + dy * sin;
+        const ry = -dx * sin + dy * cos;
+        dx = rx;
+        dy = ry;
+      }
 
       const shiftX = dx / zoom.value / movementSensitivity.value;
       const shiftY = dy / zoom.value / movementSensitivity.value;
@@ -439,9 +473,9 @@ const ReactNativeZoomableViewInner: ForwardRefRenderFunction<
       y: gestureCenterPoint.y,
     };
 
-    if (staticPinPosition.value) {
-      // When we use a static pin position, the zoom centre is the same as that position,
-      // otherwise the pin moves around way too much while zooming.
+    if (staticPinPosition.value && !pinchPanEnabled.value) {
+      // Follow mode: zoom centres on the static pin position.
+      // Non-follow (pinchPanEnabled): zoom centres between fingers.
       zoomCenter = {
         x: staticPinPosition.value.x,
         y: staticPinPosition.value.y,
@@ -458,24 +492,42 @@ const ReactNativeZoomableViewInner: ForwardRefRenderFunction<
 
     if (!originalHeight.value || !originalWidth.value) return;
 
+    // Counter-rotate zoom center into content space when content is rotated.
+    // The algorithm treats X/Y independently, which is only correct when the
+    // zoom subject is axis-aligned. With rotation, the axes are coupled through
+    // the rotation matrix.
+    let zcX = zoomCenter.x;
+    let zcY = zoomCenter.y;
+    if (propContentRotation && propContentRotation.value !== 0) {
+      const angle = propContentRotation.value;
+      const cos = Math.cos(angle);
+      const sin = Math.sin(angle);
+      const cx = originalWidth.value / 2;
+      const cy = originalHeight.value / 2;
+      const dx = zoomCenter.x - cx;
+      const dy = zoomCenter.y - cy;
+      zcX = cx + dx * cos + dy * sin;
+      zcY = cy - dx * sin + dy * cos;
+    }
+
     let newOffsetY = calcNewScaledOffsetForZoomCentering(
       oldOffsetY,
       originalHeight.value,
       oldScale,
       newScale,
-      zoomCenter.y
+      zcY
     );
     let newOffsetX = calcNewScaledOffsetForZoomCentering(
       oldOffsetX,
       originalWidth.value,
       oldScale,
       newScale,
-      zoomCenter.x
+      zcX
     );
 
     const offsetShift =
       _calcOffsetShiftSinceLastGestureState(gestureCenterPoint);
-    if (offsetShift) {
+    if (pinchPanEnabled.value && offsetShift) {
       newOffsetX += offsetShift.x;
       newOffsetY += offsetShift.y;
     }
@@ -483,6 +535,20 @@ const ReactNativeZoomableViewInner: ForwardRefRenderFunction<
     offsetX.value = newOffsetX;
     offsetY.value = newOffsetY;
     zoom.value = newScale;
+
+    if (onRotation) {
+      const angle = calcGestureTouchAngle(e);
+      if (angle != null && lastGestureTouchAngle.value != null) {
+        let delta = angle - lastGestureTouchAngle.value;
+        if (delta > Math.PI) delta -= 2 * Math.PI;
+        if (delta < -Math.PI) delta += 2 * Math.PI;
+
+        // No threshold; pass rotation through directly.
+        const fingerDist = calcGestureTouchDistance(e);
+        onRotation(delta, fingerDist ?? 0);
+      }
+      lastGestureTouchAngle.value = angle;
+    }
   };
 
   /**
@@ -515,19 +581,28 @@ const ReactNativeZoomableViewInner: ForwardRefRenderFunction<
     ) {
       return;
     }
+    const t0 = e.allTouches[0];
+    if (!t0) return;
     const shift = _calcOffsetShiftSinceLastGestureState({
-      x: e.allTouches[0].x,
-      y: e.allTouches[0].y,
+      x: t0.x,
+      y: t0.y,
     });
     if (!shift) return;
+
+    // Track velocity for momentum scrolling
+    const now = Date.now();
+    const dt = now - lastTouchTimestamp.value;
+    if (dt > 0 && dt < 100) {
+      velocityX.value = shift.x / (dt / 1000);
+      velocityY.value = shift.y / (dt / 1000);
+    }
+    lastTouchTimestamp.value = now;
 
     const newOffsetX = offsetX.value + shift.x;
     const newOffsetY = offsetY.value + shift.y;
 
     if (debug) {
-      const x = e.allTouches[0].x;
-      const y = e.allTouches[0].y;
-      runOnJS(setDebugPoints)([{ x, y }]);
+      runOnJS(setDebugPoints)([{ x: t0.x, y: t0.y }]);
     }
 
     _setNewOffsetPosition(newOffsetX, newOffsetY);
@@ -615,9 +690,11 @@ const ReactNativeZoomableViewInner: ForwardRefRenderFunction<
     if (nextZoomStep == null) return;
 
     // define new zoom position coordinates
+    const tapTouch = e.allTouches[0];
+    if (!tapTouch) return;
     const zoomPositionCoordinates = {
-      x: e.allTouches[0].x,
-      y: e.allTouches[0].y,
+      x: tapTouch.x,
+      y: tapTouch.y,
     };
 
     // if doubleTapZoomToCenter enabled -> always zoom to center instead
@@ -657,26 +734,41 @@ const ReactNativeZoomableViewInner: ForwardRefRenderFunction<
         });
       singleTapTimeoutId.current && clearTimeout(singleTapTimeoutId.current);
       delete doubleTapFirstTapReleaseTimestamp.value;
-      delete singleTapTimeoutId.current;
+      singleTapTimeoutId.current = undefined;
       delete doubleTapFirstTap.value;
       _handleDoubleTap(e);
     } else {
       doubleTapFirstTapReleaseTimestamp.value = now;
+      const firstTapTouch = e.allTouches[0];
+      if (!firstTapTouch) return;
       doubleTapFirstTap.value = {
         id: now.toString(),
-        x: e.allTouches[0].x,
-        y: e.allTouches[0].y,
+        x: firstTapTouch.x,
+        y: firstTapTouch.y,
       };
       _addTouch(doubleTapFirstTap.value);
 
       singleTapTimeoutId.current = setTimeout(() => {
         delete doubleTapFirstTapReleaseTimestamp.value;
-        delete singleTapTimeoutId.current;
+        singleTapTimeoutId.current = undefined;
 
-        // Pan to the tapped location
-        if (props.staticPinPosition && doubleTapFirstTap.value) {
-          const tapX = props.staticPinPosition.x - doubleTapFirstTap.value.x;
-          const tapY = props.staticPinPosition.y - doubleTapFirstTap.value.y;
+        // Call onSingleTap first; if it returns true, skip the pan-to-tap behavior
+        const handled = props.onSingleTap?.(e, _getZoomableViewEventObject());
+        // Pan to the tapped location (unless onSingleTap handled it)
+        if (!handled && props.staticPinPosition && doubleTapFirstTap.value) {
+          let tapX = props.staticPinPosition.x - doubleTapFirstTap.value.x;
+          let tapY = props.staticPinPosition.y - doubleTapFirstTap.value.y;
+
+          // Counter-rotate screen-space delta into content-space when content is rotated
+          if (propContentRotation) {
+            const angle = propContentRotation.value;
+            const cos = Math.cos(angle);
+            const sin = Math.sin(angle);
+            const rx = tapX * cos + tapY * sin;
+            const ry = -tapX * sin + tapY * cos;
+            tapX = rx;
+            tapY = ry;
+          }
 
           const toX = offsetX.value + tapX / zoom.value;
           const toY = offsetY.value + tapY / zoom.value;
@@ -690,8 +782,6 @@ const ReactNativeZoomableViewInner: ForwardRefRenderFunction<
           offsetX.value = withTiming(toX, { duration: 200 }, done);
           offsetY.value = withTiming(toY, { duration: 200 }, done);
         }
-
-        props.onSingleTap?.(e, _getZoomableViewEventObject());
       }, props.doubleTapDelay);
     }
   };
@@ -721,6 +811,72 @@ const ReactNativeZoomableViewInner: ForwardRefRenderFunction<
     }
   );
 
+  // Worklet sibling of `publicMoveStaticPinTo`. Reads SharedValue mirrors of
+  // `staticPinPosition`, `contentWidth`, `contentHeight` (all declared as
+  // `useDerivedValue(() => prop)` at top of component) so the math runs
+  // entirely on UI thread — no JS hop. Used by `useAnimatedReaction`-driven
+  // centering reactions in consumers (sheetHome's FollowMode reaction).
+  //
+  // The `withTiming` completion callback on `offsetY` (the second of the
+  // two parallel animations) invokes `_invokeOnTransform()` so consumer
+  // mirrors of `offsetX/Y` settle on the post-animation value — same
+  // rationale as `zoomToWorklet` below: the polling reaction does not
+  // reliably fire on the final frame of a worklet-initiated `withTiming`.
+  const moveStaticPinToWorklet = (position: Vec2D, duration?: number) => {
+    'worklet';
+    if (!staticPinPosition.value) return;
+    if (!originalWidth.value || !originalHeight.value) return;
+    if (!contentWidth.value || !contentHeight.value) return;
+
+    const pinX = staticPinPosition.value.x - originalWidth.value / 2;
+    const pinY = staticPinPosition.value.y - originalHeight.value / 2;
+    const newOffsetX = contentWidth.value / 2 - position.x + pinX / zoom.value;
+    const newOffsetY = contentHeight.value / 2 - position.y + pinY / zoom.value;
+
+    if (duration) {
+      offsetX.value = withTiming(newOffsetX, { duration });
+      offsetY.value = withTiming(newOffsetY, { duration }, (finished) => {
+        'worklet';
+        if (!finished) return;
+        _invokeOnTransform();
+      });
+    } else {
+      offsetX.value = newOffsetX;
+      offsetY.value = newOffsetY;
+      _invokeOnTransform();
+    }
+  };
+
+  // Worklet sibling of `publicZoomTo`. Pure worklet path: animates `zoom`
+  // shared value via `withTiming` matching the JS variant's `zoomToAnimation`.
+  // When a `center` is provided, snaps the static pin to that bitmap position
+  // first (no animation) so the zoom origin is correct, then animates zoom.
+  // No `runOnJS` callback for `onZoomEnd` — consumers needing zoom-end
+  // notification should use the JS `publicZoomTo` instead.
+  //
+  // The `withTiming` completion callback explicitly invokes
+  // `_invokeOnTransform()` so consumer-side mirrors of zoom (e.g.
+  // `zoomSharedValue` in `SheetZoomContext`) reflect the post-animation
+  // value. Without this push, the polling `useAnimatedReaction` that
+  // normally bridges `zoom` → `onTransform` does not reliably fire on the
+  // final frame of a worklet-initiated `withTiming` (the animation settles
+  // exactly on the target value, so the frame-to-frame delta the polling
+  // reaction watches collapses to zero on the last tick — consumers
+  // observe a stale pre-animation value). Calling `_invokeOnTransform`
+  // synchronously inside the completion callback guarantees consumers see
+  // the final zoom AND offsets, mirroring the public JS variant which
+  // always lands consumers on the post-animation state via its own
+  // `runOnJS(onZoomEnd)`-style hook chain.
+  const zoomToWorklet = (zoomLevel: number, center?: Vec2D) => {
+    'worklet';
+    if (center) moveStaticPinToWorklet(center, 0);
+    zoom.value = withTiming(zoomLevel, zoomToAnimation, (finished) => {
+      'worklet';
+      if (!finished) return;
+      _invokeOnTransform();
+    });
+  };
+
   /**
    * Zooms in or out by a specified change level
    * Use a positive number for `zoomLevelChange` to zoom in
@@ -748,13 +904,25 @@ const ReactNativeZoomableViewInner: ForwardRefRenderFunction<
    * @return {bool}
    */
   const publicMoveTo = useLatestCallback(
-    (newOffsetX: number, newOffsetY: number) => {
+    (newOffsetX: number, newOffsetY: number, zoomOverride?: number) => {
       if (!originalWidth.value || !originalHeight.value) return;
 
-      const offsetX = (newOffsetX - originalWidth.value / 2) / zoom.value;
-      const offsetY = (newOffsetY - originalHeight.value / 2) / zoom.value;
+      const z = zoomOverride ?? zoom.value;
+      const oX = (newOffsetX - originalWidth.value / 2) / z;
+      const oY = (newOffsetY - originalHeight.value / 2) / z;
 
-      _setNewOffsetPosition(-offsetX, -offsetY);
+      // Cancel ongoing animations before setting an exact viewport position.
+      cancelAnimation(offsetX);
+      cancelAnimation(offsetY);
+      cancelAnimation(zoom);
+      zoomToDestination.value = undefined;
+
+      if (zoomOverride) {
+        zoom.value = zoomOverride;
+      }
+
+      offsetX.value = -oX;
+      offsetY.value = -oY;
     }
   );
 
@@ -781,10 +949,12 @@ const ReactNativeZoomableViewInner: ForwardRefRenderFunction<
 
   useImperativeHandle(ref, () => ({
     zoomTo: publicZoomTo,
+    zoomToWorklet,
     zoomBy: publicZoomBy,
     moveTo: publicMoveTo,
     moveBy: publicMoveBy,
     moveStaticPinTo: publicMoveStaticPinTo,
+    moveStaticPinToWorklet,
     get gestureStarted() {
       return gestureStarted.value;
     },
@@ -816,6 +986,42 @@ const ReactNativeZoomableViewInner: ForwardRefRenderFunction<
     if (gestureType.value === 'pinch') {
       runOnJS(onZoomEnd)(e, _getZoomableViewEventObject());
     } else if (gestureType.value === 'shift') {
+      // Apply momentum decay if velocity is significant
+      const vx = velocityX.value;
+      const vy = velocityY.value;
+      const speed = Math.sqrt(vx * vx + vy * vy);
+      if (speed > 50) {
+        let decayFinishedCount = 0;
+        const checkMomentumEnd = () => {
+          'worklet';
+          decayFinishedCount++;
+          if (decayFinishedCount >= 2) runOnJS(onMomentumEnd)();
+        };
+        offsetX.value = withDecay(
+          {
+            velocity: vx,
+            deceleration: 0.997,
+          },
+          (finished) => {
+            'worklet';
+            if (finished) checkMomentumEnd();
+          }
+        );
+        offsetY.value = withDecay(
+          {
+            velocity: vy,
+            deceleration: 0.997,
+          },
+          (finished) => {
+            'worklet';
+            if (finished) checkMomentumEnd();
+          }
+        );
+      } else {
+        runOnJS(onMomentumEnd)();
+      }
+      velocityX.value = 0;
+      velocityY.value = 0;
       runOnJS(onShiftingEnd)(e, _getZoomableViewEventObject());
     }
 
@@ -865,10 +1071,18 @@ const ReactNativeZoomableViewInner: ForwardRefRenderFunction<
       if (gestureType.value !== 'pinch') {
         lastGestureCenterPosition.value = calcGestureCenterPoint(e);
         lastGestureTouchDistance.value = calcGestureTouchDistance(e);
+        lastGestureTouchAngle.value = calcGestureTouchAngle(e);
       }
       gestureType.value = 'pinch';
       _handlePinching(e);
     } else if (e.numberOfTouches === 1) {
+      // Don't downgrade from pinch to shift when lifting one finger
+      if (gestureType.value === 'pinch') {
+        // Reset rotation state so next 2-finger contact starts fresh
+        lastGestureTouchAngle.value = null;
+        return;
+      }
+
       const { dx, dy } = gestureState;
 
       if (longPressTimeout.value && (Math.abs(dx) > 5 || Math.abs(dy) > 5)) {
@@ -893,15 +1107,19 @@ const ReactNativeZoomableViewInner: ForwardRefRenderFunction<
     .onTouchesDown((e, stateManager) => {
       // only begin if this is the first touch
       if (!firstTouch.value) {
+        const touch = e.allTouches[0];
+        if (!touch) return;
         stateManager.activate();
         stateManager.begin();
-        firstTouch.value = { x: e.allTouches[0].x, y: e.allTouches[0].y };
+        firstTouch.value = { x: touch.x, y: touch.y };
         _handlePanResponderGrant(e);
       }
     })
     .onTouchesMove((e) => {
-      const dx = e.allTouches[0].x - (firstTouch.value?.x || 0);
-      const dy = e.allTouches[0].y - (firstTouch.value?.y || 0);
+      const touch = e.allTouches[0];
+      if (!touch) return;
+      const dx = touch.x - (firstTouch.value?.x || 0);
+      const dy = touch.y - (firstTouch.value?.y || 0);
       _handlePanResponderMove(e, { dx, dy });
     })
     .onTouchesUp((e, stateManager) => {
@@ -921,6 +1139,22 @@ const ReactNativeZoomableViewInner: ForwardRefRenderFunction<
     });
 
   const transformStyle = useAnimatedStyle(() => {
+    if (propContentRotation) {
+      return {
+        transform: [
+          // Content rotation applies before scale/translate so the content
+          // rotates around center while the viewport stays axis-aligned.
+          { rotate: `${propContentRotation.value}rad` },
+          // In RN79, we need to split the scale into X and Y to avoid
+          // the content getting pixelated when zooming in
+          { scaleX: zoom.value },
+          { scaleY: zoom.value },
+          { translateX: offsetX.value },
+          { translateY: offsetY.value },
+        ],
+      };
+    }
+
     return {
       transform: [
         // In RN79, we need to split the scale into X and Y to avoid
@@ -949,22 +1183,21 @@ const ReactNativeZoomableViewInner: ForwardRefRenderFunction<
             >
               {children}
             </Animated.View>
+            {overlayContent}
 
-            {visualTouchFeedbackEnabled &&
-              stateTouches.map(
-                (touch) =>
-                  doubleTapDelay && (
-                    <AnimatedTouchFeedback
-                      x={touch.x}
-                      y={touch.y}
-                      key={touch.id}
-                      animationDuration={doubleTapDelay}
-                      onAnimationDone={() => {
-                        _removeTouch(touch);
-                      }}
-                    />
-                  )
-              )}
+            {visualTouchFeedbackEnabled && doubleTapDelay
+              ? stateTouches.map((touch) => (
+                  <AnimatedTouchFeedback
+                    x={touch.x}
+                    y={touch.y}
+                    key={touch.id}
+                    animationDuration={doubleTapDelay}
+                    onAnimationDone={() => {
+                      _removeTouch(touch);
+                    }}
+                  />
+                ))
+              : null}
 
             {/* For Debugging Only */}
             {debugPoints.map(({ x, y }, index) => {

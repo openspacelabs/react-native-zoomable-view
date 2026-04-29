@@ -15,9 +15,12 @@ export const useDebugPoints = () => {
    */
   const setPinchDebugPoints = useLatestCallback(
     (e: GestureTouchEvent, zoomCenter: Vec2D, ...points: Vec2D[]) => {
+      const t0 = e.allTouches[0];
+      const t1 = e.allTouches[1];
+      if (!t0 || !t1) return;
       setDebugPoints([
-        { x: e.allTouches[0].x, y: e.allTouches[0].y },
-        { x: e.allTouches[1].x, y: e.allTouches[1].y },
+        { x: t0.x, y: t0.y },
+        { x: t1.x, y: t1.y },
         zoomCenter,
         ...points,
       ]);
