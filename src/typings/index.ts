@@ -16,8 +16,22 @@ export type ReactNativeZoomableViewRef = {
   moveTo(newOffsetX: number, newOffsetY: number, zoomOverride?: number): void;
   moveBy(offsetChangeX: number, offsetChangeY: number): void;
   zoomTo(newZoomLevel: number, zoomCenter?: Vec2D): boolean;
+  /**
+   * UI-thread worklet sibling of `zoomTo`. Must be called from a worklet
+   * context (e.g. inside `useAnimatedReaction`). No `runOnJS` callback for
+   * `onZoomEnd` — consumers needing zoom-end notification should use the
+   * JS `zoomTo` instead.
+   */
+  zoomToWorklet: Worklet<(newZoomLevel: number, zoomCenter?: Vec2D) => void>;
   zoomBy(zoomLevelChange: number): boolean;
   moveStaticPinTo: (position: Vec2D, duration?: number) => void;
+  /**
+   * UI-thread worklet sibling of `moveStaticPinTo`. Must be called from a
+   * worklet context. Reads `staticPinPosition` / `contentWidth` /
+   * `contentHeight` from the component's internal SharedValue mirrors of the
+   * matching props, so the entire pan computation runs on UI thread.
+   */
+  moveStaticPinToWorklet: Worklet<(position: Vec2D, duration?: number) => void>;
   readonly gestureStarted: boolean;
 };
 

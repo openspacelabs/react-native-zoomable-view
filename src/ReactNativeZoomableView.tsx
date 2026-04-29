@@ -807,6 +807,72 @@ const ReactNativeZoomableViewInner: ForwardRefRenderFunction<
     }
   );
 
+  // Worklet sibling of `publicMoveStaticPinTo`. Reads SharedValue mirrors of
+  // `staticPinPosition`, `contentWidth`, `contentHeight` (all declared as
+  // `useDerivedValue(() => prop)` at top of component) so the math runs
+  // entirely on UI thread — no JS hop. Used by `useAnimatedReaction`-driven
+  // centering reactions in consumers (sheetHome's FollowMode reaction).
+  //
+  // The `withTiming` completion callback on `offsetY` (the second of the
+  // two parallel animations) invokes `_invokeOnTransform()` so consumer
+  // mirrors of `offsetX/Y` settle on the post-animation value — same
+  // rationale as `zoomToWorklet` below: the polling reaction does not
+  // reliably fire on the final frame of a worklet-initiated `withTiming`.
+  const moveStaticPinToWorklet = (position: Vec2D, duration?: number) => {
+    'worklet';
+    if (!staticPinPosition.value) return;
+    if (!originalWidth.value || !originalHeight.value) return;
+    if (!contentWidth.value || !contentHeight.value) return;
+
+    const pinX = staticPinPosition.value.x - originalWidth.value / 2;
+    const pinY = staticPinPosition.value.y - originalHeight.value / 2;
+    const newOffsetX = contentWidth.value / 2 - position.x + pinX / zoom.value;
+    const newOffsetY = contentHeight.value / 2 - position.y + pinY / zoom.value;
+
+    if (duration) {
+      offsetX.value = withTiming(newOffsetX, { duration });
+      offsetY.value = withTiming(newOffsetY, { duration }, (finished) => {
+        'worklet';
+        if (!finished) return;
+        _invokeOnTransform();
+      });
+    } else {
+      offsetX.value = newOffsetX;
+      offsetY.value = newOffsetY;
+      _invokeOnTransform();
+    }
+  };
+
+  // Worklet sibling of `publicZoomTo`. Pure worklet path: animates `zoom`
+  // shared value via `withTiming` matching the JS variant's `zoomToAnimation`.
+  // When a `center` is provided, snaps the static pin to that bitmap position
+  // first (no animation) so the zoom origin is correct, then animates zoom.
+  // No `runOnJS` callback for `onZoomEnd` — consumers needing zoom-end
+  // notification should use the JS `publicZoomTo` instead.
+  //
+  // The `withTiming` completion callback explicitly invokes
+  // `_invokeOnTransform()` so consumer-side mirrors of zoom (e.g.
+  // `zoomSharedValue` in `SheetZoomContext`) reflect the post-animation
+  // value. Without this push, the polling `useAnimatedReaction` that
+  // normally bridges `zoom` → `onTransform` does not reliably fire on the
+  // final frame of a worklet-initiated `withTiming` (the animation settles
+  // exactly on the target value, so the frame-to-frame delta the polling
+  // reaction watches collapses to zero on the last tick — consumers
+  // observe a stale pre-animation value). Calling `_invokeOnTransform`
+  // synchronously inside the completion callback guarantees consumers see
+  // the final zoom AND offsets, mirroring the public JS variant which
+  // always lands consumers on the post-animation state via its own
+  // `runOnJS(onZoomEnd)`-style hook chain.
+  const zoomToWorklet = (zoomLevel: number, center?: Vec2D) => {
+    'worklet';
+    if (center) moveStaticPinToWorklet(center, 0);
+    zoom.value = withTiming(zoomLevel, zoomToAnimation, (finished) => {
+      'worklet';
+      if (!finished) return;
+      _invokeOnTransform();
+    });
+  };
+
   /**
    * Zooms in or out by a specified change level
    * Use a positive number for `zoomLevelChange` to zoom in
@@ -879,10 +945,12 @@ const ReactNativeZoomableViewInner: ForwardRefRenderFunction<
 
   useImperativeHandle(ref, () => ({
     zoomTo: publicZoomTo,
+    zoomToWorklet,
     zoomBy: publicZoomBy,
     moveTo: publicMoveTo,
     moveBy: publicMoveBy,
     moveStaticPinTo: publicMoveStaticPinTo,
+    moveStaticPinToWorklet,
     get gestureStarted() {
       return gestureStarted.value;
     },
