@@ -1,6 +1,32 @@
 # Shared Task Notes — PR #165 (pre-existing fixes v2)
 
-## Status (loop cycle 4, 2026-04-29)
+## Status (loop cycle 5, 2026-04-29)
+
+Fixed SPECS.md C1/C2 drift flagged by claude review on SPECS.md:322
+(thread `PRRT_kwDOGE0Kh85-ZNXv`). The reviewer raised two findings in
+one comment:
+
+- **Bug 2 (FIXED)**: scenario C2 in the 3+-finger Classification Rules
+  paragraph (SPECS.md line 172) described a path where a prior single
+  tap's `doubleTapFirstTapReleaseTimestamp` survives a classified-gesture
+  interruption and fires a spurious double-tap zoom. Cycle 2's
+  `_handlePanResponderMove` cleanup (lines 669–670 / 697–698) deletes the
+  timestamp on transition into `'pinch'`/`'shift'` *before* `gestureType`
+  is set, so C2 cannot occur. Collapsed C1/C2 into one sentence: the
+  second `_handlePanResponderEnd` always lands in the else branch
+  (spurious `onSingleTap`).
+- **Bug 1 (DISMISSED)**: Mounted Guards bullet at SPECS.md:317–321
+  doesn't list the `if (finished && isMounted.current)` site at
+  `src/ReactNativeZoomableView.tsx:987`. Per CLAUDE.md SPECS scope rule:
+  enumeration/completeness expansion is not a correctness gap. Dismissed
+  with the standard "out of spec scope, public behavior not
+  implementation internals" reply.
+
+Reply posted (`r3162344902`); thread resolved.
+
+`yarn typescript` ✓, `yarn lint` ✓.
+
+## Earlier (cycle 4, 2026-04-29)
 
 Fixed SPECS.md:286 spec drift flagged by claude review at 09:31Z.
 The bullet claimed `singleTapTimeoutId` is "not cleared on new gesture
@@ -98,3 +124,7 @@ git log --oneline origin/master..HEAD -- <file>
   `singleTapTimeoutId` Timeout Cleanup bullet to reflect that Grant
   clears the timer (suppression, not "fires mid-gesture"). Thread
   replied + resolved.
+- **Cycle 5 (2026-04-29)**: SPECS.md:172 — collapsed unreachable C2
+  scenario (cycle 2 cleanup makes prior-tap timestamp gone before
+  classified-gesture interruption); dismissed Bug 1 (4th mounted-guard
+  bullet) as enumeration/completeness per CLAUDE.md SPECS scope.
