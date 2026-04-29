@@ -123,7 +123,7 @@ const ReactNativeZoomableView: ForwardRefRenderFunction<
   const zoomAnimRef = useRef<Animated.Value | null>(null);
   if (zoomAnimRef.current === null) {
     zoomAnimRef.current =
-      props.zoomAnimatedValue ?? new Animated.Value(props.initialZoom ?? 1);
+      props.zoomAnimatedValue ?? new Animated.Value(props.initialZoom || 1);
   }
   const zoomAnim = zoomAnimRef as React.MutableRefObject<Animated.Value>;
 
