@@ -546,16 +546,19 @@ const ReactNativeZoomableView: ForwardRefRenderFunction<
     // ticks, which can lag the native value. Without the callback form, a new
     // gesture starting mid-animation would compute its first frame against a
     // stale JS mirror and produce a visible offset/zoom drift (SPECS.md
-    // "stopAnimation with Callback").
+    // "stopAnimation with Callback"). For zoom we route through
+    // `_cancelInFlightZoomToAnimation()` so any in-flight `zoomTo(zoomCenter)`
+    // also has its temporary pan-sync listener removed — without that, the
+    // listener keeps firing on every `zoomAnim.setValue()` in `_handlePinching`
+    // and overwrites the gesture-computed offset with one anchored at the
+    // cancelled zoomTo's center.
     panAnim.current.x.stopAnimation((x) => {
       offsetX.current = x;
     });
     panAnim.current.y.stopAnimation((y) => {
       offsetY.current = y;
     });
-    zoomAnim.current.stopAnimation((zoom) => {
-      zoomLevel.current = zoom;
-    });
+    _cancelInFlightZoomToAnimation();
     gestureStarted.current = true;
   });
 
@@ -920,7 +923,6 @@ const ReactNativeZoomableView: ForwardRefRenderFunction<
       offsetY.current = newOffsetY;
 
       panAnim.current.setValue({ x: offsetX.current, y: offsetY.current });
-      zoomAnim.current.setValue(zoomLevel.current);
 
       onShiftingAfter?.(null, null, _getZoomableViewEventObject());
     }

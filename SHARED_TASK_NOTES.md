@@ -1,48 +1,52 @@
-# Shared Task Notes — PR #150 (functional component conversion)
+# Shared Task Notes — PR #165 (pre-existing fixes v2)
 
-## Status (loop cycle 1, 2026-04-29)
+## Status (loop cycle 1, 2026-04-28)
 
-- Local HEAD `af7b2e6` is 1 commit ahead of `origin/thomas/functional` —
-  wrapper still owes the push.
-- All claude[bot] actionable findings through commit `efbbde22` are addressed.
-  Latest one (`initialZoom={0}` lazy seed at line 126/128) → fixed by `??` → `||`.
-  Thread `PRRT_kwDOGE0Kh85-TZnu` is resolved.
-- No new claude[bot] review on `af7b2e6` yet — wrapper still has to push it,
-  then trigger `@claude review`.
-- PR is `APPROVED` (elliottkember LGTM, reviewDecision APPROVED).
-- CI green on prior commits; this round `yarn typescript && yarn lint` both pass.
+This iteration applied two code fixes for the two unresolved Claude review
+threads on PR #165. Wrapper will commit + push.
 
-## This iteration's action
+### Fixes applied
 
-**No code changes.** No actionable findings on current HEAD. Validation passed.
+1. **Thread `PRRT_kwDOGE0Kh858DY3M`** (outdated, pinch-during-zoomTo race) —
+   `_handlePanResponderGrant` now calls `_cancelInFlightZoomToAnimation()`
+   instead of `zoomAnim.current.stopAnimation((zoom) => …)`. The helper both
+   stops the animation AND removes any active `zoomToListenerId`, so a pinch
+   that interrupts an in-flight `zoomTo(zoomCenter)` no longer keeps firing
+   the stale listener on every `zoomAnim.setValue()` inside `_handlePinching`
+   (which was overwriting the gesture-computed pan offset with one anchored
+   at the cancelled zoomTo's center).
+2. **Thread `PRRT_kwDOGE0Kh85-Vwi9`** (active, SPECS-vs-code drift) —
+   removed `zoomAnim.current.setValue(zoomLevel.current);` from
+   `_setNewOffsetPosition`. SPECS already claims this method updates only
+   `panAnim`. The redundant zoom write made `onTransform` /
+   `onStaticPinPositionMove` fire twice per pan frame and twice per
+   `moveTo()`/`moveBy()` call. The previous implicit cancellation effect of
+   `zoomAnim.setValue` is now performed explicitly by the new
+   `_cancelInFlightZoomToAnimation` helper invoked from
+   `publicMoveTo`/`publicMoveBy`, so the deletion is safe.
 
-## Open unresolved threads (non-actionable, leave alone)
+Validation: `yarn typescript` clean, `yarn lint` clean. No test suite.
 
-Four `thomasttvo`-authored threads on `src/ReactNativeZoomableView.tsx` are the
-author's own conversion-explainer annotations for reviewers, not findings:
-- line 187 — "function now split into 3 layout effects"
-- line 192 — "deps arrays scoped to the watched changes"
-- (outdated) — "all functions wrapped in `useLatestCallback`"
-- line 366 — "redundant if-block, react checks individual state"
+## For next iteration (after wrapper pushes)
 
-These are author commentary; do NOT post agent replies, do NOT auto-resolve.
+1. Reply + resolve both threads with the new commit SHA. Templates:
+   - `PRRT_kwDOGE0Kh858DY3M` → `🤖 Agent: Fixed in <SHA> — _handlePanResponderGrant now routes through _cancelInFlightZoomToAnimation, stopping zoomAnim AND removing the stale zoomToListenerId so a pinch interrupting zoomTo(zoomCenter) no longer keeps overwriting the gesture pan offset.`
+   - `PRRT_kwDOGE0Kh85-Vwi9` → `🤖 Agent: Fixed in <SHA> — removed redundant zoomAnim.setValue from _setNewOffsetPosition. SPECS now matches code; the implicit zoomTo-cancellation side effect is now explicit via _cancelInFlightZoomToAnimation in publicMoveTo/publicMoveBy.`
+2. Resolve via `pr-iterate resolve openspacelabs/react-native-zoomable-view 165`
+   (both threads are AI-only — last author was `claude`, last reply will be
+   `thomasttvo`, so they're eligible).
+3. Re-run `pr-iterate status` to confirm CI + threads + claude review all
+   green on the new HEAD. Trigger `@claude review` if claude hasn't picked
+   up the new HEAD on its own.
 
-## For next iteration
+## Open question for human
 
-- Wrapper will push `af7b2e6` (and any subsequent commits) and trigger
-  `@claude review` on the new HEAD.
-- After push + new claude review fires, respond to any new actionable findings.
-- If a new claude review on `af7b2e6` produces zero red/yellow findings, this
-  PR is effectively done — surface that and stop iterating.
-- No `yarn ci` exists. Strongest validation: `yarn typescript && yarn lint`.
-  No test suite in the repo.
+None right now. Both fixes are mechanical and validated against SPECS.
 
-## Commands cheat sheet
+## Validation cheat sheet
 
-- Recent commits in PR scope: `git log --oneline origin/master..HEAD`
+- `yarn typescript && yarn lint` — strongest available validation. No
+  `yarn ci`, no jest tests in this repo.
+- Recent PR commits: `git log --oneline origin/master..HEAD`
 - Unresolved threads: `gh api graphql ...reviewThreads ... | select(.isResolved==false)`
-- Latest claude[bot] reviews: filter `/pulls/150/reviews` by
-  `.user.login=="claude[bot]"` (NOT `"claude"`).
-- Latest claude[bot] inline comments: same filter on `/pulls/150/comments`.
-- Reply to a review thread: `gh api .../pulls/{pr}/comments/{review_comment_id}/replies -f body="..."`
-- Resolve thread: `gh api graphql -f query='mutation { resolveReviewThread(... }'`
+- PR scope check (per PIPELINE 2.0.0): `git log --oneline origin/master..HEAD -- <file>`
