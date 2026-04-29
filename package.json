@@ -67,7 +67,6 @@
   "devDependencies": {
     "@commitlint/config-conventional": "^11.0.0",
     "@react-native/eslint-config": "^0.73.0",
-    "@release-it/conventional-changelog": "^2.0.0",
     "@types/lodash": "^4.17.7",
     "@types/react": "^16.9.19",
     "@types/react-native": "^0.65.4",
@@ -84,7 +83,7 @@
     "react": "17.0.2",
     "react-native": "0.79.7",
     "react-native-builder-bob": "^0.30.0",
-    "release-it": "^14.2.2",
+    "release-it": "^15.0.0",
     "typescript": "^4.9.5"
   },
   "peerDependencies": {
@@ -118,12 +117,8 @@
       "publish": false
     },
     "github": {
-      "release": true
-    },
-    "plugins": {
-      "@release-it/conventional-changelog": {
-        "preset": "angular"
-      }
+      "release": true,
+      "autoGenerate": true
     }
   },
   "eslintConfig": {

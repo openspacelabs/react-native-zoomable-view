@@ -101,6 +101,21 @@ Only maintainers with permission to create releases can publish. The repository 
 
 > **Note:** GitHub pre-releases (e.g. `v3.0.0-beta.1`) intentionally skip the npm publish step to prevent beta versions from being tagged as `latest`. The CI job will show as "Skipped" — this is expected. To publish a pre-release manually, build locally and run `npm publish --tag beta --access public`.
 
+### Changelog and Release Notes
+
+Release notes are automatically generated from merged pull requests using GitHub's release notes feature. Labels control which category a PR appears under in the release notes — they do not affect version numbering. The maintainer chooses the version (major/minor/patch) interactively when running `yarn release`.
+
+Please label your PRs with:
+
+- `breaking`: Breaking changes
+- `enhancement`: New features
+- `bug`: Bug fixes
+- `documentation`: Documentation updates
+
+PRs labeled with `ignore-for-release` or `dependencies` are excluded from release notes.
+
+Release notes categories are configured in `.github/release.yml`.
+
 ### Scripts
 
 The `package.json` file contains various scripts for common tasks:
