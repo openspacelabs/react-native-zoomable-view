@@ -147,7 +147,7 @@ const ReactNativeZoomableViewInner: ForwardRefRenderFunction<
     undefined
   );
   const onTransformInvocationInitialized = useSharedValue(false);
-  const singleTapTimeoutId = useRef<NodeJS.Timeout>();
+  const singleTapTimeoutId = useRef<NodeJS.Timeout | undefined>(undefined);
   const touches = useSharedValue<TouchPoint[]>([]);
   const doubleTapFirstTap = useSharedValue<TouchPoint | undefined>(undefined);
   const gestureType = useSharedValue<'shift' | 'pinch' | undefined>(undefined);
@@ -734,7 +734,7 @@ const ReactNativeZoomableViewInner: ForwardRefRenderFunction<
         });
       singleTapTimeoutId.current && clearTimeout(singleTapTimeoutId.current);
       delete doubleTapFirstTapReleaseTimestamp.value;
-      delete singleTapTimeoutId.current;
+      singleTapTimeoutId.current = undefined;
       delete doubleTapFirstTap.value;
       _handleDoubleTap(e);
     } else {
@@ -750,7 +750,7 @@ const ReactNativeZoomableViewInner: ForwardRefRenderFunction<
 
       singleTapTimeoutId.current = setTimeout(() => {
         delete doubleTapFirstTapReleaseTimestamp.value;
-        delete singleTapTimeoutId.current;
+        singleTapTimeoutId.current = undefined;
 
         // Call onSingleTap first; if it returns true, skip the pan-to-tap behavior
         const handled = props.onSingleTap?.(e, _getZoomableViewEventObject());
@@ -1185,21 +1185,22 @@ const ReactNativeZoomableViewInner: ForwardRefRenderFunction<
             </Animated.View>
             {overlayContent}
 
-            {visualTouchFeedbackEnabled &&
-              stateTouches.map(
-                (touch) =>
-                  doubleTapDelay && (
-                    <AnimatedTouchFeedback
-                      x={touch.x}
-                      y={touch.y}
-                      key={touch.id}
-                      animationDuration={doubleTapDelay}
-                      onAnimationDone={() => {
-                        _removeTouch(touch);
-                      }}
-                    />
-                  )
-              )}
+            {visualTouchFeedbackEnabled
+              ? stateTouches.map(
+                  (touch) =>
+                    doubleTapDelay && (
+                      <AnimatedTouchFeedback
+                        x={touch.x}
+                        y={touch.y}
+                        key={touch.id}
+                        animationDuration={doubleTapDelay}
+                        onAnimationDone={() => {
+                          _removeTouch(touch);
+                        }}
+                      />
+                    )
+                )
+              : null}
 
             {/* For Debugging Only */}
             {debugPoints.map(({ x, y }, index) => {
