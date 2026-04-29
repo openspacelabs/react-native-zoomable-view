@@ -1,6 +1,21 @@
 # Shared Task Notes — PR #165 (pre-existing fixes v2)
 
-## Status (loop cycle 5, 2026-04-29)
+## Status (loop cycle 6, 2026-04-29)
+
+Fixed stale-closure regression in `publicZoomTo`'s `.start()` completion
+callback (claude review thread `PRRT_kwDOGE0Kh85-gDig` against HEAD
+`afae34a`). The callback was reading `props.staticPinPosition` and
+`props.onZoomAfter` at schedule time; a parent re-render during the
+~500ms zoom animation would be ignored. Extracted the body into a
+`_onPublicZoomToAnimationComplete` `useLatestCallback` wrapper
+(src/ReactNativeZoomableView.tsx), mirroring the `_fireSingleTapTimerBody`
+pattern. `capturedListenerId` stays a local variable passed as an argument
+to preserve the rapid-zoomTo race protection at lines 1280–1287.
+
+Reply posted (`r3162627830`); thread resolved. `yarn typescript` ✓,
+`yarn lint` ✓ (jest not installed locally — CI handles tests).
+
+## Earlier (cycle 5, 2026-04-29)
 
 Fixed SPECS.md C1/C2 drift flagged by claude review on SPECS.md:322
 (thread `PRRT_kwDOGE0Kh85-ZNXv`). The reviewer raised two findings in

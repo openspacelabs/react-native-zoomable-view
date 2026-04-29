@@ -1184,6 +1184,40 @@ const ReactNativeZoomableView: ForwardRefRenderFunction<
     return nextZoomStep;
   });
 
+  // Read props.staticPinPosition / props.onZoomAfter at fire time, not at
+  // schedule time. The .start() completion callback below runs ~animation
+  // duration after publicZoomTo is invoked; without this wrapper the inner
+  // lambda would close over the props snapshot at schedule time and miss
+  // any parent re-render during the animation. Mirrors the pattern in
+  // _fireSingleTapTimerBody and StaticPin's onPress/onLongPress refs.
+  const _onPublicZoomToAnimationComplete = useLatestCallback(
+    ({
+      finished,
+      capturedListenerId,
+    }: {
+      finished: boolean;
+      capturedListenerId?: string;
+    }) => {
+      if (!isMounted.current) return;
+      if (capturedListenerId) {
+        zoomAnim.current.removeListener(capturedListenerId);
+        if (zoomToListenerId.current === capturedListenerId) {
+          zoomToListenerId.current = undefined;
+        }
+      }
+      if (finished) {
+        // Flush any pending debounced static-pin position change so
+        // consumers observing pin position in onZoomAfter see the final
+        // post-animation value, matching the pattern in
+        // _handlePanResponderEnd.
+        if (props.staticPinPosition) {
+          debouncedOnStaticPinPositionChange.flush();
+        }
+        props.onZoomAfter?.(null, null, _getZoomableViewEventObject());
+      }
+    }
+  );
+
   /**
    * Zooms to a specific level. A "zoom center" can be provided, which specifies
    * the point that will remain in the same position on the screen after the zoom.
@@ -1251,26 +1285,10 @@ const ReactNativeZoomableView: ForwardRefRenderFunction<
       // overwritten — so reading the ref at fire time would read listener2.
       // Mirrors the class component's local-capture + identity-equality
       // pattern.
-      const listenerId = zoomToListenerId.current;
+      const capturedListenerId = zoomToListenerId.current;
       getZoomToAnimation(zoomAnim.current, newZoomLevel).start(
         ({ finished }) => {
-          if (!isMounted.current) return;
-          if (listenerId) {
-            zoomAnim.current.removeListener(listenerId);
-            if (zoomToListenerId.current === listenerId) {
-              zoomToListenerId.current = undefined;
-            }
-          }
-          if (finished) {
-            // Flush any pending debounced static-pin position change so
-            // consumers observing pin position in onZoomAfter see the final
-            // post-animation value, matching the pattern in
-            // _handlePanResponderEnd.
-            if (props.staticPinPosition) {
-              debouncedOnStaticPinPositionChange.flush();
-            }
-            props.onZoomAfter?.(null, null, _getZoomableViewEventObject());
-          }
+          _onPublicZoomToAnimationComplete({ finished, capturedListenerId });
         }
       );
       // == Zoom Animation Ends ==
