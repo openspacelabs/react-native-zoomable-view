@@ -53,6 +53,10 @@ export const StaticPin = ({
   const pressDuration = longPressDuration ?? 500;
   const pressDurationRef = React.useRef(pressDuration);
   pressDurationRef.current = pressDuration;
+  const onPressRef = React.useRef(onPress);
+  onPressRef.current = onPress;
+  const onLongPressRef = React.useRef(onLongPress);
+  onLongPressRef.current = onLongPress;
   const transform = [
     { translateY: -pinSize.height },
     { translateX: -pinSize.width / 2 },
@@ -98,11 +102,11 @@ export const StaticPin = ({
           return;
         }
         const dt = Date.now() - tapTime.current;
-        if (onPress && dt < pressDurationRef.current) {
-          onPress(evt);
+        if (onPressRef.current && dt < pressDurationRef.current) {
+          onPressRef.current(evt);
         }
-        if (onLongPress && dt >= pressDurationRef.current) {
-          onLongPress(evt);
+        if (onLongPressRef.current && dt >= pressDurationRef.current) {
+          onLongPressRef.current(evt);
         }
       },
       onPanResponderTerminate: (evt, gestureState) => {
