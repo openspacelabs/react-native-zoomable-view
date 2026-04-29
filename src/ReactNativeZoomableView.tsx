@@ -581,9 +581,11 @@ const ReactNativeZoomableViewInner: ForwardRefRenderFunction<
     ) {
       return;
     }
+    const t0 = e.allTouches[0];
+    if (!t0) return;
     const shift = _calcOffsetShiftSinceLastGestureState({
-      x: e.allTouches[0].x,
-      y: e.allTouches[0].y,
+      x: t0.x,
+      y: t0.y,
     });
     if (!shift) return;
 
@@ -600,9 +602,7 @@ const ReactNativeZoomableViewInner: ForwardRefRenderFunction<
     const newOffsetY = offsetY.value + shift.y;
 
     if (debug) {
-      const x = e.allTouches[0].x;
-      const y = e.allTouches[0].y;
-      runOnJS(setDebugPoints)([{ x, y }]);
+      runOnJS(setDebugPoints)([{ x: t0.x, y: t0.y }]);
     }
 
     _setNewOffsetPosition(newOffsetX, newOffsetY);
@@ -690,9 +690,11 @@ const ReactNativeZoomableViewInner: ForwardRefRenderFunction<
     if (nextZoomStep == null) return;
 
     // define new zoom position coordinates
+    const tapTouch = e.allTouches[0];
+    if (!tapTouch) return;
     const zoomPositionCoordinates = {
-      x: e.allTouches[0].x,
-      y: e.allTouches[0].y,
+      x: tapTouch.x,
+      y: tapTouch.y,
     };
 
     // if doubleTapZoomToCenter enabled -> always zoom to center instead
@@ -737,10 +739,12 @@ const ReactNativeZoomableViewInner: ForwardRefRenderFunction<
       _handleDoubleTap(e);
     } else {
       doubleTapFirstTapReleaseTimestamp.value = now;
+      const firstTapTouch = e.allTouches[0];
+      if (!firstTapTouch) return;
       doubleTapFirstTap.value = {
         id: now.toString(),
-        x: e.allTouches[0].x,
-        y: e.allTouches[0].y,
+        x: firstTapTouch.x,
+        y: firstTapTouch.y,
       };
       _addTouch(doubleTapFirstTap.value);
 
@@ -1103,15 +1107,19 @@ const ReactNativeZoomableViewInner: ForwardRefRenderFunction<
     .onTouchesDown((e, stateManager) => {
       // only begin if this is the first touch
       if (!firstTouch.value) {
+        const touch = e.allTouches[0];
+        if (!touch) return;
         stateManager.activate();
         stateManager.begin();
-        firstTouch.value = { x: e.allTouches[0].x, y: e.allTouches[0].y };
+        firstTouch.value = { x: touch.x, y: touch.y };
         _handlePanResponderGrant(e);
       }
     })
     .onTouchesMove((e) => {
-      const dx = e.allTouches[0].x - (firstTouch.value?.x || 0);
-      const dy = e.allTouches[0].y - (firstTouch.value?.y || 0);
+      const touch = e.allTouches[0];
+      if (!touch) return;
+      const dx = touch.x - (firstTouch.value?.x || 0);
+      const dy = touch.y - (firstTouch.value?.y || 0);
       _handlePanResponderMove(e, { dx, dy });
     })
     .onTouchesUp((e, stateManager) => {
