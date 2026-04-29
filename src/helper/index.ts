@@ -4,6 +4,11 @@ import { Vec2D } from '../typings';
 
 export { calcNewScaledOffsetForZoomCentering } from './calcNewScaledOffsetForZoomCentering';
 
+// Minimum distance between two touch points to be considered a valid pinch gesture
+// Uses Apple's Human Interface Guidelines recommended minimum touch target size
+// https://developer.apple.com/design/human-interface-guidelines/accessibility#Mobility
+const MIN_PINCH_DISTANCE = 44;
+
 /**
  * Calculates the gesture center point relative to the page coordinate system
  *
@@ -49,5 +54,6 @@ export function calcGestureTouchDistance(
 
   const dx = Math.abs(touches[0].pageX - touches[1].pageX);
   const dy = Math.abs(touches[0].pageY - touches[1].pageY);
-  return Math.sqrt(dx * dx + dy * dy);
+
+  return Math.max(MIN_PINCH_DISTANCE, Math.sqrt(dx * dx + dy * dy));
 }
