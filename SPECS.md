@@ -283,7 +283,7 @@ Tap resolution runs when no gesture type was classified (no movement detected). 
 3. **No second tap (timeout fires):** Clears saved state. If `staticPinPosition` is set, starts a 200ms pan animation toward the tap position relative to the pin. Then fires `onSingleTap` callback (animation is already in progress when callback runs).
 
 ### Timeout Cleanup
-- `singleTapTimeoutId` is cleared on: double-tap detection and `componentWillUnmount` (not cleared on new gesture start — a tap followed by immediate pan within `doubleTapDelay` will fire `onSingleTap` mid-gesture)
+- `singleTapTimeoutId` is cleared on: double-tap detection, new gesture start (`_handlePanResponderGrant` clears it before starting any long-press timer, so a tap followed by an immediate pan/long-press within `doubleTapDelay` suppresses the pending `onSingleTap`), single-tap timeout fire, and `componentWillUnmount`
 - `doubleTapFirstTapReleaseTimestamp` is cleared on: double-tap detection, single-tap timeout fire, transition into a `pinch` or `shift` gesture (pan-responder move), and long-press timer fire. The `pinch`/`shift` and long-press paths prevent tap→drag→tap and tap→long-press→release sequences within `doubleTapDelay` from spuriously matching as a double-tap.
 
 ### Long-press-then-release fires `onSingleTap` too

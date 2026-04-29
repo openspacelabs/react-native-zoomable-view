@@ -1,11 +1,22 @@
 # Shared Task Notes — PR #165 (pre-existing fixes v2)
 
-## Status (loop cycle 2, 2026-04-29)
+## Status (loop cycle 4, 2026-04-29)
+
+Fixed SPECS.md:286 spec drift flagged by claude review at 09:31Z.
+The bullet claimed `singleTapTimeoutId` is "not cleared on new gesture
+start", but `_handlePanResponderGrant`
+(`src/ReactNativeZoomableView.tsx:528-531`) unconditionally clears it.
+Replaced the parenthetical with the correct enumeration (double-tap
+detection, new gesture start, single-tap timeout fire,
+`componentWillUnmount`); reply posted on the thread + thread resolved.
+
+`yarn typescript` ✓, `yarn lint` ✓.
+
+## Earlier (cycle 2, 2026-04-29)
 
 Restored two double-tap state cleanups that PR #150's functional-component
 conversion dropped (originally landed as class commits cf2d4d7 + cda405e,
-then reverted in 5bed041 and never restored). Addresses the one new
-unresolved review thread from the latest claude review.
+then reverted in 5bed041 and never restored).
 
 ### Changes this cycle
 
@@ -83,3 +94,7 @@ git log --oneline origin/master..HEAD -- <file>
   SUCCESS, Claude Code Review NEUTRAL = informational), 0 unresolved
   review threads. Latest Claude review (2026-04-29T08:51Z) explicitly
   confirms cycle 2 cleanup fix was correct.
+- **Cycle 4 (2026-04-29)**: fixed SPECS.md:286 spec drift — corrected
+  `singleTapTimeoutId` Timeout Cleanup bullet to reflect that Grant
+  clears the timer (suppression, not "fires mid-gesture"). Thread
+  replied + resolved.
