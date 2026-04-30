@@ -1,7 +1,20 @@
-import { ReactNativeZoomableView } from '@openspacelabs/react-native-zoomable-view';
+import {
+  FixedSize,
+  ReactNativeZoomableView,
+  ReactNativeZoomableViewRef,
+} from '@openspacelabs/react-native-zoomable-view';
 import { debounce } from 'lodash';
-import React, { useCallback, useRef, useState } from 'react';
-import { Animated, Button, Image, Text, View } from 'react-native';
+import React, { ReactNode, useCallback, useRef, useState } from 'react';
+import {
+  Alert,
+  Button,
+  Image,
+  Modal,
+  Text,
+  View,
+  ViewProps,
+} from 'react-native';
+import { scheduleOnRN } from 'react-native-worklets';
 
 import { applyContainResizeMode } from '../src/helper/coordinateConversion';
 import { styles } from './style';
@@ -13,10 +26,24 @@ const imageSize = { width: kittenSize, height: kittenSize };
 const stringifyPoint = (point?: { x: number; y: number }) =>
   point ? `${Math.round(point.x)}, ${Math.round(point.y)}` : 'Off map';
 
+const PageSheetModal = ({
+  children,
+  style,
+}: {
+  children: ReactNode;
+  style?: ViewProps['style'];
+}) => {
+  return (
+    <Modal animationType="slide" presentationStyle="pageSheet">
+      <View style={style}>{children}</View>
+    </Modal>
+  );
+};
+
 export default function App() {
-  const zoomAnimatedValue = useRef(new Animated.Value(1)).current;
-  const scale = Animated.divide(1, zoomAnimatedValue);
+  const ref = useRef<ReactNativeZoomableViewRef>(null);
   const [showMarkers, setShowMarkers] = useState(true);
+  const [modal, setModal] = useState(false);
   const [size, setSize] = useState<{ width: number; height: number }>({
     width: 0,
     height: 0,
@@ -36,8 +63,10 @@ export default function App() {
   const staticPinPosition = { x: size.width / 2, y: size.height / 2 };
   const { size: contentSize } = applyContainResizeMode(imageSize, size);
 
+  const Wrapper = modal ? PageSheetModal : View;
+
   return (
-    <View style={styles.container}>
+    <Wrapper style={styles.container}>
       <Text>ReactNativeZoomableView</Text>
       <View
         style={styles.box}
@@ -46,35 +75,36 @@ export default function App() {
         }}
       >
         <ReactNativeZoomableView
+          ref={ref}
+          debug
+          onLongPress={() => {
+            Alert.alert('Long press detected');
+          }}
           // Where to put the pin in the content view
           staticPinPosition={staticPinPosition}
           // Callback that returns the position of the pin
           // on the actual source image
           onStaticPinPositionChange={debouncedUpdatePin}
-          onStaticPinPositionMove={debouncedUpdateMovePin}
+          onStaticPinPositionMove={(position) => {
+            'worklet';
+            scheduleOnRN(debouncedUpdateMovePin, position);
+          }}
           maxZoom={30}
           // Give these to the zoomable view so it can apply the boundaries around the actual content.
           // Need to make sure the content is actually centered and the width and height are
           // measured when it's rendered naturally. Not the intrinsic sizes.
           contentWidth={contentSize?.width ?? 0}
           contentHeight={contentSize?.height ?? 0}
-          zoomAnimatedValue={zoomAnimatedValue}
         >
           <View style={styles.contents}>
             <Image style={styles.img} source={{ uri }} />
 
             {showMarkers &&
-              (['20%', '40%', '60%', '80%'] as const).map((left) =>
-                (['20%', '40%', '60%', '80%'] as const).map((top) => (
-                  <Animated.View
-                    key={`${left}x${top}`}
-                    // These markers will move and zoom with the image, but will retain their size
-                    // because of the scale transformation.
-                    style={[
-                      styles.marker,
-                      { left, top, transform: [{ scale }] },
-                    ]}
-                  />
+              [20, 40, 60, 80].map((left) =>
+                [20, 40, 60, 80].map((top) => (
+                  <FixedSize left={left} top={top} key={`${left}x${top}`}>
+                    <View style={styles.marker} />
+                  </FixedSize>
                 ))
               )}
           </View>
@@ -88,6 +118,15 @@ export default function App() {
           setShowMarkers((value) => !value);
         }}
       />
-    </View>
+
+      <Button
+        // Toggle modal to test if zoomable view works correctly in modal,
+        // where pull-down-to-close gesture can interfere with pan gestures.
+        title={`Toggle Modal Mode`}
+        onPress={() => {
+          setModal((value) => !value);
+        }}
+      />
+    </Wrapper>
   );
 }
