@@ -11,6 +11,7 @@ export const DebugTouchPoint = ({
   return (
     <View
       style={[
+        // eslint-disable-next-line @typescript-eslint/no-use-before-define
         styles.debugPoint,
         {
           width: diameter,
@@ -40,6 +41,7 @@ export const DebugRect = ({
   return (
     <View
       style={[
+        // eslint-disable-next-line @typescript-eslint/no-use-before-define
         styles.debugRect,
         {
           width,
