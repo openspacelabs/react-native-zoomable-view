@@ -58,3 +58,6 @@ android/keystores/debug.keystore
 
 # Expo
 .expo/*
+
+# Local agent/tooling artifacts (see REVIEW.md §1)
+.merge-notes/
