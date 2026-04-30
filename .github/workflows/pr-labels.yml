@@ -1,0 +1,33 @@
+name: PR Labels
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, labeled, unlabeled]
+
+jobs:
+  check-labels:
+    runs-on: ubuntu-latest
+    if: github.actor != 'dependabot[bot]'
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Extract valid labels from release.yml
+        id: extract-labels
+        run: |
+          # Extract category labels and exclude labels so PRs labeled with
+          # ignore-for-release or dependencies also pass the check
+          category_labels=$(yq eval '.changelog.categories[].labels[]' .github/release.yml)
+          exclude_labels=$(yq eval '.changelog.exclude.labels[]' .github/release.yml 2>/dev/null)
+          labels=$(printf '%s\n%s' "$category_labels" "$exclude_labels")
+          labels=$(echo "$labels" | grep -v '^\*$')  # Remove wildcard entries (*)
+          labels=$(echo "$labels" | grep -v '^$')    # Remove empty lines
+          labels=$(echo "$labels" | tr '\n' ',')     # Convert newlines to commas
+          labels=$(echo "$labels" | sed 's/,$//')    # Remove trailing comma
+          echo "labels=$labels" >> $GITHUB_OUTPUT
+          echo "Extracted labels: $labels"
+
+      - uses: mheap/github-action-required-labels@v5
+        with:
+          mode: minimum
+          count: 1
+          labels: ${{ steps.extract-labels.outputs.labels }}
