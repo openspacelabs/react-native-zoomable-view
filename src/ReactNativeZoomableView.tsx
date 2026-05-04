@@ -1,10 +1,10 @@
-import { debounce, defaults } from 'lodash';
+import { defaults } from 'lodash';
 import React, {
   forwardRef,
   ForwardRefRenderFunction,
+  useEffect,
   useImperativeHandle,
   useLayoutEffect,
-  useMemo,
   useRef,
   useState,
 } from 'react';
@@ -17,8 +17,8 @@ import {
 } from 'react-native-gesture-handler';
 import Animated, {
   cancelAnimation,
-  makeMutable,
   runOnJS,
+  runOnUI,
   useAnimatedReaction,
   useAnimatedStyle,
   useDerivedValue,
@@ -125,6 +125,12 @@ const ReactNativeZoomableViewInner: ForwardRefRenderFunction<
   const offsetX = useSharedValue(0);
   const offsetY = useSharedValue(0);
   const zoom = useSharedValue(1);
+  // Programmatic-zoom support state. Declared here (rather than next to
+  // `publicZoomTo`) because the unified transform reaction below references
+  // them; React hooks are evaluated top-to-bottom and the closure captured by
+  // the worklet must see initialised values.
+  const prevZoom = useSharedValue<number>(1);
+  const zoomToDestination = useSharedValue<Vec2D | undefined>(undefined);
   const inverseZoom = useDerivedValue(() => 1 / zoom.value);
   const inverseZoomStyle = useAnimatedStyle(() => ({
     transform: [{ scale: inverseZoom.value }],
@@ -225,12 +231,6 @@ const ReactNativeZoomableViewInner: ForwardRefRenderFunction<
     });
   };
 
-  const _updateStaticPin = useLatestCallback(() => {
-    const position = _staticPinPosition();
-    if (!position) return;
-    props.onStaticPinPositionChange?.(position);
-  });
-
   const _addTouch = useLatestCallback((touch: TouchPoint) => {
     touches.value.push(touch);
     setStateTouches([...touches.value]);
@@ -243,11 +243,6 @@ const ReactNativeZoomableViewInner: ForwardRefRenderFunction<
 
   const onStaticPinPositionChange = useLatestCallback(
     props.onStaticPinPositionChange || (() => undefined)
-  );
-
-  const debouncedOnStaticPinPositionChange = useMemo(
-    () => debounce(onStaticPinPositionChange, 100),
-    []
   );
 
   /**
@@ -267,11 +262,53 @@ const ReactNativeZoomableViewInner: ForwardRefRenderFunction<
 
     if (position) {
       onStaticPinPositionMoveWorklet?.(position);
-      runOnJS(debouncedOnStaticPinPositionChange)(position);
     }
 
     return { successful: true };
   };
+
+  // Settle-detection state for `onStaticPinPositionChange` (JS-thread callback,
+  // fired ~100ms after motion stops). Drives one bridge hop per logical settle
+  // event regardless of how many frames moved during the gesture or animation.
+  const lastFiredPosition = useSharedValue<Vec2D | null>(null);
+  // `NodeJS.Timeout` matches the global `setTimeout` return type that
+  // TypeScript sees in this codebase; at runtime on the worklet runtime
+  // the value is the numeric handle from the worklet `setTimeout` polyfill.
+  const settleTimer = useSharedValue<NodeJS.Timeout | null>(null);
+  const SETTLE_QUIET_MS = 100;
+  const SAME_POSITION_EPSILON = 0.001;
+
+  const samePosition = (a: Vec2D, b: Vec2D) => {
+    'worklet';
+    return (
+      Math.abs(a.x - b.x) < SAME_POSITION_EPSILON &&
+      Math.abs(a.y - b.y) < SAME_POSITION_EPSILON
+    );
+  };
+
+  useAnimatedReaction(_staticPinPosition, (current) => {
+    'worklet';
+    if (!current) return;
+
+    // Cancel any in-flight settle — motion is still happening.
+    if (settleTimer.value !== null) {
+      clearTimeout(settleTimer.value);
+      settleTimer.value = null;
+    }
+
+    // Schedule the JS-thread fire SETTLE_QUIET_MS after motion stops.
+    // Value-based dedup at fire time prevents redundant hops when the
+    // settled position equals the last fired one (e.g. a zoomTo whose
+    // visual end-state matches the start, or a pan that returns home).
+    settleTimer.value = setTimeout(() => {
+      'worklet';
+      settleTimer.value = null;
+      const last = lastFiredPosition.value;
+      if (last && samePosition(current, last)) return;
+      lastFiredPosition.value = current;
+      runOnJS(onStaticPinPositionChange)(current);
+    }, SETTLE_QUIET_MS);
+  });
 
   useLayoutEffect(() => {
     if (props.initialZoom) zoom.value = props.initialZoom;
@@ -285,9 +322,78 @@ const ReactNativeZoomableViewInner: ForwardRefRenderFunction<
     }
   }, [propZoomEnabled]);
 
+  // Component-level cleanup. Cancels every animation and pending timer the
+  // component owns when it unmounts; without this, an in-flight `withTiming`
+  // can fire its callback (or the settle reaction can fire its 100ms timer)
+  // after the host has gone away — leaking refs and crashing on `setState`
+  // against an unmounted component.
+  useEffect(() => {
+    return () => {
+      // `singleTapTimeoutId` and `longPressTimeout` are scheduled via JS-thread
+      // `setTimeout` (the latter via `runOnJS(scheduleLongPressTimeout)` from a
+      // worklet), so their handles belong to the JS runtime — clear from JS.
+      if (singleTapTimeoutId.current) {
+        clearTimeout(singleTapTimeoutId.current);
+      }
+      if (longPressTimeout.value) {
+        clearTimeout(longPressTimeout.value);
+      }
+      // `settleTimer` is scheduled via `setTimeout` on the UI runtime
+      // (worklet polyfill backed by requestAnimationFrame); its handle is
+      // only valid in that runtime, so clear it from there. Animations are
+      // also cancelled on the UI runtime in the same hop to avoid two
+      // round-trips.
+      runOnUI(() => {
+        'worklet';
+        if (settleTimer.value !== null) {
+          clearTimeout(settleTimer.value);
+          settleTimer.value = null;
+        }
+        cancelAnimation(zoom);
+        cancelAnimation(offsetX);
+        cancelAnimation(offsetY);
+      })();
+    };
+    // Refs/SharedValues are stable across the component lifetime; empty deps
+    // run the cleanup on unmount only.
+  }, []);
+
+  // Unified transform reaction. Two responsibilities, fused into a single
+  // reaction so they observe a consistent atomic state on every tick:
+  //   1. While `zoomToDestination` is set (programmatic `zoomTo()` is in flight)
+  //      and zoom changed, recompute offsets to preserve the zoom centre.
+  //      This MUST run BEFORE step 2 so the event object passed to
+  //      `_invokeOnTransform` reflects the post-recompute offsets — otherwise
+  //      consumers see a chimera state where zoom advanced but offsets haven't.
+  //   2. Fire `_invokeOnTransform` (consumer onTransformWorklet etc.).
+  // Splitting into two reactions previously caused the chimera state because
+  // registration order determined which reaction observed the half-applied
+  // tick first.
   useAnimatedReaction(
     _getZoomableViewEventObject,
-    () => {
+    (curr, prev) => {
+      if (
+        zoomToDestination.value &&
+        prev &&
+        curr.zoomLevel !== prev.zoomLevel
+      ) {
+        offsetX.value = calcNewScaledOffsetForZoomCentering(
+          offsetX.value,
+          originalWidth.value,
+          prevZoom.value,
+          curr.zoomLevel,
+          zoomToDestination.value.x
+        );
+        offsetY.value = calcNewScaledOffsetForZoomCentering(
+          offsetY.value,
+          originalHeight.value,
+          prevZoom.value,
+          curr.zoomLevel,
+          zoomToDestination.value.y
+        );
+        prevZoom.value = curr.zoomLevel;
+      }
+
       if (
         !onTransformInvocationInitialized.value &&
         _invokeOnTransform().successful
@@ -535,9 +641,6 @@ const ReactNativeZoomableViewInner: ForwardRefRenderFunction<
     _setNewOffsetPosition(newOffsetX, newOffsetY);
   };
 
-  const prevZoom = useSharedValue<number>(1);
-  const zoomToDestination = useSharedValue<Vec2D | undefined>(undefined);
-
   /**
    * Zooms to a specific level. A "zoom center" can be provided, which specifies
    * the point that will remain in the same position on the screen after the zoom.
@@ -555,7 +658,8 @@ const ReactNativeZoomableViewInner: ForwardRefRenderFunction<
     if (minZoom.value != null && newZoomLevel < minZoom.value) return false;
 
     // == Trigger Pan Animation to preserve the zoom center while zooming ==
-    // See the "Zoom Animation Support" block more details
+    // The unified transform reaction (above) recomputes offsets every tick that
+    // `zoomToDestination` is set, so the centre stays put as zoom animates.
     zoomToDestination.value = zoomCenter;
     prevZoom.value = zoom.value;
 
@@ -570,30 +674,6 @@ const ReactNativeZoomableViewInner: ForwardRefRenderFunction<
 
     return true;
   };
-
-  // Zoom Animation Support:
-  // Adapt offsets when zoom level changes during zoomTo animation
-  useAnimatedReaction(
-    () => zoom.value,
-    (newZoom) => {
-      if (!zoomToDestination.value) return;
-      offsetX.value = calcNewScaledOffsetForZoomCentering(
-        offsetX.value,
-        originalWidth.value,
-        prevZoom.value,
-        newZoom,
-        zoomToDestination.value.x
-      );
-      offsetY.value = calcNewScaledOffsetForZoomCentering(
-        offsetY.value,
-        originalHeight.value,
-        prevZoom.value,
-        newZoom,
-        zoomToDestination.value.y
-      );
-      prevZoom.value = newZoom;
-    }
-  );
 
   /**
    * Handles the double tap event
@@ -683,14 +763,12 @@ const ReactNativeZoomableViewInner: ForwardRefRenderFunction<
           const toX = offsetX.value + tapX / zoom.value;
           const toY = offsetY.value + tapY / zoom.value;
 
-          const animationsDone = makeMutable(0);
-          const done = () => {
-            'worklet';
-            if (++animationsDone.value >= 2) runOnJS(_updateStaticPin)();
-          };
-
-          offsetX.value = withTiming(toX, { duration: 200 }, done);
-          offsetY.value = withTiming(toY, { duration: 200 }, done);
+          // No animation-end callback here — the unified `_staticPinPosition`
+          // reaction with UI-thread settle detection catches the final pin
+          // position ~100ms after `withTiming` stops emitting frames, and
+          // fires `onStaticPinPositionChange` once for the entire animation.
+          offsetX.value = withTiming(toX, { duration: 200 });
+          offsetY.value = withTiming(toY, { duration: 200 });
         }
 
         props.onSingleTap?.(e, _getZoomableViewEventObject());
@@ -798,9 +876,9 @@ const ReactNativeZoomableViewInner: ForwardRefRenderFunction<
       runOnJS(onShiftingEnd)(e, _getZoomableViewEventObject());
     }
 
-    if (staticPinPosition.value) {
-      runOnJS(_updateStaticPin)();
-    }
+    // `onStaticPinPositionChange` fires from the unified settle reaction
+    // SETTLE_QUIET_MS after the last position change — gesture end included.
+    // No explicit invocation needed here.
 
     gestureType.value = undefined;
     gestureStarted.value = false;
