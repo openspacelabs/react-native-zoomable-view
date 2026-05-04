@@ -207,6 +207,15 @@ const ReactNativeZoomableViewInner: ForwardRefRenderFunction<
   // producing a spurious `onSingleTap`/`onDoubleTap*` for what was a multi-finger
   // gesture. Reset on each non-recovery `_handlePanResponderGrant`.
   const forceEndPending = useSharedValue(false);
+  // Sentinel used to suppress tap classification when the consumer's
+  // `onPanResponderMoveWorklet` returned truthy at any point during this touch
+  // cycle. The early-return in `_handlePanResponderMove` happens BEFORE
+  // `gestureType.value` is assigned to `'shift'`/`'pinch'`, so a consumer who
+  // intercepts every move event leaves `gestureType` undefined for the cycle.
+  // The eventual release would otherwise fall through to `_resolveAndHandleTap`
+  // and fire a phantom `onSingleTap` after a deliberate intercepted drag.
+  // Reset on each non-recovery `_handlePanResponderGrant`.
+  const externallyHandled = useSharedValue(false);
   const onTransformInvocationInitialized = useSharedValue(false);
   const singleTapTimeoutId = useRef<NodeJS.Timeout>();
   const touches = useSharedValue<TouchPoint[]>([]);
@@ -646,6 +655,7 @@ const ReactNativeZoomableViewInner: ForwardRefRenderFunction<
       // release.
       longPressFired.value = false;
       forceEndPending.value = false;
+      externallyHandled.value = false;
       // Long-press is a single-finger gesture. Gate the timer here so a
       // simultaneous 2-finger `onTouchesDown` (one event with
       // `numberOfTouches === 2` and no prior `firstTouch`) does not arm
@@ -1109,24 +1119,41 @@ const ReactNativeZoomableViewInner: ForwardRefRenderFunction<
    *   classification (`_resolveAndHandleTap`) only runs when `wasReleased`
    *   is `true` — otherwise multi-finger force-end and RNGH cancellations
    *   would each produce a spurious `onSingleTap` event.
+   * @param isCancellation — `true` only on the RNGH cancellation path
+   *   (`onTouchesCancelled`). When set, queues `runOnJS(onPanResponderTerminate)`
+   *   from INSIDE this worklet so the terminate callback lands on the JS
+   *   thread BEFORE the terminal `setGestureStartedJS(false)` mirror reset.
+   *   Otherwise the cancellation site would queue `runOnJS(onPanResponderTerminate)`
+   *   AFTER this worklet returns, which is FIFO-after the mirror reset and
+   *   would leave a consumer reading `ref.current.gestureStarted` from inside
+   *   `onPanResponderTerminate` observing `false` — asymmetric with the
+   *   `onPanResponderEnd`/`onZoomEnd`/`onShiftingEnd` callbacks that all see
+   *   `true` per SPECS L157.
    *
    * @private
    */
   const _handlePanResponderEnd = (
     e: GestureTouchEvent,
-    wasReleased = false
+    wasReleased = false,
+    isCancellation = false
   ) => {
     'worklet';
 
     if (wasReleased && !gestureType.value) {
       // Skip tap classification entirely if a long-press already fired during
-      // this touch cycle, or if a 3+ finger force-end armed `forceEndPending`
-      // earlier in this cycle — otherwise the same release would produce a
-      // spurious single/double-tap event for what was a long-press or a
-      // multi-finger gesture.
-      if (longPressFired.value || forceEndPending.value) {
+      // this touch cycle, if a 3+ finger force-end armed `forceEndPending`
+      // earlier in this cycle, or if the consumer's `onPanResponderMoveWorklet`
+      // returned truthy at any move during this cycle — otherwise the same
+      // release would produce a spurious single/double-tap event for what was
+      // a long-press, a multi-finger gesture, or a consumer-handled drag.
+      if (
+        longPressFired.value ||
+        forceEndPending.value ||
+        externallyHandled.value
+      ) {
         longPressFired.value = false;
         forceEndPending.value = false;
+        externallyHandled.value = false;
       } else {
         runOnJS(_resolveAndHandleTap)(e);
       }
@@ -1146,6 +1173,15 @@ const ReactNativeZoomableViewInner: ForwardRefRenderFunction<
       runOnJS(onShiftingEnd)(e, _getZoomableViewEventObject());
     }
 
+    // RNGH cancellation: queue `onPanResponderTerminate` HERE — inside the
+    // worklet, after the other end-callbacks but before the terminal
+    // `setGestureStartedJS(false)` mirror reset. This way a consumer reading
+    // `ref.current.gestureStarted` from inside `onPanResponderTerminate`
+    // observes `true`, matching SPECS L157 for the other end-callbacks.
+    if (isCancellation) {
+      runOnJS(onPanResponderTerminate)(e, _getZoomableViewEventObject());
+    }
+
     // `onStaticPinPositionChange` fires from the unified settle reaction
     // SETTLE_QUIET_MS after the last position change — gesture end included.
     // No explicit invocation needed here.
@@ -1161,9 +1197,9 @@ const ReactNativeZoomableViewInner: ForwardRefRenderFunction<
     // Defer ONLY the JS-thread mirror reset so it enqueues *after* the
     // prior `runOnJS` end-callback dispatches drain. SPECS L157: a consumer
     // reading `ref.current.gestureStarted` from inside `onPanResponderEnd`
-    // / `onZoomEnd` / `onShiftingEnd` must see `true`. The mirror is the
-    // consumer-facing source of truth; the SharedValue above is internal
-    // state-machine only.
+    // / `onZoomEnd` / `onShiftingEnd` / `onPanResponderTerminate` must see
+    // `true`. The mirror is the consumer-facing source of truth; the
+    // SharedValue above is internal state-machine only.
     runOnJS(setGestureStartedJS)(false);
   };
 
@@ -1187,6 +1223,13 @@ const ReactNativeZoomableViewInner: ForwardRefRenderFunction<
         _getZoomableViewEventObject()
       )
     ) {
+      // Consumer intercepted this move. The early-return below skips the
+      // gesture-classification branches that would otherwise assign
+      // `gestureType.value = 'shift'` / `'pinch'`, so the eventual release
+      // would fall through to `_resolveAndHandleTap` and fire a phantom
+      // `onSingleTap`. Mark the cycle as externally-handled so
+      // `_handlePanResponderEnd`'s tap-classification gate suppresses it.
+      externallyHandled.value = true;
       return;
     }
 
@@ -1284,6 +1327,15 @@ const ReactNativeZoomableViewInner: ForwardRefRenderFunction<
         // a single-finger gesture — disarm it as soon as a second finger
         // arrives.
         runOnJS(clearLongPressTimeout)();
+        // Mirror the pinch-transition clear in `_handlePanResponderMove`:
+        // a 2nd finger landing means the user is starting a multi-finger
+        // gesture, NOT a double-tap, regardless of subsequent movement.
+        // Without this, a tap-then-2-finger-touch-and-release within
+        // `doubleTapDelay` (with no movement crossing the 2px shift
+        // threshold) misclassifies as a double-tap and triggers an
+        // unintended programmatic zoom.
+        doubleTapFirstTapReleaseTimestamp.value = undefined;
+        doubleTapFirstTap.value = undefined;
       }
     })
     .onTouchesMove((e) => {
@@ -1302,10 +1354,11 @@ const ReactNativeZoomableViewInner: ForwardRefRenderFunction<
     })
     .onTouchesCancelled((e, stateManager) => {
       // RNGH cancellation — gesture aborted, not released. Pass
-      // `wasReleased=false` (default) so this path does not produce a
-      // spurious `onSingleTap`.
-      _handlePanResponderEnd(e);
-      runOnJS(onPanResponderTerminate)(e, _getZoomableViewEventObject());
+      // `wasReleased=false` so this path does not produce a spurious
+      // `onSingleTap`, and `isCancellation=true` so the terminate callback
+      // is queued from inside `_handlePanResponderEnd` (before the terminal
+      // mirror reset) — see the JSDoc on `_handlePanResponderEnd` for why.
+      _handlePanResponderEnd(e, false, true);
       stateManager.end();
     })
     .onFinalize(() => {
