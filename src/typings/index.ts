@@ -30,18 +30,18 @@ export interface ReactNativeZoomableViewProps {
   initialOffsetY?: number;
   contentWidth?: number;
   contentHeight?: number;
-  /** `null` (or omitted) means unlimited; runtime check is `!= null`. */
-  maxZoom?: number | null;
-  /** `null` (or omitted) means unlimited; runtime check is `!= null`. */
-  minZoom?: number | null;
+  /** Maximum zoom level. Omit for unlimited. */
+  maxZoom?: number;
+  /** Minimum zoom level. Omit for unlimited. */
+  minZoom?: number;
   doubleTapDelay?: number;
   doubleTapZoomToCenter?: boolean;
-  /** `null` (or omitted) disables stepwise zoom; runtime check is `!= null`. */
-  zoomStep?: number | null;
-  /** `null` (or omitted) disables pinch-to-zoom-in sensitivity scaling; runtime check is `!= null`. */
-  pinchToZoomInSensitivity?: number | null;
-  /** `null` (or omitted) disables pinch-to-zoom-out sensitivity scaling; runtime check is `!= null`. */
-  pinchToZoomOutSensitivity?: number | null;
+  /** Zoom step multiplier for double-tap and `zoomBy`. Omit to disable stepwise zoom. */
+  zoomStep?: number;
+  /** Sensitivity multiplier for zoom-in pinch — defaults to 1. */
+  pinchToZoomInSensitivity?: number;
+  /** Sensitivity multiplier for zoom-out pinch — defaults to 1. */
+  pinchToZoomOutSensitivity?: number;
   movementSensitivity?: number;
   longPressDuration?: number;
   visualTouchFeedbackEnabled?: boolean;

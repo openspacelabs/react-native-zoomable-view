@@ -1,4 +1,3 @@
-import { defaults } from 'lodash';
 import React, {
   forwardRef,
   ForwardRefRenderFunction,
@@ -50,6 +49,18 @@ import {
   ZoomableViewEvent,
 } from './typings';
 
+// Native replacement for `lodash.defaults` — preserves the same semantics:
+// only `undefined` triggers the default; `null`/`0`/`false`/`""` are treated
+// as explicit consumer values and override the default. Avoids pulling lodash
+// into the library's runtime/peer dependency surface for a single helper.
+function applyDefaults<T extends object>(input: T, defaults: T): T {
+  const result = { ...defaults };
+  for (const key in input) {
+    if (input[key] !== undefined) result[key] = input[key];
+  }
+  return result;
+}
+
 const ReactNativeZoomableViewInner: ForwardRefRenderFunction<
   ReactNativeZoomableViewRef,
   ReactNativeZoomableViewProps
@@ -89,7 +100,7 @@ const ReactNativeZoomableViewInner: ForwardRefRenderFunction<
       );
     }
     if (props.movementSensitivity === undefined) {
-      // Coerce a legacy `null` to `undefined` so the `defaults()` call below
+      // Coerce a legacy `null` to `undefined` so the `applyDefaults` call below
       // applies `1`, matching what `movementSensitivity: null` would have
       // produced (the runtime guard is `if (lastGestureCenterPosition.value
       // && movementSensitivity.value)` which treats falsy as no-op).
@@ -100,7 +111,7 @@ const ReactNativeZoomableViewInner: ForwardRefRenderFunction<
     }
   }
 
-  props = defaults({}, props, {
+  props = applyDefaults(props, {
     zoomEnabled: true,
     panEnabled: true,
     initialZoom: 1,
