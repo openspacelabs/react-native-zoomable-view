@@ -72,6 +72,34 @@ const ReactNativeZoomableViewInner: ForwardRefRenderFunction<
     undefined
   );
 
+  // `movementSensibility` is the legacy (typo) name of `movementSensitivity`.
+  // Accept the old prop name so existing consumers keep working through one
+  // major version, then warn in dev so they migrate. Removal is tracked as a
+  // breaking change for the next major.
+  const legacyMovementSensibility = (
+    props as { movementSensibility?: number | null }
+  ).movementSensibility;
+  if (legacyMovementSensibility !== undefined) {
+    if (__DEV__) {
+      // Once-per-render-cycle in dev only; not throttled across renders, but
+      // the cost is negligible and the goal is consumer migration, not perf.
+      // eslint-disable-next-line no-console
+      console.warn(
+        '`movementSensibility` is deprecated and will be removed in the next major. Rename to `movementSensitivity`.'
+      );
+    }
+    if (props.movementSensitivity === undefined) {
+      // Coerce a legacy `null` to `undefined` so the `defaults()` call below
+      // applies `1`, matching what `movementSensitivity: null` would have
+      // produced (the runtime guard is `if (lastGestureCenterPosition.value
+      // && movementSensitivity.value)` which treats falsy as no-op).
+      props = {
+        ...props,
+        movementSensitivity: legacyMovementSensibility ?? undefined,
+      };
+    }
+  }
+
   props = defaults({}, props, {
     zoomEnabled: true,
     panEnabled: true,
@@ -146,6 +174,11 @@ const ReactNativeZoomableViewInner: ForwardRefRenderFunction<
   const longPressTimeout = useSharedValue<NodeJS.Timeout | undefined>(
     undefined
   );
+  // Sentinel used to suppress single/double-tap classification when a long-press
+  // already fired during this touch cycle. Without it, releasing after a
+  // long-press would also `_resolveAndHandleTap`, producing both `onLongPress`
+  // and `onSingleTap` for one gesture. Reset on each `_handlePanResponderGrant`.
+  const longPressFired = useSharedValue(false);
   const onTransformInvocationInitialized = useSharedValue(false);
   const singleTapTimeoutId = useRef<NodeJS.Timeout>();
   const touches = useSharedValue<TouchPoint[]>([]);
@@ -444,6 +477,14 @@ const ReactNativeZoomableViewInner: ForwardRefRenderFunction<
       longPressTimeout.value = setTimeout(() => {
         props.onLongPress?.(e, _getZoomableViewEventObject());
         longPressTimeout.value = undefined;
+        // Mark long-press as fired so `_handlePanResponderEnd` skips
+        // tap classification — otherwise the same touch release would
+        // fire both `onLongPress` and `onSingleTap`.
+        longPressFired.value = true;
+        // Also clear `doubleTapFirstTapReleaseTimestamp` so a subsequent
+        // tap is classified as the FIRST tap, not the second of a double-tap
+        // straddling the long-press.
+        doubleTapFirstTapReleaseTimestamp.value = undefined;
       }, props.longPressDuration);
     }
   });
@@ -454,8 +495,24 @@ const ReactNativeZoomableViewInner: ForwardRefRenderFunction<
     }
   });
 
+  const clearSingleTapTimeout = useLatestCallback(() => {
+    if (singleTapTimeoutId.current) {
+      clearTimeout(singleTapTimeoutId.current);
+      singleTapTimeoutId.current = undefined;
+    }
+  });
+
   const _handlePanResponderGrant = (e: GestureTouchEvent) => {
     'worklet';
+
+    // Cancel any pending single-tap fire from the previous gesture cycle —
+    // a fresh touch invalidates the still-classifying single-tap, otherwise
+    // the previous tap's `setTimeout` could fire alongside this gesture's
+    // `onPanResponderEnd`-driven tap classification.
+    runOnJS(clearSingleTapTimeout)();
+    // Reset long-press sentinel so a new gesture starts in a known state;
+    // see `longPressFired` for why this gates `_resolveAndHandleTap`.
+    longPressFired.value = false;
 
     runOnJS(scheduleLongPressTimeout)(e);
 
@@ -644,8 +701,9 @@ const ReactNativeZoomableViewInner: ForwardRefRenderFunction<
   /**
    * Zooms to a specific level. A "zoom center" can be provided, which specifies
    * the point that will remain in the same position on the screen after the zoom.
-   * The coordinates of the zoom center is relative to the zoom subject.
-   * { x: 0, y: 0 } is the very center of the zoom subject.
+   * The coordinates of the zoom center are subject-relative pixels with the
+   * top-left at (0, 0); the visual centre is
+   * `{ x: originalWidth / 2, y: originalHeight / 2 }`.
    *
    * @param newZoomLevel
    * @param zoomCenter - If not supplied, the container's center is the zoom center
@@ -664,8 +722,14 @@ const ReactNativeZoomableViewInner: ForwardRefRenderFunction<
     prevZoom.value = zoom.value;
 
     // == Perform Zoom Animation ==
-    zoom.value = withTiming(newZoomLevel, zoomToAnimation, () => {
+    zoom.value = withTiming(newZoomLevel, zoomToAnimation, (finished) => {
       'worklet';
+      // Bail on cancellation. The zoomToDestination cleanup does NOT run
+      // here — the entity that cancelled us (pinch handler, another
+      // zoomTo, moveTo, or unmount) has its own state to set up, and
+      // clearing here would clobber theirs. Each cancellation path is
+      // responsible for its own zoomToDestination cleanup.
+      if (!finished) return;
 
       // == Zoom Animation Ends ==
       zoomToDestination.value = undefined;
@@ -702,10 +766,13 @@ const ReactNativeZoomableViewInner: ForwardRefRenderFunction<
       y: e.allTouches[0].y,
     };
 
-    // if doubleTapZoomToCenter enabled -> always zoom to center instead
+    // if doubleTapZoomToCenter enabled -> always zoom to the centre of the
+    // zoom subject. Coordinates are subject-relative pixels (top-left origin),
+    // so the centre is `(originalWidth/2, originalHeight/2)` — not `(0, 0)`,
+    // which is the top-left corner.
     if (doubleTapZoomToCenter) {
-      zoomPositionCoordinates.x = 0;
-      zoomPositionCoordinates.y = 0;
+      zoomPositionCoordinates.x = originalWidth.value / 2;
+      zoomPositionCoordinates.y = originalHeight.value / 2;
     }
 
     publicZoomTo(nextZoomStep, zoomPositionCoordinates);
@@ -738,9 +805,12 @@ const ReactNativeZoomableViewInner: ForwardRefRenderFunction<
           isSecondTap: true,
         });
       singleTapTimeoutId.current && clearTimeout(singleTapTimeoutId.current);
-      delete doubleTapFirstTapReleaseTimestamp.value;
-      delete singleTapTimeoutId.current;
-      delete doubleTapFirstTap.value;
+      // `delete` on a SharedValue's `.value` setter was a no-op — assigning
+      // `undefined` is the defined way to clear the value. Same for the
+      // plain ref above.
+      doubleTapFirstTapReleaseTimestamp.value = undefined;
+      singleTapTimeoutId.current = undefined;
+      doubleTapFirstTap.value = undefined;
       _handleDoubleTap(e);
     } else {
       doubleTapFirstTapReleaseTimestamp.value = now;
@@ -752,8 +822,8 @@ const ReactNativeZoomableViewInner: ForwardRefRenderFunction<
       _addTouch(doubleTapFirstTap.value);
 
       singleTapTimeoutId.current = setTimeout(() => {
-        delete doubleTapFirstTapReleaseTimestamp.value;
-        delete singleTapTimeoutId.current;
+        doubleTapFirstTapReleaseTimestamp.value = undefined;
+        singleTapTimeoutId.current = undefined;
 
         // Pan to the tapped location
         if (props.staticPinPosition && doubleTapFirstTap.value) {
@@ -816,6 +886,12 @@ const ReactNativeZoomableViewInner: ForwardRefRenderFunction<
   const publicMoveTo = (newOffsetX: number, newOffsetY: number) => {
     'worklet';
 
+    // Cancel any in-flight zoomTo() so its zoom-centering reaction doesn't
+    // fight the move we're about to apply — without this, a concurrent
+    // zoomTo's per-tick offset recompute would clobber our final position.
+    cancelAnimation(zoom);
+    zoomToDestination.value = undefined;
+
     if (!originalWidth.value || !originalHeight.value) return;
 
     const offsetX = (newOffsetX - originalWidth.value / 2) / zoom.value;
@@ -827,6 +903,11 @@ const ReactNativeZoomableViewInner: ForwardRefRenderFunction<
   /** Moves the zoomed view by the given delta in container coordinates. */
   const publicMoveBy = (offsetChangeX: number, offsetChangeY: number) => {
     'worklet';
+
+    // Cancel any in-flight zoomTo() so its zoom-centering reaction doesn't
+    // fight the move we're about to apply.
+    cancelAnimation(zoom);
+    zoomToDestination.value = undefined;
 
     const newOffsetX =
       (offsetX.value * zoom.value - offsetChangeX) / zoom.value;
@@ -859,7 +940,14 @@ const ReactNativeZoomableViewInner: ForwardRefRenderFunction<
     'worklet';
 
     if (!gestureType.value) {
-      runOnJS(_resolveAndHandleTap)(e);
+      // Skip tap classification entirely if a long-press already fired
+      // during this touch cycle — otherwise the same release would also
+      // produce a single/double-tap event.
+      if (longPressFired.value) {
+        longPressFired.value = false;
+      } else {
+        runOnJS(_resolveAndHandleTap)(e);
+      }
     }
 
     runOnJS(setDebugPoints)([]);
@@ -922,6 +1010,15 @@ const ReactNativeZoomableViewInner: ForwardRefRenderFunction<
       if (gestureType.value !== 'pinch') {
         lastGestureCenterPosition.value = calcGestureCenterPoint(e);
         lastGestureTouchDistance.value = calcGestureTouchDistance(e);
+        // Pinch starts → previous tap-release timestamp can no longer
+        // contribute to a double-tap; reset so the next 1-finger tap is
+        // classified as a fresh first-tap.
+        doubleTapFirstTapReleaseTimestamp.value = undefined;
+        // Clear any stale zoomTo target so the unified transform reaction
+        // doesn't fight pinch's own offset math — pinch computes its own
+        // zoom centre and shouldn't be re-centered against the previous
+        // `zoomTo()`'s destination.
+        zoomToDestination.value = undefined;
       }
       gestureType.value = 'pinch';
       _handlePinching(e);
@@ -935,6 +1032,9 @@ const ReactNativeZoomableViewInner: ForwardRefRenderFunction<
       // change some measurement states when switching gesture to ensure a smooth transition
       if (gestureType.value !== 'shift') {
         lastGestureCenterPosition.value = calcGestureCenterPoint(e);
+        // Shift starts → previous tap-release timestamp can no longer
+        // contribute to a double-tap; reset so the next tap is fresh.
+        doubleTapFirstTapReleaseTimestamp.value = undefined;
       }
 
       const isShiftGesture = Math.abs(dx) > 2 || Math.abs(dy) > 2;
@@ -1010,7 +1110,13 @@ const ReactNativeZoomableViewInner: ForwardRefRenderFunction<
             {visualTouchFeedbackEnabled &&
               stateTouches.map(
                 (touch) =>
-                  doubleTapDelay && (
+                  // Coerce `doubleTapDelay` to a strict boolean — bare
+                  // `doubleTapDelay && (...)` evaluates to `0` when delay is
+                  // `0`, and React will then try to render the literal `0` as
+                  // a text child outside a <Text>, crashing with the
+                  // "Text strings must be rendered within a <Text> component"
+                  // error.
+                  !!doubleTapDelay && (
                     <AnimatedTouchFeedback
                       x={touch.x}
                       y={touch.y}
