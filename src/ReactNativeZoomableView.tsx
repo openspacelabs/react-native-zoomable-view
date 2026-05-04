@@ -278,6 +278,41 @@ const ReactNativeZoomableViewInner: ForwardRefRenderFunction<
     props.onStaticPinPositionChange || (() => undefined)
   );
 
+  // Mirror worklet-typed prop callbacks into SharedValues so the empty-deps
+  // `useAnimatedReaction` below (and the worklet-context `_handlePanResponderMove`)
+  // always invoke the LATEST consumer callback, not the first-render snapshot.
+  // Without this indirection, the worklet body captures these props by closure
+  // at first render — subsequent renders that hand a fresh callback identity
+  // (e.g. inline arrow whose closure changes per render) would never reach the
+  // worklet, silently invoking stale state forever.
+  // `useLatestCallback` (used for the JS-thread callbacks above) is not viable
+  // here: it returns a JS-thread function, and these refs must be readable from
+  // worklet contexts.
+  // The values are wrapped in `{ fn }` rather than stored bare, because
+  // Reanimated's `valueSetter` treats raw function values as animation factories
+  // (calls them with no args expecting an `AnimationObject`), which crashes
+  // immediately on assignment. The object wrapper sidesteps that branch.
+  const onTransformWorkletShared = useSharedValue<{
+    fn: typeof onTransformWorklet | undefined;
+  }>({ fn: undefined });
+  const onStaticPinPositionMoveWorkletShared = useSharedValue<{
+    fn: typeof onStaticPinPositionMoveWorklet | undefined;
+  }>({ fn: undefined });
+  const onPanResponderMoveWorkletShared = useSharedValue<{
+    fn: typeof onPanResponderMoveWorklet | undefined;
+  }>({ fn: undefined });
+  useEffect(() => {
+    onTransformWorkletShared.value = { fn: onTransformWorklet };
+  }, [onTransformWorklet]);
+  useEffect(() => {
+    onStaticPinPositionMoveWorkletShared.value = {
+      fn: onStaticPinPositionMoveWorklet,
+    };
+  }, [onStaticPinPositionMoveWorklet]);
+  useEffect(() => {
+    onPanResponderMoveWorkletShared.value = { fn: onPanResponderMoveWorklet };
+  }, [onPanResponderMoveWorklet]);
+
   /**
    * try to invoke onTransform
    * @private
@@ -291,10 +326,10 @@ const ReactNativeZoomableViewInner: ForwardRefRenderFunction<
     if (!zoomableViewEvent.originalWidth || !zoomableViewEvent.originalHeight)
       return { successful: false };
 
-    onTransformWorklet?.(zoomableViewEvent);
+    onTransformWorkletShared.value.fn?.(zoomableViewEvent);
 
     if (position) {
-      onStaticPinPositionMoveWorklet?.(position);
+      onStaticPinPositionMoveWorkletShared.value.fn?.(position);
     }
 
     return { successful: true };
@@ -986,7 +1021,12 @@ const ReactNativeZoomableViewInner: ForwardRefRenderFunction<
   ) => {
     'worklet';
 
-    if (onPanResponderMoveWorklet?.(e, _getZoomableViewEventObject())) {
+    if (
+      onPanResponderMoveWorkletShared.value.fn?.(
+        e,
+        _getZoomableViewEventObject()
+      )
+    ) {
       return;
     }
 
