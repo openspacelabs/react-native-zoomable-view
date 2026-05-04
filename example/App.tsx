@@ -4,7 +4,7 @@ import {
   ReactNativeZoomableViewRef,
 } from '@openspacelabs/react-native-zoomable-view';
 import { debounce } from 'lodash';
-import React, { ReactNode, useCallback, useRef, useState } from 'react';
+import React, { ReactNode, useMemo, useRef, useState } from 'react';
 import {
   Alert,
   Button,
@@ -53,12 +53,18 @@ export default function App() {
   const [pin, setPin] = useState({ x: 0, y: 0 });
   const [movePin, setMovePin] = useState({ x: 0, y: 0 });
 
-  // Debounce the change event to avoid layout event firing too often while dragging
-  const debouncedUpdatePin = useCallback(() => debounce(setPin, 10), [])();
-  const debouncedUpdateMovePin = useCallback(
+  // Debounce the change event to avoid layout event firing too often while
+  // dragging. `useMemo` caches the debounce instance across renders so its
+  // internal timer state actually batches calls — the previous
+  // `useCallback(() => debounce(...), [])()` invoked the memoized factory
+  // on every render, producing a fresh debounce each time and defeating
+  // the debouncing entirely. `setPin`/`setMovePin` are stable `useState`
+  // setters, so the deps array effectively never re-creates the instance.
+  const debouncedUpdatePin = useMemo(() => debounce(setPin, 10), [setPin]);
+  const debouncedUpdateMovePin = useMemo(
     () => debounce(setMovePin, 10),
-    []
-  )();
+    [setMovePin]
+  );
 
   const staticPinPosition = { x: size.width / 2, y: size.height / 2 };
   const { size: contentSize } = applyContainResizeMode(imageSize, size);
