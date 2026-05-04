@@ -228,6 +228,14 @@ const ReactNativeZoomableViewInner: ForwardRefRenderFunction<
   const onShiftingEnd = useLatestCallback(
     props.onShiftingEnd || (() => undefined)
   );
+  // `onLongPress` and `onSingleTap` are read inside `setTimeout` bodies whose
+  // closure captures `props` at schedule time (long-press: 700ms, single-tap:
+  // 300ms). Without a stable wrapper, a parent re-render with new callback
+  // refs during the timer window fires the stale callback. `useLatestCallback`
+  // returns a stable wrapper that reads the latest prop on fire, eliminating
+  // the schedule-vs-fire staleness race.
+  const onLongPress = useLatestCallback(props.onLongPress || (() => undefined));
+  const onSingleTap = useLatestCallback(props.onSingleTap || (() => undefined));
 
   /**
    * Returns additional information about components current state for external event hooks
@@ -521,7 +529,11 @@ const ReactNativeZoomableViewInner: ForwardRefRenderFunction<
   const scheduleLongPressTimeout = useLatestCallback((e: GestureTouchEvent) => {
     if (props.onLongPress && props.longPressDuration) {
       longPressTimeout.value = setTimeout(() => {
-        props.onLongPress?.(e, _getZoomableViewEventObject());
+        // Invoke the stable `onLongPress` wrapper rather than the captured
+        // `props.onLongPress` — the closure was captured at schedule time and
+        // would fire a stale callback if the parent re-rendered during the
+        // 700ms timer window.
+        onLongPress(e, _getZoomableViewEventObject());
         longPressTimeout.value = undefined;
         // Mark long-press as fired so `_handlePanResponderEnd` skips
         // tap classification — otherwise the same touch release would
@@ -871,10 +883,16 @@ const ReactNativeZoomableViewInner: ForwardRefRenderFunction<
         doubleTapFirstTapReleaseTimestamp.value = undefined;
         singleTapTimeoutId.current = undefined;
 
+        // Read `staticPinPosition` from the existing `useDerivedValue` mirror
+        // rather than the closure-captured `props.staticPinPosition` — the
+        // closure was captured at schedule time (300ms ago) and may now be
+        // stale if the consumer moved the pin during the timer window.
+        const currentStaticPinPosition = staticPinPosition.value;
+
         // Pan to the tapped location
-        if (props.staticPinPosition && doubleTapFirstTap.value) {
-          const tapX = props.staticPinPosition.x - doubleTapFirstTap.value.x;
-          const tapY = props.staticPinPosition.y - doubleTapFirstTap.value.y;
+        if (currentStaticPinPosition && doubleTapFirstTap.value) {
+          const tapX = currentStaticPinPosition.x - doubleTapFirstTap.value.x;
+          const tapY = currentStaticPinPosition.y - doubleTapFirstTap.value.y;
 
           const toX = offsetX.value + tapX / zoom.value;
           const toY = offsetY.value + tapY / zoom.value;
@@ -887,7 +905,9 @@ const ReactNativeZoomableViewInner: ForwardRefRenderFunction<
           offsetY.value = withTiming(toY, { duration: 200 });
         }
 
-        props.onSingleTap?.(e, _getZoomableViewEventObject());
+        // Invoke the stable `onSingleTap` wrapper rather than the captured
+        // `props.onSingleTap` — same staleness reasoning as `onLongPress`.
+        onSingleTap(e, _getZoomableViewEventObject());
       }, props.doubleTapDelay);
     }
   };
