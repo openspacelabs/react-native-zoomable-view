@@ -156,8 +156,8 @@ These options can be used to limit and change the zoom behavior.
 | zoomEnabled                | boolean | Can be used to enable or disable the zooming dynamically                                                                 | true      |
 | panEnabled                 | boolean | Can be used to enable or disable the panning dynamically                                                                 | true      |
 | initialZoom                | number  | Initial zoom level on startup                                                                                            | 1.0       |
-| maxZoom                    | number  | Maximum possible zoom level (zoom in). Can be set to `null` to allow unlimited zooming                                   | 1.5       |
-| minZoom                    | number  | Minimum possible zoom level (zoom out)                                                                                   | 0.5       |
+| maxZoom                    | number  | Maximum possible zoom level (zoom in). Pass `Infinity` to allow unbounded zoom-in                                        | 1.5       |
+| minZoom                    | number  | Minimum possible zoom level (zoom out). Pass `-Infinity` to allow unbounded zoom-out                                     | 0.5       |
 | disablePanOnInitialZoom    | boolean | If true, panning is disabled when zoom level is equal to the initial zoom level                                          | false     |
 | doubleTapDelay             | number  | How much delay will still be recognized as double press (ms)                                                             | 300       |
 | doubleTapZoomToCenter      | boolean | If true, double tapping will always zoom to center of View instead of the direction it was double tapped in              |
@@ -197,6 +197,7 @@ These events can be used to work with data after specific events.
 | name               | description                                                                                                                      | params                                                   | expected return |
 | ------------------ | -------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------- | --------------- |
 | onTransformWorklet | Worklet called when the transformation configuration (zoom level and offset) changes (UI thread — must declare `'worklet';`)     | zoomableViewEventObject                                  | void            |
+| onSingleTap        | Will be called once a tap is confirmed as a single tap (after `doubleTapDelay`)                                                  | event, zoomableViewEventObject                           | void            |
 | onDoubleTapBefore  | Will be called at the start of a double tap                                                                                      | event, zoomableViewEventObject                           | void            |
 | onDoubleTapAfter  | Will be called at the end of a double tap                                                                                        | event, zoomableViewEventObject                           | void            |
 | onShiftingEnd     | Will be called when user stops a tap and move gesture                                                                            | event, zoomableViewEventObject                           | void            |
@@ -211,10 +212,11 @@ The following methods allow you to control the ZoomableView zoom level & positio
 
 | name   | description                                                                                                          | params                                 | expected return |
 | ------ | -------------------------------------------------------------------------------------------------------------------- | -------------------------------------- | --------------- |
-| zoomTo | Changes the zoom level to a specific number                                                                          | newZoomLevel: number                   | boolean         |
-| zoomBy | Changes the zoom level relative to the current level (use positive numbers to zoom in, negative numbers to zoom out) | zoomLevelChange: number                | boolean         |
-| moveTo | Shifts the zoomed part to a specific point (in px relative to x: 0, y: 0)                                            | newOffsetX: number, newOffsetY: number | void            |
-| moveBy | Shifts the zoomed part by a specific pixel number                                                                    | newOffsetX: number, newOffsetY: number | void            |
+| zoomTo          | Changes the zoom level to a specific number                                                                          | newZoomLevel: number, zoomCenter?: Vec2D     | boolean         |
+| zoomBy          | Changes the zoom level relative to the current level (use positive numbers to zoom in, negative numbers to zoom out) | zoomLevelChange: number                      | boolean         |
+| moveTo          | Shifts the zoomed part to a specific point (in px relative to x: 0, y: 0)                                            | newOffsetX: number, newOffsetY: number       | void            |
+| moveBy          | Shifts the zoomed part by a specific pixel number                                                                    | newOffsetX: number, newOffsetY: number       | void            |
+| moveStaticPinTo | Pans so the static pin aligns with `position` (in content coordinates). Requires `staticPinPosition`, `contentWidth`, and `contentHeight` | position: Vec2D, duration?: number | void            |
 
 #### Properties
 

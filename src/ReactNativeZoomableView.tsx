@@ -284,6 +284,11 @@ const ReactNativeZoomableViewInner: ForwardRefRenderFunction<
   };
 
   const _addTouch = useLatestCallback((touch: TouchPoint) => {
+    // Skip when feedback is disabled — the render path short-circuits
+    // anyway, so the entry would never be paired with a `_removeTouch`
+    // (only fired from `AnimatedTouchFeedback.onAnimationDone`) and
+    // `touches.value` would grow monotonically.
+    if (!visualTouchFeedbackEnabled) return;
     touches.value.push(touch);
     setStateTouches([...touches.value]);
   });
@@ -598,17 +603,16 @@ const ReactNativeZoomableViewInner: ForwardRefRenderFunction<
     // the previous tap's `setTimeout` could fire alongside this gesture's
     // `onPanResponderEnd`-driven tap classification.
     runOnJS(clearSingleTapTimeout)();
-    // Reset long-press sentinel so a new gesture starts in a known state;
-    // see `longPressFired` for why this gates `_resolveAndHandleTap`.
-    longPressFired.value = false;
 
     if (!isRecovery) {
-      // The consumer-visible grant + long-press arming run only on the
-      // first grant of a touch cycle. The recovery path (a 3+ finger
-      // transient that force-ended an active gesture, then dropped back
-      // to ≤2 fingers without all touches lifting) restores internal
-      // gesture state without re-firing `onPanResponderGrant` or
-      // re-arming a stale long-press timer for a continuous gesture.
+      // First grant of a touch cycle: reset the long-press sentinel and
+      // arm consumer-visible grant + long-press timer. The recovery path
+      // (a 3+ finger transient that force-ended an active gesture, then
+      // dropped back to ≤2 fingers without all touches lifting) is a
+      // continuation of the same gesture cycle — preserving
+      // `longPressFired` is what suppresses a spurious trailing
+      // `onSingleTap` after a long-press fired earlier in the cycle.
+      longPressFired.value = false;
       runOnJS(scheduleLongPressTimeout)(e);
       runOnJS(onPanResponderGrant)(e, _getZoomableViewEventObject());
     }
