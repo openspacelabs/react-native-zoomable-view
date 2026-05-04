@@ -1,5 +1,5 @@
 import { ReactNode } from 'react';
-import { LayoutChangeEvent, ViewProps } from 'react-native';
+import { ViewProps } from 'react-native';
 import { GestureTouchEvent } from 'react-native-gesture-handler';
 
 export interface ZoomableViewEvent {
@@ -51,14 +51,7 @@ export interface ReactNativeZoomableViewProps {
   debug?: boolean;
 
   // callbacks
-  onLayout?: (event: Pick<LayoutChangeEvent, 'nativeEvent'>) => void;
-  /**
-   * Called on the UI thread.
-   * The function passed MUST contain a `'worklet';` directive as the first statement
-   * — otherwise the Reanimated Babel plugin won't compile it as a worklet, and the
-   * UI-thread invocation will crash. The `*Worklet` suffix on the prop name signals
-   * this requirement.
-   */
+  onLayoutWorklet?: (layout: Size2D & Vec2D) => void;
   onTransformWorklet?: (zoomableViewEventObject: ZoomableViewEvent) => void;
   onSingleTap?: (
     event: GestureTouchEvent,
@@ -92,15 +85,7 @@ export interface ReactNativeZoomableViewProps {
     event: GestureTouchEvent,
     zoomableViewEventObject: ZoomableViewEvent
   ) => void;
-  /**
-   * Called on the UI thread.
-   * The function passed MUST contain a `'worklet';` directive as the first statement
-   * — otherwise the Reanimated Babel plugin won't compile it as a worklet, and the
-   * UI-thread invocation will crash. The `*Worklet` suffix on the prop name signals
-   * this requirement.
-   *
-   * Return `true` to short-circuit the library's default pan/pinch handling.
-   */
+  /** Return `true` to short-circuit the library's default pan/pinch handling. */
   onPanResponderMoveWorklet?: (
     event: GestureTouchEvent,
     zoomableViewEventObject: ZoomableViewEvent
@@ -117,13 +102,6 @@ export interface ReactNativeZoomableViewProps {
    * fire mid-gesture (e.g. persisting the final pin location).
    */
   onStaticPinPositionChange?: (position: Vec2D) => void;
-  /**
-   * Called on the UI thread on every transform that affects the static pin.
-   * The function passed MUST contain a `'worklet';` directive as the first statement
-   * — otherwise the Reanimated Babel plugin won't compile it as a worklet, and the
-   * UI-thread invocation will crash. The `*Worklet` suffix on the prop name signals
-   * this requirement.
-   */
   onStaticPinPositionMoveWorklet?: (position: Vec2D) => void;
   pinProps?: ViewProps;
 }

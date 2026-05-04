@@ -203,7 +203,7 @@ These events can be used to work with data after specific events.
 | onShiftingEnd     | Will be called when user stops a tap and move gesture                                                                            | event, zoomableViewEventObject                           | void            |
 | onZoomEnd         | Will be called after pinchzooming has ended                                                                                      | event, zoomableViewEventObject                           | void            |
 | onLongPress       | Will be called after the user pressed on the image for a while                                                                   | event                                                    | void            |
-| onLayout          | Like `View`'s `onLayout`, but different in that it syncs with this component's internal state and returns a fake sythentic event | Like `View`'s `onLayout` but the synthetic event is fake | void            |
+| onLayoutWorklet   | Worklet called when the zoom subject's measured layout changes. Skipped while measurements are still zero (initial mount before `View.measure` lands). UI thread — must declare `'worklet';` | layout: { x, y, width, height }                          | void            |
 
 #### Methods
 

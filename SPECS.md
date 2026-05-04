@@ -98,7 +98,7 @@ All event-receiving callbacks accept `(event: GestureTouchEvent, zoomableViewEve
 
 | Callback | Thread | When |
 |----------|--------|------|
-| `onLayout` | JS | Internal measurements (origin/size of zoom subject) change. Receives `{ nativeEvent: { layout: { x, y, width, height } } }`. |
+| `onLayoutWorklet` | UI | Internal measurements (origin/size of zoom subject) change. Receives `{ x, y, width, height }`. Skipped while measurements are zero (initial mount before `View.measure` lands). See [Worklet callback contract](#worklet-callback-contract). |
 | `onTransformWorklet` | UI | Every transform tick. See [Worklet callback contract](#worklet-callback-contract). |
 | `onPanResponderGrant` | JS | Gesture starts. Not re-fired during 3+ finger recovery. |
 | `onPanResponderEnd` | JS | Gesture ends — natural release, RNGH cancellation, or 3+ finger force-end. Always fires. |
@@ -160,7 +160,7 @@ Reflects whether a gesture is currently in progress. Useful for consumers to sup
 
 ## Worklet callback contract
 
-Three props expect functions that run on the UI thread: `onTransformWorklet`, `onStaticPinPositionMoveWorklet`, `onPanResponderMoveWorklet`. Each MUST start with the `'worklet';` directive — without it, the Reanimated Babel plugin won't compile the callback as a worklet and the UI-thread invocation will crash. The `*Worklet` suffix on the prop name signals this requirement.
+Four props expect functions that run on the UI thread: `onLayoutWorklet`, `onTransformWorklet`, `onStaticPinPositionMoveWorklet`, `onPanResponderMoveWorklet`. Each MUST start with the `'worklet';` directive — without it, the Reanimated Babel plugin won't compile the callback as a worklet and the UI-thread invocation will crash. The `*Worklet` suffix on the prop name signals this requirement.
 
 A parent re-render that hands a fresh callback identity is honored — there is no closure staleness for these props.
 
@@ -304,7 +304,7 @@ This major replaces the class-component PanResponder/Animated implementation wit
 
 ### New props
 
-- `onTransformWorklet`, `onPanResponderMoveWorklet`, `onStaticPinPositionMoveWorklet` — UI-thread callbacks (must include `'worklet';`)
+- `onLayoutWorklet`, `onTransformWorklet`, `onPanResponderMoveWorklet`, `onStaticPinPositionMoveWorklet` — UI-thread callbacks (must include `'worklet';`)
 - `onPanResponderGrant`, `onPanResponderEnd`, `onPanResponderTerminate` — JS-thread gesture-lifecycle callbacks
 - `onShiftingEnd`, `onZoomEnd` — JS-thread gesture-end callbacks
 - `debug` — renders touch/pinch debug markers
@@ -318,7 +318,7 @@ This major replaces the class-component PanResponder/Animated implementation wit
 
 ### `ZoomableViewEvent` shape change
 
-`originalPageX` and `originalPageY` are no longer in `ZoomableViewEvent`. Consumers needing absolute page coordinates should read them from `onLayout` or via the `View`'s `measure()` API directly.
+`originalPageX` and `originalPageY` are no longer in `ZoomableViewEvent`. Consumers needing absolute page coordinates should read them from `onLayoutWorklet` or via the `View`'s `measure()` API directly.
 
 ### Default `zoomTo` animation
 

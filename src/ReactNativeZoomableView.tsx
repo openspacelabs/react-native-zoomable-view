@@ -39,7 +39,7 @@ import { getNextZoomStep } from './helper/getNextZoomStep';
 import { useDebugPoints } from './hooks/useDebugPoints';
 import { useLatestCallback } from './hooks/useLatestCallback';
 import { useZoomSubject } from './hooks/useZoomSubject';
-import { ReactNativeZoomableViewContext } from './ReactNativeZoomableViewContext';
+import { ReactNativeZoomableViewProvider } from './ReactNativeZoomableViewContext';
 import {
   ReactNativeZoomableViewProps,
   ReactNativeZoomableViewRef,
@@ -189,6 +189,12 @@ const ReactNativeZoomableViewInner: ForwardRefRenderFunction<
   // long-press would also `_resolveAndHandleTap`, producing both `onLongPress`
   // and `onSingleTap` for one gesture. Reset on each `_handlePanResponderGrant`.
   const longPressFired = useSharedValue(false);
+  // Sentinel used to suppress tap classification when this touch cycle saw a
+  // 3+ finger force-end. Without it, the eventual real release of the fingers
+  // (after `onTouchesUp` with `numberOfTouches === 0`) would `_resolveAndHandleTap`,
+  // producing a spurious `onSingleTap`/`onDoubleTap*` for what was a multi-finger
+  // gesture. Reset on each non-recovery `_handlePanResponderGrant`.
+  const forceEndPending = useSharedValue(false);
   const onTransformInvocationInitialized = useSharedValue(false);
   const singleTapTimeoutId = useRef<NodeJS.Timeout>();
   const touches = useSharedValue<TouchPoint[]>([]);
@@ -283,11 +289,12 @@ const ReactNativeZoomableViewInner: ForwardRefRenderFunction<
   };
 
   const _addTouch = useLatestCallback((touch: TouchPoint) => {
-    // Skip when feedback is disabled — the render path short-circuits
-    // anyway, so the entry would never be paired with a `_removeTouch`
-    // (only fired from `AnimatedTouchFeedback.onAnimationDone`) and
-    // `touches.value` would grow monotonically.
-    if (!visualTouchFeedbackEnabled) return;
+    // Symmetric to the render-path gate (`visualTouchFeedbackEnabled &&
+    // !!doubleTapDelay`). Skipping either case prevents `touches.value` from
+    // growing monotonically — `_removeTouch` only fires from
+    // `AnimatedTouchFeedback.onAnimationDone`, which never mounts when the
+    // render gate fails.
+    if (!visualTouchFeedbackEnabled || !doubleTapDelay) return;
     touches.value.push(touch);
     setStateTouches([...touches.value]);
   });
@@ -520,9 +527,20 @@ const ReactNativeZoomableViewInner: ForwardRefRenderFunction<
     []
   );
 
-  const onLayout = useLatestCallback(props.onLayout || (() => undefined));
+  // Mirror `onLayoutWorklet` into a SharedValue so the empty-deps reaction
+  // below always invokes the latest consumer callback. Same pattern (and same
+  // function-wrapping rationale) as `onTransformWorkletShared` above.
+  const onLayoutWorkletShared = useSharedValue<{
+    fn: typeof props.onLayoutWorklet | undefined;
+  }>({ fn: undefined });
+  useEffect(() => {
+    onLayoutWorkletShared.value = { fn: props.onLayoutWorklet };
+  }, [props.onLayoutWorklet]);
 
-  // Handle original measurements changed
+  // Handle original measurements changed — invoke `onLayoutWorklet` directly
+  // on the UI thread (no `runOnJS` hop). Guard against the initial mapper
+  // registration fire (all SharedValues start at 0); matches the equivalent
+  // guard in `_invokeOnTransform`.
   useAnimatedReaction(
     () => [
       originalHeight.value,
@@ -531,16 +549,13 @@ const ReactNativeZoomableViewInner: ForwardRefRenderFunction<
       originalY.value,
     ],
     () => {
-      // We use a custom `onLayout` event, so the clients can stay in-sync
-      // with when the internal measurements are actually saved to the state,
-      // thus helping them apply transformations at more accurate timings
-      const layout = {
+      if (!originalWidth.value || !originalHeight.value) return;
+      onLayoutWorkletShared.value.fn?.({
         width: originalWidth.value,
         height: originalHeight.value,
         x: originalX.value,
         y: originalY.value,
-      };
-      runOnJS(onLayout)({ nativeEvent: { layout } });
+      });
     }
   );
 
@@ -604,14 +619,15 @@ const ReactNativeZoomableViewInner: ForwardRefRenderFunction<
     runOnJS(clearSingleTapTimeout)();
 
     if (!isRecovery) {
-      // First grant of a touch cycle: reset the long-press sentinel and
-      // arm consumer-visible grant + long-press timer. The recovery path
-      // (a 3+ finger transient that force-ended an active gesture, then
-      // dropped back to ≤2 fingers without all touches lifting) is a
-      // continuation of the same gesture cycle — preserving
-      // `longPressFired` is what suppresses a spurious trailing
-      // `onSingleTap` after a long-press fired earlier in the cycle.
+      // First grant of a touch cycle: reset cycle-scoped sentinels and arm
+      // consumer-visible grant + long-press timer. The recovery path (a 3+
+      // finger transient that force-ended an active gesture, then dropped back
+      // to ≤2 fingers without all touches lifting) is a continuation of the
+      // same gesture cycle — preserving `longPressFired` and `forceEndPending`
+      // is what suppresses spurious trailing tap events on the eventual real
+      // release.
       longPressFired.value = false;
+      forceEndPending.value = false;
       runOnJS(scheduleLongPressTimeout)(e);
       runOnJS(onPanResponderGrant)(e, _getZoomableViewEventObject());
     }
@@ -1063,11 +1079,14 @@ const ReactNativeZoomableViewInner: ForwardRefRenderFunction<
     'worklet';
 
     if (wasReleased && !gestureType.value) {
-      // Skip tap classification entirely if a long-press already fired
-      // during this touch cycle — otherwise the same release would also
-      // produce a single/double-tap event.
-      if (longPressFired.value) {
+      // Skip tap classification entirely if a long-press already fired during
+      // this touch cycle, or if a 3+ finger force-end armed `forceEndPending`
+      // earlier in this cycle — otherwise the same release would produce a
+      // spurious single/double-tap event for what was a long-press or a
+      // multi-finger gesture.
+      if (longPressFired.value || forceEndPending.value) {
         longPressFired.value = false;
+        forceEndPending.value = false;
       } else {
         runOnJS(_resolveAndHandleTap)(e);
       }
@@ -1131,7 +1150,14 @@ const ReactNativeZoomableViewInner: ForwardRefRenderFunction<
       if (gestureStarted.value) {
         // Forced end on `numberOfTouches > 2` — the user is still touching
         // the screen, just with too many fingers. Pass `wasReleased=false`
-        // (default) so this path does not run tap classification.
+        // (default) so this path does not run tap classification, and arm
+        // `forceEndPending` so the eventual real release of these fingers
+        // is also suppressed (per SPECS L178). Also clear stale double-tap
+        // state — the touch cycle aborted before it could combine into a
+        // double-tap with a future tap.
+        forceEndPending.value = true;
+        doubleTapFirstTapReleaseTimestamp.value = undefined;
+        doubleTapFirstTap.value = undefined;
         _handlePanResponderEnd(e);
       }
       return;
@@ -1247,7 +1273,7 @@ const ReactNativeZoomableViewInner: ForwardRefRenderFunction<
   });
 
   return (
-    <ReactNativeZoomableViewContext.Provider
+    <ReactNativeZoomableViewProvider
       value={{ zoom, inverseZoom, inverseZoomStyle, offsetX, offsetY }}
     >
       <GestureHandlerRootView>
@@ -1304,7 +1330,7 @@ const ReactNativeZoomableViewInner: ForwardRefRenderFunction<
           </View>
         </GestureDetector>
       </GestureHandlerRootView>
-    </ReactNativeZoomableViewContext.Provider>
+    </ReactNativeZoomableViewProvider>
   );
 };
 
