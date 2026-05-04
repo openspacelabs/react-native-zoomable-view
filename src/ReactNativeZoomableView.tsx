@@ -722,15 +722,9 @@ const ReactNativeZoomableViewInner: ForwardRefRenderFunction<
   };
 
   /**
-   * Zooms in or out by a specified change level
-   * Use a positive number for `zoomLevelChange` to zoom in
-   * Use a negative number for `zoomLevelChange` to zoom out
-   *
-   * Returns a promise if everything was updated and a boolean, whether it could be updated or if it exceeded the min/max zoom limits.
-   *
-   * @param {number | null} zoomLevelChange
-   *
-   * @return {bool}
+   * Zooms in or out by a specified change level.
+   * Positive `zoomLevelChange` zooms in, negative zooms out.
+   * Returns false if the new level would exceed min/max zoom.
    */
   const publicZoomBy = (zoomLevelChange: number) => {
     'worklet';
@@ -740,15 +734,7 @@ const ReactNativeZoomableViewInner: ForwardRefRenderFunction<
     return publicZoomTo(zoom.value + zoomLevelChange);
   };
 
-  /**
-   * Moves the zoomed view to a specified position
-   * Returns a promise when finished
-   *
-   * @param {number} newOffsetX the new position we want to move it to (x-axis)
-   * @param {number} newOffsetY the new position we want to move it to (y-axis)
-   *
-   * @return {bool}
-   */
+  /** Moves the zoomed view so the given (x, y) lands at the container center. */
   const publicMoveTo = (newOffsetX: number, newOffsetY: number) => {
     'worklet';
 
@@ -760,16 +746,7 @@ const ReactNativeZoomableViewInner: ForwardRefRenderFunction<
     _setNewOffsetPosition(-offsetX, -offsetY);
   };
 
-  /**
-   * Moves the zoomed view by a certain amount.
-   *
-   * Returns a promise when finished
-   *
-   * @param {number} offsetChangeX the amount we want to move the offset by (x-axis)
-   * @param {number} offsetChangeY the amount we want to move the offset by (y-axis)
-   *
-   * @return {bool}
-   */
+  /** Moves the zoomed view by the given delta in container coordinates. */
   const publicMoveBy = (offsetChangeX: number, offsetChangeY: number) => {
     'worklet';
 
