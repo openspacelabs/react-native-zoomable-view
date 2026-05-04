@@ -10,8 +10,11 @@ export const getNextZoomStep = ({
   initialZoom,
   zoomLevel,
 }: {
-  zoomStep: number | undefined;
-  maxZoom: number | undefined;
+  // `null` and `undefined` are both treated as "not set" via the `!= null`
+  // checks below — accept either to match the public prop typing where
+  // `null = unlimited` and `undefined = default`.
+  zoomStep: number | null | undefined;
+  maxZoom: number | null | undefined;
   initialZoom: number | undefined;
   zoomLevel: number;
 }) => {

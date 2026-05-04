@@ -93,7 +93,7 @@ const ReactNativeZoomableViewInner: ForwardRefRenderFunction<
     staticPinPosition: undefined,
     staticPinIcon: undefined,
     onStaticPinPositionChange: undefined,
-    onStaticPinPositionMove: undefined,
+    onStaticPinPositionMoveWorklet: undefined,
     disablePanOnInitialZoom: false,
   });
 
@@ -106,9 +106,9 @@ const ReactNativeZoomableViewInner: ForwardRefRenderFunction<
     staticPinPosition: propStaticPinPosition,
     contentWidth: propContentWidth,
     contentHeight: propContentHeight,
-    onTransform,
-    onStaticPinPositionMove,
-    onPanResponderMove,
+    onTransformWorklet,
+    onStaticPinPositionMoveWorklet,
+    onPanResponderMoveWorklet,
     zoomEnabled: propZoomEnabled,
     maxZoom: propMaxZoom,
     minZoom: propMinZoom,
@@ -263,10 +263,10 @@ const ReactNativeZoomableViewInner: ForwardRefRenderFunction<
     if (!zoomableViewEvent.originalWidth || !zoomableViewEvent.originalHeight)
       return { successful: false };
 
-    onTransform?.(zoomableViewEvent);
+    onTransformWorklet?.(zoomableViewEvent);
 
     if (position) {
-      onStaticPinPositionMove?.(position);
+      onStaticPinPositionMoveWorklet?.(position);
       runOnJS(debouncedOnStaticPinPositionChange)(position);
     }
 
@@ -820,7 +820,7 @@ const ReactNativeZoomableViewInner: ForwardRefRenderFunction<
   ) => {
     'worklet';
 
-    if (onPanResponderMove?.(e, _getZoomableViewEventObject())) {
+    if (onPanResponderMoveWorklet?.(e, _getZoomableViewEventObject())) {
       return;
     }
 

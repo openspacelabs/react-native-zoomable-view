@@ -19,9 +19,6 @@ export type ReactNativeZoomableViewRef = {
   readonly gestureStarted: boolean;
 };
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-type Worklet<T extends (...args: any[]) => any> = T;
-
 export interface ReactNativeZoomableViewProps {
   // options
   style?: ViewProps['style'];
@@ -33,13 +30,18 @@ export interface ReactNativeZoomableViewProps {
   initialOffsetY?: number;
   contentWidth?: number;
   contentHeight?: number;
-  maxZoom?: number;
-  minZoom?: number;
+  /** `null` (or omitted) means unlimited; runtime check is `!= null`. */
+  maxZoom?: number | null;
+  /** `null` (or omitted) means unlimited; runtime check is `!= null`. */
+  minZoom?: number | null;
   doubleTapDelay?: number;
   doubleTapZoomToCenter?: boolean;
-  zoomStep?: number;
-  pinchToZoomInSensitivity?: number;
-  pinchToZoomOutSensitivity?: number;
+  /** `null` (or omitted) disables stepwise zoom; runtime check is `!= null`. */
+  zoomStep?: number | null;
+  /** `null` (or omitted) disables pinch-to-zoom-in sensitivity scaling; runtime check is `!= null`. */
+  pinchToZoomInSensitivity?: number | null;
+  /** `null` (or omitted) disables pinch-to-zoom-out sensitivity scaling; runtime check is `!= null`. */
+  pinchToZoomOutSensitivity?: number | null;
   movementSensitivity?: number;
   longPressDuration?: number;
   visualTouchFeedbackEnabled?: boolean;
@@ -52,9 +54,12 @@ export interface ReactNativeZoomableViewProps {
   onLayout?: (event: Pick<LayoutChangeEvent, 'nativeEvent'>) => void;
   /**
    * Called on the UI thread.
-   * Must be a worklet.
+   * The function passed MUST contain a `'worklet';` directive as the first statement
+   * — otherwise the Reanimated Babel plugin won't compile it as a worklet, and the
+   * UI-thread invocation will crash. The `*Worklet` suffix on the prop name signals
+   * this requirement.
    */
-  onTransform?: Worklet<(zoomableViewEventObject: ZoomableViewEvent) => void>;
+  onTransformWorklet?: (zoomableViewEventObject: ZoomableViewEvent) => void;
   onSingleTap?: (
     event: GestureTouchEvent,
     zoomableViewEventObject: ZoomableViewEvent
@@ -87,12 +92,19 @@ export interface ReactNativeZoomableViewProps {
     event: GestureTouchEvent,
     zoomableViewEventObject: ZoomableViewEvent
   ) => void;
-  onPanResponderMove?: Worklet<
-    (
-      event: GestureTouchEvent,
-      zoomableViewEventObject: ZoomableViewEvent
-    ) => boolean
-  >;
+  /**
+   * Called on the UI thread.
+   * The function passed MUST contain a `'worklet';` directive as the first statement
+   * — otherwise the Reanimated Babel plugin won't compile it as a worklet, and the
+   * UI-thread invocation will crash. The `*Worklet` suffix on the prop name signals
+   * this requirement.
+   *
+   * Return `true` to short-circuit the library's default pan/pinch handling.
+   */
+  onPanResponderMoveWorklet?: (
+    event: GestureTouchEvent,
+    zoomableViewEventObject: ZoomableViewEvent
+  ) => boolean;
   onPanResponderTerminate?: (
     event: GestureTouchEvent,
     zoomableViewEventObject: ZoomableViewEvent
@@ -100,15 +112,19 @@ export interface ReactNativeZoomableViewProps {
   staticPinPosition?: Vec2D;
   staticPinIcon?: React.ReactElement;
   /**
-   * Called on the UI thread.
-   * Must be a worklet.
+   * Called on the JS thread once the static pin position has settled
+   * (~100ms after the last motion). Use for state updates that should not
+   * fire mid-gesture (e.g. persisting the final pin location).
    */
-  onStaticPinPositionChange?: Worklet<(position: Vec2D) => void>;
+  onStaticPinPositionChange?: (position: Vec2D) => void;
   /**
-   * Called on the UI thread.
-   * Must be a worklet.
+   * Called on the UI thread on every transform that affects the static pin.
+   * The function passed MUST contain a `'worklet';` directive as the first statement
+   * — otherwise the Reanimated Babel plugin won't compile it as a worklet, and the
+   * UI-thread invocation will crash. The `*Worklet` suffix on the prop name signals
+   * this requirement.
    */
-  onStaticPinPositionMove?: Worklet<(position: Vec2D) => void>;
+  onStaticPinPositionMoveWorklet?: (position: Vec2D) => void;
   pinProps?: ViewProps;
 }
 
