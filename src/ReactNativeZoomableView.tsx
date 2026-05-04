@@ -634,7 +634,18 @@ const ReactNativeZoomableViewInner: ForwardRefRenderFunction<
       // release.
       longPressFired.value = false;
       forceEndPending.value = false;
-      runOnJS(scheduleLongPressTimeout)(e);
+      // Long-press is a single-finger gesture. Gate the timer here so a
+      // simultaneous 2-finger `onTouchesDown` (one event with
+      // `numberOfTouches === 2` and no prior `firstTouch`) does not arm
+      // a timer that would otherwise fire as a phantom `onLongPress`
+      // when the user pauses ~700ms before pinching. The `else if`
+      // branch in `onTouchesDown` covers the sequential case where the
+      // 2nd finger arrives in a later event after the timer was already
+      // armed; this gate covers the simultaneous case that branch can't
+      // see (mutually exclusive with the `!firstTouch` branch).
+      if (e.numberOfTouches === 1) {
+        runOnJS(scheduleLongPressTimeout)(e);
+      }
       runOnJS(onPanResponderGrant)(e, _getZoomableViewEventObject());
     }
 
@@ -1116,8 +1127,19 @@ const ReactNativeZoomableViewInner: ForwardRefRenderFunction<
     // SETTLE_QUIET_MS after the last position change — gesture end included.
     // No explicit invocation needed here.
 
-    gestureType.value = undefined;
-    gestureStarted.value = false;
+    // Defer the gesture-state resets via a final `runOnJS` so they enqueue
+    // *after* the prior `runOnJS` end-callback dispatches drain on the JS
+    // thread. SPECS L157: `gestureStarted` clears at the END of the
+    // gesture-end handler, after all end callbacks have fired. A consumer
+    // reading `ref.current.gestureStarted` from inside `onPanResponderEnd`
+    // / `onZoomEnd` / `onShiftingEnd` must see `true`. Synchronous UI-thread
+    // writes here would land before the JS-thread callbacks run, breaking
+    // the contract. `gestureType` is reset alongside so its reads (e.g. in
+    // a consumer's branching end-callback) stay consistent.
+    runOnJS(() => {
+      gestureType.value = undefined;
+      gestureStarted.value = false;
+    })();
   };
 
   /**
