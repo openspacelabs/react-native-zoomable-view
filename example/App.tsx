@@ -14,7 +14,7 @@ import {
   View,
   ViewProps,
 } from 'react-native';
-import { scheduleOnRN } from 'react-native-worklets';
+import { runOnJS } from 'react-native-reanimated';
 
 import { applyContainResizeMode } from '../src/helper/coordinateConversion';
 import { styles } from './style';
@@ -93,7 +93,7 @@ export default function App() {
           onStaticPinPositionChange={debouncedUpdatePin}
           onStaticPinPositionMoveWorklet={(position) => {
             'worklet';
-            scheduleOnRN(debouncedUpdateMovePin, position);
+            runOnJS(debouncedUpdateMovePin)(position);
           }}
           maxZoom={30}
           // Give these to the zoomable view so it can apply the boundaries around the actual content.

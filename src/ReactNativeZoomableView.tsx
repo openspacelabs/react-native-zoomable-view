@@ -375,7 +375,17 @@ const ReactNativeZoomableViewInner: ForwardRefRenderFunction<
 
   useAnimatedReaction(_staticPinPosition, (current) => {
     'worklet';
-    if (!current) return;
+    if (!current) {
+      // Pin/content went away — cancel any armed timer so it can't fire
+      // `onStaticPinPositionChange` with a closure-captured stale Vec2D after
+      // the consumer just unset the pin (or contentWidth/contentHeight
+      // collapsed to 0).
+      if (settleTimer.value !== null) {
+        clearTimeout(settleTimer.value);
+        settleTimer.value = null;
+      }
+      return;
+    }
 
     // Cancel any in-flight settle — motion is still happening.
     if (settleTimer.value !== null) {
@@ -405,6 +415,15 @@ const ReactNativeZoomableViewInner: ForwardRefRenderFunction<
 
   useLayoutEffect(() => {
     if (!propZoomEnabled && initialZoom.value) {
+      // Mirror the cancellation contract documented on publicZoomTo's
+      // withTiming completion ("Each cancellation path is responsible for
+      // its own zoomToDestination cleanup"): the direct `zoom.value =` write
+      // cancels any in-flight zoomTo animation, but the unified transform
+      // reaction would still see `zoomToDestination.value` set and run its
+      // recompute branch — producing an unexpected pan jump on what should
+      // be an instant snap.
+      cancelAnimation(zoom);
+      zoomToDestination.value = undefined;
       zoom.value = initialZoom.value;
     }
   }, [propZoomEnabled]);
@@ -523,7 +542,15 @@ const ReactNativeZoomableViewInner: ForwardRefRenderFunction<
 
   // Handle staticPinPosition changed
   useLayoutEffect(() => {
-    if (onTransformInvocationInitialized.value) _invokeOnTransform();
+    // `_invokeOnTransform` is a worklet that calls the consumer's
+    // `onTransformWorklet` and `onStaticPinPositionMoveWorklet` (both
+    // documented as UI-thread). The primary call site is the unified
+    // transform reaction (UI thread); this prop-change path must hop to UI
+    // explicitly, otherwise the same callback runs on the JS thread here
+    // and on the UI thread elsewhere — producing inconsistent threading
+    // semantics for consumers using UI-thread APIs (e.g. `scheduleOnRN`)
+    // inside the callback.
+    if (onTransformInvocationInitialized.value) runOnUI(_invokeOnTransform)();
   }, [props.staticPinPosition?.x, props.staticPinPosition?.y]);
 
   const scheduleLongPressTimeout = useLatestCallback((e: GestureTouchEvent) => {
@@ -915,6 +942,13 @@ const ReactNativeZoomableViewInner: ForwardRefRenderFunction<
   const publicMoveStaticPinTo = (position: Vec2D, duration?: number) => {
     'worklet';
 
+    // Same hazard as publicMoveTo / publicMoveBy: a concurrent zoomTo would
+    // keep recentering offsets via the unified transform reaction's
+    // recompute branch, clobbering the offset writes below (direct `.value`
+    // assignments cancel `withTiming` on the same SharedValue).
+    cancelAnimation(zoom);
+    zoomToDestination.value = undefined;
+
     if (!staticPinPosition.value) return;
     if (!originalWidth.value || !originalHeight.value) return;
     if (!contentWidth.value || !contentHeight.value) return;
@@ -1134,8 +1168,12 @@ const ReactNativeZoomableViewInner: ForwardRefRenderFunction<
     .onTouchesDown((e, stateManager) => {
       // only begin if this is the first touch
       if (!firstTouch.value) {
-        stateManager.activate();
+        // RNGH state machine order: UNDETERMINED → BEGAN (begin) → ACTIVE
+        // (activate). Calling activate() first relies on activate's force-true
+        // path to jump straight to ACTIVE, which makes the subsequent begin()
+        // a no-op (ACTIVE cannot regress to BEGAN).
         stateManager.begin();
+        stateManager.activate();
         firstTouch.value = { x: e.allTouches[0].x, y: e.allTouches[0].y };
         _handlePanResponderGrant(e);
       }
