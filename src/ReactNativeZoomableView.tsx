@@ -656,15 +656,11 @@ const ReactNativeZoomableViewInner: ForwardRefRenderFunction<
       longPressFired.value = false;
       forceEndPending.value = false;
       externallyHandled.value = false;
-      // Long-press is a single-finger gesture. Gate the timer here so a
-      // simultaneous 2-finger `onTouchesDown` (one event with
-      // `numberOfTouches === 2` and no prior `firstTouch`) does not arm
-      // a timer that would otherwise fire as a phantom `onLongPress`
-      // when the user pauses ~700ms before pinching. The `else if`
-      // branch in `onTouchesDown` covers the sequential case where the
-      // 2nd finger arrives in a later event after the timer was already
-      // armed; this gate covers the simultaneous case that branch can't
-      // see (mutually exclusive with the `!firstTouch` branch).
+      // Long-press is a single-finger gesture. Don't arm the timer when this
+      // grant is for a simultaneous 2+ finger touch (one batched UIEvent with
+      // `numberOfTouches >= 2` and no prior `firstTouch`). The unconditional
+      // multi-finger normalization in `onTouchesDown` would clear it anyway,
+      // but gating here avoids the queue→clear churn.
       if (e.numberOfTouches === 1) {
         runOnJS(scheduleLongPressTimeout)(e);
       }
@@ -1309,7 +1305,6 @@ const ReactNativeZoomableViewInner: ForwardRefRenderFunction<
   const firstTouch = useSharedValue<Vec2D | undefined>(undefined);
   const gesture = Gesture.Manual()
     .onTouchesDown((e, stateManager) => {
-      // only begin if this is the first touch
       if (!firstTouch.value) {
         // RNGH state machine order: UNDETERMINED → BEGAN (begin) → ACTIVE
         // (activate). Calling activate() first relies on activate's force-true
@@ -1319,21 +1314,27 @@ const ReactNativeZoomableViewInner: ForwardRefRenderFunction<
         stateManager.activate();
         firstTouch.value = { x: e.allTouches[0].x, y: e.allTouches[0].y };
         _handlePanResponderGrant(e);
-      } else if (e.numberOfTouches >= 2) {
-        // RNGH `onTouchesMove` only fires on actual position change, so a
-        // user who places two fingers and pauses ~700ms before pinching
-        // would otherwise see the single-finger long-press timer fire
-        // through (the move-driven clear paths never run). Long-press is
-        // a single-finger gesture — disarm it as soon as a second finger
-        // arrives.
+      }
+
+      // Multi-finger normalization. Runs UNCONDITIONALLY whenever the touch
+      // event reports 2+ fingers — covering both the simultaneous case (touch
+      // begins with 2 fingers in a single batched UIEvent, `!firstTouch.value`
+      // branch above ran) AND the sequential case (2nd finger arrives in a
+      // later event, `firstTouch.value` already set). Centralising here
+      // eliminates the prior mutually-exclusive-branches structure where each
+      // new single-finger invariant (long-press timer, double-tap state,
+      // future additions) had to be re-mirrored into both branches and
+      // reviewers kept finding gaps.
+      if (e.numberOfTouches >= 2) {
+        // Long-press is a single-finger gesture — disarm any armed timer.
+        // Safe no-op if the simultaneous-case long-press gate in
+        // `_handlePanResponderGrant` already prevented arming.
         runOnJS(clearLongPressTimeout)();
-        // Mirror the pinch-transition clear in `_handlePanResponderMove`:
-        // a 2nd finger landing means the user is starting a multi-finger
-        // gesture, NOT a double-tap, regardless of subsequent movement.
-        // Without this, a tap-then-2-finger-touch-and-release within
-        // `doubleTapDelay` (with no movement crossing the 2px shift
-        // threshold) misclassifies as a double-tap and triggers an
-        // unintended programmatic zoom.
+        // A 2nd finger landing means the user is starting a multi-finger
+        // gesture, NOT a double-tap. Clear stale tap-release state so a
+        // tap-then-2-finger-touch-and-release within `doubleTapDelay` is
+        // not misclassified as a double-tap (mirrors the pinch-transition
+        // clear in `_handlePanResponderMove`).
         doubleTapFirstTapReleaseTimestamp.value = undefined;
         doubleTapFirstTap.value = undefined;
       }
