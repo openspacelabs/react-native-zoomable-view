@@ -998,14 +998,24 @@ const ReactNativeZoomableViewInner: ForwardRefRenderFunction<
    * Handles the end of touch events
    *
    * @param e
-   * @param gestureState
+   * @param wasReleased — `true` only when the gesture ended via a genuine
+   *   touch release (`onTouchesUp` with `numberOfTouches === 0`). The forced
+   *   end on `numberOfTouches > 2` and the cancellation path
+   *   (`onTouchesCancelled`) pass `false`. Default is `false` so adding a new
+   *   call site cannot accidentally classify a non-release as a tap. Tap
+   *   classification (`_resolveAndHandleTap`) only runs when `wasReleased`
+   *   is `true` — otherwise multi-finger force-end and RNGH cancellations
+   *   would each produce a spurious `onSingleTap` event.
    *
    * @private
    */
-  const _handlePanResponderEnd = (e: GestureTouchEvent) => {
+  const _handlePanResponderEnd = (
+    e: GestureTouchEvent,
+    wasReleased = false
+  ) => {
     'worklet';
 
-    if (!gestureType.value) {
+    if (wasReleased && !gestureType.value) {
       // Skip tap classification entirely if a long-press already fired
       // during this touch cycle — otherwise the same release would also
       // produce a single/double-tap event.
@@ -1069,6 +1079,9 @@ const ReactNativeZoomableViewInner: ForwardRefRenderFunction<
       }
     } else {
       if (gestureStarted.value) {
+        // Forced end on `numberOfTouches > 2` — the user is still touching
+        // the screen, just with too many fingers. Pass `wasReleased=false`
+        // (default) so this path does not run tap classification.
         _handlePanResponderEnd(e);
       }
       return;
@@ -1135,11 +1148,16 @@ const ReactNativeZoomableViewInner: ForwardRefRenderFunction<
     .onTouchesUp((e, stateManager) => {
       // only end if this is the last touch being lifted
       if (e.numberOfTouches === 0) {
-        _handlePanResponderEnd(e);
+        // Genuine touch release — `wasReleased=true` enables tap
+        // classification (single/double/long press resolution).
+        _handlePanResponderEnd(e, true);
         stateManager.end();
       }
     })
     .onTouchesCancelled((e, stateManager) => {
+      // RNGH cancellation — gesture aborted, not released. Pass
+      // `wasReleased=false` (default) so this path does not produce a
+      // spurious `onSingleTap`.
       _handlePanResponderEnd(e);
       runOnJS(onPanResponderTerminate)(e, _getZoomableViewEventObject());
       stateManager.end();
