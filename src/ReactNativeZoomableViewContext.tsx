@@ -6,6 +6,9 @@ type ZoomableViewContextValue = {
   inverseZoom: DerivedValue<number>;
   // A style that applies the inverse zoom level, so that children stay the same size when zooming.
   // Generic type for compatibility with React Native versions.
+  // Backed by `useAnimatedStyle` — apply only to `Animated.View` (or a
+  // Reanimated-aware component), otherwise children render at the snapshot
+  // scale from first render and will not animate with zoom.
   inverseZoomStyle: { transform: { scale: number }[] };
   offsetX: SharedValue<number>;
   offsetY: SharedValue<number>;

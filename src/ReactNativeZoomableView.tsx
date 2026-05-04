@@ -226,7 +226,18 @@ const ReactNativeZoomableViewInner: ForwardRefRenderFunction<
   const doubleTapFirstTap = useSharedValue<TouchPoint | undefined>(undefined);
   const gestureType = useSharedValue<'shift' | 'pinch' | undefined>(undefined);
 
-  const staticPinPosition = useDerivedValue(() => propStaticPinPosition);
+  // Direct `useSharedValue` rather than a `useDerivedValue` mirror: the prop-
+  // change `useLayoutEffect` below schedules `runOnUI(_invokeOnTransform)()` on
+  // the UI thread, and `_invokeOnTransform` reads `staticPinPosition.value`. A
+  // `useDerivedValue` mirror would update its value via its own `useEffect`,
+  // which React runs AFTER `useLayoutEffect`, so the queued worklet would read
+  // the OLD value and fire `onStaticPinPositionMoveWorklet` with stale data.
+  // Cross-thread `sharedValue.value =` writes via JSI are visible to the UI
+  // runtime, so writing from the JS-thread layout effect before the `runOnUI`
+  // hop guarantees `_invokeOnTransform` reads the new position.
+  const staticPinPosition = useSharedValue<Vec2D | undefined>(
+    propStaticPinPosition
+  );
   const contentWidth = useDerivedValue(() => propContentWidth);
   const contentHeight = useDerivedValue(() => propContentHeight);
   const zoomEnabled = useDerivedValue(() => propZoomEnabled);
@@ -592,6 +603,10 @@ const ReactNativeZoomableViewInner: ForwardRefRenderFunction<
 
   // Handle staticPinPosition changed
   useLayoutEffect(() => {
+    // Sync the SharedValue synchronously before the `runOnUI` hop so the UI-
+    // thread `_invokeOnTransform` reads the new position. See the note on the
+    // `staticPinPosition` declaration for why this is not a `useDerivedValue`.
+    staticPinPosition.value = propStaticPinPosition;
     // `_invokeOnTransform` is a worklet that calls the consumer's
     // `onTransformWorklet` and `onStaticPinPositionMoveWorklet` (both
     // documented as UI-thread). The primary call site is the unified
@@ -989,10 +1004,10 @@ const ReactNativeZoomableViewInner: ForwardRefRenderFunction<
         doubleTapFirstTapReleaseTimestamp.value = undefined;
         singleTapTimeoutId.current = undefined;
 
-        // Read `staticPinPosition` from the existing `useDerivedValue` mirror
-        // rather than the closure-captured `props.staticPinPosition` — the
-        // closure was captured at schedule time (300ms ago) and may now be
-        // stale if the consumer moved the pin during the timer window.
+        // Read `staticPinPosition` from the SharedValue rather than the
+        // closure-captured `props.staticPinPosition` — the closure was
+        // captured at schedule time (300ms ago) and may now be stale if the
+        // consumer moved the pin during the timer window.
         const currentStaticPinPosition = staticPinPosition.value;
 
         // Pan to the tapped location
