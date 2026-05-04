@@ -118,6 +118,7 @@ const ReactNativeZoomableViewInner: ForwardRefRenderFunction<
     panEnabled: propPanEnabled,
     disablePanOnInitialZoom: propDisablePanOnInitialZoom,
     initialZoom: propsInitialZoom,
+    zoomStep: propZoomStep,
     pinProps,
   } = props;
 
@@ -163,6 +164,7 @@ const ReactNativeZoomableViewInner: ForwardRefRenderFunction<
   );
   const initialZoom = useDerivedValue(() => propsInitialZoom);
   const movementSensitivity = useDerivedValue(() => propMovementSensitivity);
+  const zoomStep = useDerivedValue(() => propZoomStep);
   const onPanResponderGrant = useLatestCallback(
     props.onPanResponderGrant || (() => undefined)
   );
@@ -545,29 +547,29 @@ const ReactNativeZoomableViewInner: ForwardRefRenderFunction<
    * @param newZoomLevel
    * @param zoomCenter - If not supplied, the container's center is the zoom center
    */
-  const publicZoomTo = useLatestCallback(
-    (newZoomLevel: number, zoomCenter?: Vec2D) => {
-      if (!props.zoomEnabled) return false;
-      if (props.maxZoom && newZoomLevel > props.maxZoom) return false;
-      if (props.minZoom && newZoomLevel < props.minZoom) return false;
+  const publicZoomTo = (newZoomLevel: number, zoomCenter?: Vec2D) => {
+    'worklet';
 
-      // == Trigger Pan Animation to preserve the zoom center while zooming ==
-      // See the "Zoom Animation Support" block more details
-      zoomToDestination.value = zoomCenter;
-      prevZoom.value = zoom.value;
+    if (!zoomEnabled.value) return false;
+    if (maxZoom.value != null && newZoomLevel > maxZoom.value) return false;
+    if (minZoom.value != null && newZoomLevel < minZoom.value) return false;
 
-      // == Perform Zoom Animation ==
-      zoom.value = withTiming(newZoomLevel, zoomToAnimation, () => {
-        'worlet';
+    // == Trigger Pan Animation to preserve the zoom center while zooming ==
+    // See the "Zoom Animation Support" block more details
+    zoomToDestination.value = zoomCenter;
+    prevZoom.value = zoom.value;
 
-        // == Zoom Animation Ends ==
-        zoomToDestination.value = undefined;
-        runOnJS(onZoomEnd)(undefined, _getZoomableViewEventObject());
-      });
+    // == Perform Zoom Animation ==
+    zoom.value = withTiming(newZoomLevel, zoomToAnimation, () => {
+      'worklet';
 
-      return true;
-    }
-  );
+      // == Zoom Animation Ends ==
+      zoomToDestination.value = undefined;
+      runOnJS(onZoomEnd)(undefined, _getZoomableViewEventObject());
+    });
+
+    return true;
+  };
 
   // Zoom Animation Support:
   // Adapt offsets when zoom level changes during zoomTo animation
@@ -696,30 +698,28 @@ const ReactNativeZoomableViewInner: ForwardRefRenderFunction<
     }
   };
 
-  const publicMoveStaticPinTo = useLatestCallback(
-    (position: Vec2D, duration?: number) => {
-      const { staticPinPosition, contentWidth, contentHeight } = props;
+  const publicMoveStaticPinTo = (position: Vec2D, duration?: number) => {
+    'worklet';
 
-      if (!staticPinPosition) return;
-      if (!originalWidth.value || !originalHeight.value) return;
-      if (!contentWidth || !contentHeight) return;
+    if (!staticPinPosition.value) return;
+    if (!originalWidth.value || !originalHeight.value) return;
+    if (!contentWidth.value || !contentHeight.value) return;
 
-      // Offset for the static pin
-      const pinX = staticPinPosition.x - originalWidth.value / 2;
-      const pinY = staticPinPosition.y - originalHeight.value / 2;
+    // Offset for the static pin
+    const pinX = staticPinPosition.value.x - originalWidth.value / 2;
+    const pinY = staticPinPosition.value.y - originalHeight.value / 2;
 
-      const newOffsetX = contentWidth / 2 - position.x + pinX / zoom.value;
-      const newOffsetY = contentHeight / 2 - position.y + pinY / zoom.value;
+    const newOffsetX = contentWidth.value / 2 - position.x + pinX / zoom.value;
+    const newOffsetY = contentHeight.value / 2 - position.y + pinY / zoom.value;
 
-      if (duration) {
-        offsetX.value = withTiming(newOffsetX, { duration });
-        offsetY.value = withTiming(newOffsetY, { duration });
-      } else {
-        offsetX.value = newOffsetX;
-        offsetY.value = newOffsetY;
-      }
+    if (duration) {
+      offsetX.value = withTiming(newOffsetX, { duration });
+      offsetY.value = withTiming(newOffsetY, { duration });
+    } else {
+      offsetX.value = newOffsetX;
+      offsetY.value = newOffsetY;
     }
-  );
+  };
 
   /**
    * Zooms in or out by a specified change level
@@ -732,11 +732,13 @@ const ReactNativeZoomableViewInner: ForwardRefRenderFunction<
    *
    * @return {bool}
    */
-  const publicZoomBy = useLatestCallback((zoomLevelChange: number) => {
+  const publicZoomBy = (zoomLevelChange: number) => {
+    'worklet';
+
     // if no zoom level Change given -> just use zoom step
-    zoomLevelChange ||= props.zoomStep || 0;
+    zoomLevelChange ||= zoomStep.value || 0;
     return publicZoomTo(zoom.value + zoomLevelChange);
-  });
+  };
 
   /**
    * Moves the zoomed view to a specified position
@@ -747,16 +749,16 @@ const ReactNativeZoomableViewInner: ForwardRefRenderFunction<
    *
    * @return {bool}
    */
-  const publicMoveTo = useLatestCallback(
-    (newOffsetX: number, newOffsetY: number) => {
-      if (!originalWidth.value || !originalHeight.value) return;
+  const publicMoveTo = (newOffsetX: number, newOffsetY: number) => {
+    'worklet';
 
-      const offsetX = (newOffsetX - originalWidth.value / 2) / zoom.value;
-      const offsetY = (newOffsetY - originalHeight.value / 2) / zoom.value;
+    if (!originalWidth.value || !originalHeight.value) return;
 
-      _setNewOffsetPosition(-offsetX, -offsetY);
-    }
-  );
+    const offsetX = (newOffsetX - originalWidth.value / 2) / zoom.value;
+    const offsetY = (newOffsetY - originalHeight.value / 2) / zoom.value;
+
+    _setNewOffsetPosition(-offsetX, -offsetY);
+  };
 
   /**
    * Moves the zoomed view by a certain amount.
@@ -768,16 +770,16 @@ const ReactNativeZoomableViewInner: ForwardRefRenderFunction<
    *
    * @return {bool}
    */
-  const publicMoveBy = useLatestCallback(
-    (offsetChangeX: number, offsetChangeY: number) => {
-      const newOffsetX =
-        (offsetX.value * zoom.value - offsetChangeX) / zoom.value;
-      const newOffsetY =
-        (offsetY.value * zoom.value - offsetChangeY) / zoom.value;
+  const publicMoveBy = (offsetChangeX: number, offsetChangeY: number) => {
+    'worklet';
 
-      _setNewOffsetPosition(newOffsetX, newOffsetY);
-    }
-  );
+    const newOffsetX =
+      (offsetX.value * zoom.value - offsetChangeX) / zoom.value;
+    const newOffsetY =
+      (offsetY.value * zoom.value - offsetChangeY) / zoom.value;
+
+    _setNewOffsetPosition(newOffsetX, newOffsetY);
+  };
 
   useImperativeHandle(ref, () => ({
     zoomTo: publicZoomTo,
