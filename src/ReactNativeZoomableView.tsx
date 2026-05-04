@@ -553,7 +553,7 @@ const ReactNativeZoomableViewInner: ForwardRefRenderFunction<
 
       // == Perform Zoom Animation ==
       zoom.value = withTiming(newZoomLevel, zoomToAnimation, () => {
-        'worlet';
+        'worklet';
 
         // == Zoom Animation Ends ==
         zoomToDestination.value = undefined;
