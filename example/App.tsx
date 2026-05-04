@@ -1,5 +1,4 @@
 import {
-  FixedSize,
   ReactNativeZoomableView,
   ReactNativeZoomableViewRef,
 } from '@openspacelabs/react-native-zoomable-view';
@@ -42,7 +41,6 @@ const PageSheetModal = ({
 
 export default function App() {
   const ref = useRef<ReactNativeZoomableViewRef>(null);
-  const [showMarkers, setShowMarkers] = useState(true);
   const [modal, setModal] = useState(false);
   const [size, setSize] = useState<{ width: number; height: number }>({
     width: 0,
@@ -98,26 +96,11 @@ export default function App() {
         >
           <View style={styles.contents}>
             <Image style={styles.img} source={{ uri }} />
-
-            {showMarkers &&
-              [20, 40, 60, 80].map((left) =>
-                [20, 40, 60, 80].map((top) => (
-                  <FixedSize left={left} top={top} key={`${left}x${top}`}>
-                    <View style={styles.marker} />
-                  </FixedSize>
-                ))
-              )}
           </View>
         </ReactNativeZoomableView>
       </View>
       <Text>onStaticPinPositionChange: {stringifyPoint(pin)}</Text>
       <Text>onStaticPinPositionMove: {stringifyPoint(movePin)}</Text>
-      <Button
-        title={`${showMarkers ? 'Hide' : 'Show'} markers`}
-        onPress={() => {
-          setShowMarkers((value) => !value);
-        }}
-      />
 
       <Button
         // Toggle modal to test if zoomable view works correctly in modal,

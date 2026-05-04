@@ -40,7 +40,6 @@ import { getNextZoomStep } from './helper/getNextZoomStep';
 import { useDebugPoints } from './hooks/useDebugPoints';
 import { useLatestCallback } from './hooks/useLatestCallback';
 import { useZoomSubject } from './hooks/useZoomSubject';
-import { ReactNativeZoomableViewContext } from './ReactNativeZoomableViewContext';
 import { styles } from './styles';
 import {
   ReactNativeZoomableViewProps,
@@ -124,10 +123,6 @@ const ReactNativeZoomableViewInner: ForwardRefRenderFunction<
   const offsetX = useSharedValue(0);
   const offsetY = useSharedValue(0);
   const zoom = useSharedValue(1);
-  const inverseZoom = useDerivedValue(() => 1 / zoom.value);
-  const inverseZoomStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: inverseZoom.value }],
-  }));
 
   const lastGestureCenterPosition = useSharedValue<Vec2D | null>(null);
   const lastGestureTouchDistance = useSharedValue<number | null>(150);
@@ -934,56 +929,52 @@ const ReactNativeZoomableViewInner: ForwardRefRenderFunction<
   });
 
   return (
-    <ReactNativeZoomableViewContext.Provider
-      value={{ zoom, inverseZoom, inverseZoomStyle, offsetX, offsetY }}
-    >
-      <GestureHandlerRootView>
-        <GestureDetector gesture={gesture}>
-          <View
-            style={styles.container}
-            ref={zoomSubjectWrapperRef}
-            onLayout={measureZoomSubject}
+    <GestureHandlerRootView>
+      <GestureDetector gesture={gesture}>
+        <View
+          style={styles.container}
+          ref={zoomSubjectWrapperRef}
+          onLayout={measureZoomSubject}
+        >
+          <Animated.View
+            style={[styles.zoomSubject, props.style, transformStyle]}
           >
-            <Animated.View
-              style={[styles.zoomSubject, props.style, transformStyle]}
-            >
-              {children}
-            </Animated.View>
+            {children}
+          </Animated.View>
 
-            {visualTouchFeedbackEnabled &&
-              stateTouches.map(
-                (touch) =>
-                  doubleTapDelay && (
-                    <AnimatedTouchFeedback
-                      x={touch.x}
-                      y={touch.y}
-                      key={touch.id}
-                      animationDuration={doubleTapDelay}
-                      onAnimationDone={() => {
-                        _removeTouch(touch);
-                      }}
-                    />
-                  )
-              )}
-
-            {/* For Debugging Only */}
-            {debugPoints.map(({ x, y }, index) => {
-              return <DebugTouchPoint key={index} x={x} y={y} />;
-            })}
-
-            {propStaticPinPosition && (
-              <StaticPin
-                staticPinIcon={staticPinIcon}
-                staticPinPosition={propStaticPinPosition}
-                pinSize={pinSize}
-                setPinSize={setPinSize}
-                pinProps={pinProps}
-              />
+          {visualTouchFeedbackEnabled &&
+            stateTouches.map(
+              (touch) =>
+                doubleTapDelay && (
+                  <AnimatedTouchFeedback
+                    x={touch.x}
+                    y={touch.y}
+                    key={touch.id}
+                    animationDuration={doubleTapDelay}
+                    onAnimationDone={() => {
+                      _removeTouch(touch);
+                    }}
+                  />
+                )
             )}
-          </View>
-        </GestureDetector>
-      </GestureHandlerRootView>
-    </ReactNativeZoomableViewContext.Provider>
+
+          {/* For Debugging Only */}
+          {debugPoints.map(({ x, y }, index) => {
+            return <DebugTouchPoint key={index} x={x} y={y} />;
+          })}
+
+          {propStaticPinPosition && (
+            <StaticPin
+              staticPinIcon={staticPinIcon}
+              staticPinPosition={propStaticPinPosition}
+              pinSize={pinSize}
+              setPinSize={setPinSize}
+              pinProps={pinProps}
+            />
+          )}
+        </View>
+      </GestureDetector>
+    </GestureHandlerRootView>
   );
 };
 
