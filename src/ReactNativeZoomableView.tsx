@@ -270,6 +270,12 @@ const ReactNativeZoomableViewInner: ForwardRefRenderFunction<
 
     if (!staticPinPosition.value) return;
     if (!contentWidth.value || !contentHeight.value) return;
+    // Mirror the guard in `_invokeOnTransform` and `onLayoutWorklet`'s
+    // reaction: pre-measurement (originalWidth/Height === 0), the
+    // coordinate-conversion math divides by zero and yields
+    // `{x: Infinity, y: Infinity}`, which the settle reaction's `!current`
+    // check would let through to `onStaticPinPositionChange`.
+    if (!originalWidth.value || !originalHeight.value) return;
 
     return viewportPositionToImagePosition({
       viewportPosition: {
@@ -1092,7 +1098,7 @@ const ReactNativeZoomableViewInner: ForwardRefRenderFunction<
       }
     }
 
-    runOnJS(setDebugPoints)([]);
+    if (debug) runOnJS(setDebugPoints)([]);
 
     lastGestureCenterPosition.value = null;
 

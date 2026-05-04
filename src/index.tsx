@@ -9,6 +9,8 @@ import { useZoomableViewContext } from './ReactNativeZoomableViewContext';
 import type {
   ReactNativeZoomableViewProps,
   ReactNativeZoomableViewRef,
+  Size2D,
+  Vec2D,
   ZoomableViewEvent,
 } from './typings';
 
@@ -20,7 +22,9 @@ export {
   ReactNativeZoomableView,
   ReactNativeZoomableViewProps,
   ReactNativeZoomableViewRef,
+  Size2D,
   useZoomableViewContext,
+  Vec2D,
   viewportPositionToImagePosition,
   ZoomableViewEvent,
 };
