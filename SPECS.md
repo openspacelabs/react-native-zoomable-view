@@ -294,6 +294,7 @@ This major replaces the class-component PanResponder/Animated implementation wit
 - `onZoomBefore`, `onZoomAfter` — per-frame zoom callbacks are gone; use `zoomEnabled` and the sensitivity props
 - `onStartShouldSetPanResponder*`, `onMoveShouldSetPanResponderCapture`, `onPanResponderTerminationRequest`, `onShouldBlockNativeResponder` — integrate via RNGH gesture composition (e.g. `simultaneousWithExternalGesture`) instead
 - `onStaticPinPress`, `onStaticPinLongPress` — the pin no longer owns a gesture handler; the parent's tap/long-press callbacks fire whether or not the touch lands on the pin
+- `onLayout` → `onLayoutWorklet` (UI thread; payload is the unwrapped `{ x, y, width, height }` object, not a synthetic `LayoutChangeEvent`)
 - `onTransform` → `onTransformWorklet` (UI thread)
 - `onPanResponderMove` → `onPanResponderMoveWorklet` (UI thread)
 - `onStaticPinPositionMove` → `onStaticPinPositionMoveWorklet` (UI thread)

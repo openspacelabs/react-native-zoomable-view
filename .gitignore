@@ -61,5 +61,3 @@ android/keystores/debug.keystore
 
 # Local agent/tooling artifacts (see REVIEW.md §1)
 .merge-notes/
-.claude/
-.claude-work/
