@@ -53,7 +53,9 @@ We are working with the original maintainers of this library to transfer the NPM
 
 **Requirements:**
 - React Native >= 0.79.0
-- React >= 16.8.0
+- React >= 18.0.0
+- [`react-native-reanimated`](https://docs.swmansion.com/react-native-reanimated/docs/fundamentals/getting-started) ^3.16.1 (peer dependency — install separately and follow its setup, including the Babel plugin)
+- [`react-native-gesture-handler`](https://docs.swmansion.com/react-native-gesture-handler/docs/installation) ^2.20.2 (peer dependency — install separately and wrap your root with `GestureHandlerRootView`)
 
 To add this package, run
 
@@ -65,8 +67,7 @@ or
 
 ### Basic Usage
 
-This component is based on react-natives View, enhanced by panresponders and other events to make it zoomable.
-Therefore no platform specific configuration needs to be done.
+This component is built on `react-native-reanimated` and `react-native-gesture-handler`. Make sure both peer dependencies are installed and configured per their setup guides — in particular, add the Reanimated Babel plugin to your `babel.config.js` and wrap your app root in `GestureHandlerRootView`.
 
 Just use it as a drop in component instead of a normal view.
 
@@ -84,7 +85,7 @@ Use the component:
    minZoom={0.5}
    zoomStep={0.5}
    initialZoom={1}
-   onZoomAfter={this.logOutZoomState}
+   onZoomEnd={logOutZoomState}
    style={{
       padding: 10,
       backgroundColor: 'red',
@@ -224,10 +225,15 @@ The following methods allow you to control the ZoomableView zoom level & positio
 **Example:**
 
 ```TSX
+import { createRef } from 'react';
+import {
+  ReactNativeZoomableView,
+  type ReactNativeZoomableViewRef,
+} from '@openspacelabs/react-native-zoomable-view';
 
 export default function App() {
-  // you will need a reference to the ReactNativeZoomableView component
-  const zoomableViewRef = createRef<ReactNativeZoomableView>();
+  // you will need a reference to the ReactNativeZoomableView's imperative handle
+  const zoomableViewRef = createRef<ReactNativeZoomableViewRef>();
 
   return (
     <View style={styles.container}>
