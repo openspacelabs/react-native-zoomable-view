@@ -11,7 +11,6 @@ import { StyleSheet, View } from 'react-native';
 import {
   Gesture,
   GestureDetector,
-  GestureHandlerRootView,
   GestureTouchEvent,
 } from 'react-native-gesture-handler';
 import Animated, {
@@ -177,6 +176,19 @@ const ReactNativeZoomableViewInner: ForwardRefRenderFunction<
   const lastGestureCenterPosition = useSharedValue<Vec2D | null>(null);
   const lastGestureTouchDistance = useSharedValue<number | null>(150);
   const gestureStarted = useSharedValue(false);
+  // JS-thread mirror of `gestureStarted` exposed via the imperative handle.
+  // The UI-thread `gestureStarted` SharedValue must reset synchronously at
+  // the end of `_handlePanResponderEnd` so subsequent `onTouchesMove`
+  // worklets read coherent state-machine flags. But SPECS L157 requires
+  // consumers reading `ref.current.gestureStarted` from inside
+  // `onPanResponderEnd`/`onZoomEnd`/`onShiftingEnd` to see `true`. Splitting
+  // the two: UI-thread flag is internal-only; this JS-thread mirror is
+  // updated via `runOnJS` ordered LAST after the end-callbacks drain so
+  // consumer reads inside those callbacks return `true`.
+  const gestureStartedJSRef = useRef(false);
+  const setGestureStartedJS = useLatestCallback((started: boolean) => {
+    gestureStartedJSRef.current = started;
+  });
 
   /**
    * Last press time (used to evaluate whether user double tapped)
@@ -646,6 +658,17 @@ const ReactNativeZoomableViewInner: ForwardRefRenderFunction<
       if (e.numberOfTouches === 1) {
         runOnJS(scheduleLongPressTimeout)(e);
       }
+    }
+    // Mirror to JS-thread ref BEFORE the grant callback dispatches so a
+    // consumer reading `ref.current.gestureStarted` from inside
+    // `onPanResponderGrant` sees `true`. JS `runOnJS` calls execute FIFO,
+    // so queuing the mirror update first guarantees it runs before the
+    // grant callback. The recovery path (`isRecovery=true`) also re-asserts
+    // the mirror here — the prior force-end queued `setGestureStartedJS(false)`
+    // and that JS-thread write would otherwise leave the mirror `false` for
+    // the resumed gesture.
+    runOnJS(setGestureStartedJS)(true);
+    if (!isRecovery) {
       runOnJS(onPanResponderGrant)(e, _getZoomableViewEventObject());
     }
 
@@ -1070,7 +1093,7 @@ const ReactNativeZoomableViewInner: ForwardRefRenderFunction<
     moveBy: publicMoveBy,
     moveStaticPinTo: publicMoveStaticPinTo,
     get gestureStarted() {
-      return gestureStarted.value;
+      return gestureStartedJSRef.current;
     },
   }));
 
@@ -1127,19 +1150,21 @@ const ReactNativeZoomableViewInner: ForwardRefRenderFunction<
     // SETTLE_QUIET_MS after the last position change — gesture end included.
     // No explicit invocation needed here.
 
-    // Defer the gesture-state resets via a final `runOnJS` so they enqueue
-    // *after* the prior `runOnJS` end-callback dispatches drain on the JS
-    // thread. SPECS L157: `gestureStarted` clears at the END of the
-    // gesture-end handler, after all end callbacks have fired. A consumer
+    // Reset the UI-thread state-machine flags synchronously. The next
+    // `onTouchesMove` worklet (one frame later for a sustained 3+ finger
+    // gesture, or after a 2→3→2 transient) reads these flags to decide
+    // between the recovery branch and the force-end branch — a deferred
+    // `runOnJS` reset would leave them stale on the UI thread for that
+    // window, queuing duplicate end-callbacks and skipping recovery.
+    gestureType.value = undefined;
+    gestureStarted.value = false;
+    // Defer ONLY the JS-thread mirror reset so it enqueues *after* the
+    // prior `runOnJS` end-callback dispatches drain. SPECS L157: a consumer
     // reading `ref.current.gestureStarted` from inside `onPanResponderEnd`
-    // / `onZoomEnd` / `onShiftingEnd` must see `true`. Synchronous UI-thread
-    // writes here would land before the JS-thread callbacks run, breaking
-    // the contract. `gestureType` is reset alongside so its reads (e.g. in
-    // a consumer's branching end-callback) stay consistent.
-    runOnJS(() => {
-      gestureType.value = undefined;
-      gestureStarted.value = false;
-    })();
+    // / `onZoomEnd` / `onShiftingEnd` must see `true`. The mirror is the
+    // consumer-facing source of truth; the SharedValue above is internal
+    // state-machine only.
+    runOnJS(setGestureStartedJS)(false);
   };
 
   /**
@@ -1304,60 +1329,58 @@ const ReactNativeZoomableViewInner: ForwardRefRenderFunction<
     <ReactNativeZoomableViewProvider
       value={{ zoom, inverseZoom, inverseZoomStyle, offsetX, offsetY }}
     >
-      <GestureHandlerRootView>
-        <GestureDetector gesture={gesture}>
-          <View
+      <GestureDetector gesture={gesture}>
+        <View
+          // eslint-disable-next-line @typescript-eslint/no-use-before-define
+          style={styles.container}
+          ref={zoomSubjectWrapperRef}
+          onLayout={measureZoomSubject}
+        >
+          <Animated.View
             // eslint-disable-next-line @typescript-eslint/no-use-before-define
-            style={styles.container}
-            ref={zoomSubjectWrapperRef}
-            onLayout={measureZoomSubject}
+            style={[styles.zoomSubject, props.style, transformStyle]}
           >
-            <Animated.View
-              // eslint-disable-next-line @typescript-eslint/no-use-before-define
-              style={[styles.zoomSubject, props.style, transformStyle]}
-            >
-              {children}
-            </Animated.View>
+            {children}
+          </Animated.View>
 
-            {visualTouchFeedbackEnabled &&
-              stateTouches.map(
-                (touch) =>
-                  // Coerce `doubleTapDelay` to a strict boolean — bare
-                  // `doubleTapDelay && (...)` evaluates to `0` when delay is
-                  // `0`, and React will then try to render the literal `0` as
-                  // a text child outside a <Text>, crashing with the
-                  // "Text strings must be rendered within a <Text> component"
-                  // error.
-                  !!doubleTapDelay && (
-                    <AnimatedTouchFeedback
-                      x={touch.x}
-                      y={touch.y}
-                      key={touch.id}
-                      animationDuration={doubleTapDelay}
-                      onAnimationDone={() => {
-                        _removeTouch(touch);
-                      }}
-                    />
-                  )
-              )}
-
-            {/* For Debugging Only */}
-            {debugPoints.map(({ x, y }, index) => {
-              return <DebugTouchPoint key={index} x={x} y={y} />;
-            })}
-
-            {propStaticPinPosition && (
-              <StaticPin
-                staticPinIcon={staticPinIcon}
-                staticPinPosition={propStaticPinPosition}
-                pinSize={pinSize}
-                setPinSize={setPinSize}
-                pinProps={pinProps}
-              />
+          {visualTouchFeedbackEnabled &&
+            stateTouches.map(
+              (touch) =>
+                // Coerce `doubleTapDelay` to a strict boolean — bare
+                // `doubleTapDelay && (...)` evaluates to `0` when delay is
+                // `0`, and React will then try to render the literal `0` as
+                // a text child outside a <Text>, crashing with the
+                // "Text strings must be rendered within a <Text> component"
+                // error.
+                !!doubleTapDelay && (
+                  <AnimatedTouchFeedback
+                    x={touch.x}
+                    y={touch.y}
+                    key={touch.id}
+                    animationDuration={doubleTapDelay}
+                    onAnimationDone={() => {
+                      _removeTouch(touch);
+                    }}
+                  />
+                )
             )}
-          </View>
-        </GestureDetector>
-      </GestureHandlerRootView>
+
+          {/* For Debugging Only */}
+          {debugPoints.map(({ x, y }, index) => {
+            return <DebugTouchPoint key={index} x={x} y={y} />;
+          })}
+
+          {propStaticPinPosition && (
+            <StaticPin
+              staticPinIcon={staticPinIcon}
+              staticPinPosition={propStaticPinPosition}
+              pinSize={pinSize}
+              setPinSize={setPinSize}
+              pinProps={pinProps}
+            />
+          )}
+        </View>
+      </GestureDetector>
     </ReactNativeZoomableViewProvider>
   );
 };
