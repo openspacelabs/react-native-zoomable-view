@@ -587,7 +587,10 @@ const ReactNativeZoomableViewInner: ForwardRefRenderFunction<
     }
   });
 
-  const _handlePanResponderGrant = (e: GestureTouchEvent) => {
+  const _handlePanResponderGrant = (
+    e: GestureTouchEvent,
+    isRecovery = false
+  ) => {
     'worklet';
 
     // Cancel any pending single-tap fire from the previous gesture cycle —
@@ -599,9 +602,16 @@ const ReactNativeZoomableViewInner: ForwardRefRenderFunction<
     // see `longPressFired` for why this gates `_resolveAndHandleTap`.
     longPressFired.value = false;
 
-    runOnJS(scheduleLongPressTimeout)(e);
-
-    runOnJS(onPanResponderGrant)(e, _getZoomableViewEventObject());
+    if (!isRecovery) {
+      // The consumer-visible grant + long-press arming run only on the
+      // first grant of a touch cycle. The recovery path (a 3+ finger
+      // transient that force-ended an active gesture, then dropped back
+      // to ≤2 fingers without all touches lifting) restores internal
+      // gesture state without re-firing `onPanResponderGrant` or
+      // re-arming a stale long-press timer for a continuous gesture.
+      runOnJS(scheduleLongPressTimeout)(e);
+      runOnJS(onPanResponderGrant)(e, _getZoomableViewEventObject());
+    }
 
     cancelAnimation(zoom);
     cancelAnimation(offsetX);
@@ -1109,7 +1119,10 @@ const ReactNativeZoomableViewInner: ForwardRefRenderFunction<
     // any invalid number will cause the gesture to end.
     if (e.numberOfTouches <= 2) {
       if (!gestureStarted.value) {
-        _handlePanResponderGrant(e);
+        // Recovery from a 3+ finger transient that force-ended the
+        // gesture: fingers are still down, so don't re-fire the
+        // consumer-visible `onPanResponderGrant` or re-arm long-press.
+        _handlePanResponderGrant(e, true);
       }
     } else {
       if (gestureStarted.value) {
@@ -1147,16 +1160,21 @@ const ReactNativeZoomableViewInner: ForwardRefRenderFunction<
         runOnJS(clearLongPressTimeout)();
       }
 
-      // change some measurement states when switching gesture to ensure a smooth transition
-      if (gestureType.value !== 'shift') {
-        lastGestureCenterPosition.value = calcGestureCenterPoint(e);
-        // Shift starts → previous tap-release timestamp can no longer
-        // contribute to a double-tap; reset so the next tap is fresh.
-        doubleTapFirstTapReleaseTimestamp.value = undefined;
-      }
-
       const isShiftGesture = Math.abs(dx) > 2 || Math.abs(dy) > 2;
       if (isShiftGesture) {
+        // change some measurement states when switching gesture to ensure
+        // a smooth transition. Both updates are gated by `isShiftGesture`
+        // so sub-2px finger jitter on a held tap does not clobber the
+        // double-tap window: real-device touch sensors emit sub-pixel
+        // updates even for held fingers, so a reset gated only by
+        // `gestureType.value !== 'shift'` would fire on every move event
+        // before the threshold is crossed and silently drop double-taps.
+        if (gestureType.value !== 'shift') {
+          lastGestureCenterPosition.value = calcGestureCenterPoint(e);
+          // Shift starts → previous tap-release timestamp can no longer
+          // contribute to a double-tap; reset so the next tap is fresh.
+          doubleTapFirstTapReleaseTimestamp.value = undefined;
+        }
         gestureType.value = 'shift';
         _handleShifting(e);
       }
@@ -1176,6 +1194,14 @@ const ReactNativeZoomableViewInner: ForwardRefRenderFunction<
         stateManager.activate();
         firstTouch.value = { x: e.allTouches[0].x, y: e.allTouches[0].y };
         _handlePanResponderGrant(e);
+      } else if (e.numberOfTouches >= 2) {
+        // RNGH `onTouchesMove` only fires on actual position change, so a
+        // user who places two fingers and pauses ~700ms before pinching
+        // would otherwise see the single-finger long-press timer fire
+        // through (the move-driven clear paths never run). Long-press is
+        // a single-finger gesture — disarm it as soon as a second finger
+        // arrives.
+        runOnJS(clearLongPressTimeout)();
       }
     })
     .onTouchesMove((e) => {

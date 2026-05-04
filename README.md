@@ -175,24 +175,28 @@ These options can be used to limit and change the zoom behavior.
 
 These optional props can be used to keep a "static" pin in the centre of the screen and move the map underneath it. This is very useful for maps.
 
-| name                      | type                      | description                            |
-| ------------------------- | ------------------------- | -------------------------------------- |
-| staticPinPosition         | Vec2D                     | Where in the viewport to put the pin   |
-| staticPinIcon             | Element                   | The pin icon itself                    |
-| onStaticPinPress          | (event) => void           | Callback when the pin is pressed       |
-| onStaticPinLongPress      | (event) => void           | Callback when the pin is long pressed  |
-| onStaticPinPositionChange | (position: Vec2D) => void | Callback every time the pin is at rest |
-| onStaticPinPositionMove   | (position: Vec2D) => void | Callback live while the pin is moving  |
-| pinProps                  | ViewProps                 | Props forwarded to the pin wrapper     |
+| name                           | type                      | description                                                                                          |
+| ------------------------------ | ------------------------- | ---------------------------------------------------------------------------------------------------- |
+| staticPinPosition              | Vec2D                     | Where in the viewport to put the pin                                                                 |
+| staticPinIcon                  | Element                   | The pin icon itself                                                                                  |
+| onStaticPinPositionChange      | (position: Vec2D) => void | Callback every time the pin is at rest                                                               |
+| onStaticPinPositionMoveWorklet | (position: Vec2D) => void | Worklet callback live while the pin is moving (UI thread — must declare `'worklet';`, see note below) |
+| pinProps                       | ViewProps                 | Props forwarded to the pin wrapper                                                                   |
+
+> Note: `onStaticPinPress` and `onStaticPinLongPress` were removed in this revision and are tracked for restoration in a follow-up. Tap-to-select pin behaviour is not currently supported.
 
 #### Callbacks
 
 These events can be used to work with data after specific events.
 
-| name              | description                                                                                                                      | params                                                   | expected return |
-| ----------------- | -------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------- | --------------- |
-| onTransform       | Will be called when the transformation configuration (zoom level and offset) changes                                             | zoomableViewEventObject                                  | void            |
-| onDoubleTapBefore | Will be called at the start of a double tap                                                                                      | event, zoomableViewEventObject                           | void            |
+> Any prop ending in `*Worklet` runs on the UI thread; the function passed must
+> declare `'worklet';` as its first statement so the Reanimated Babel plugin
+> compiles it as a worklet — otherwise the UI-thread invocation will crash.
+
+| name               | description                                                                                                                      | params                                                   | expected return |
+| ------------------ | -------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------- | --------------- |
+| onTransformWorklet | Worklet called when the transformation configuration (zoom level and offset) changes (UI thread — must declare `'worklet';`)     | zoomableViewEventObject                                  | void            |
+| onDoubleTapBefore  | Will be called at the start of a double tap                                                                                      | event, zoomableViewEventObject                           | void            |
 | onDoubleTapAfter  | Will be called at the end of a double tap                                                                                        | event, zoomableViewEventObject                           | void            |
 | onShiftingEnd     | Will be called when user stops a tap and move gesture                                                                            | event, zoomableViewEventObject                           | void            |
 | onZoomEnd         | Will be called after pinchzooming has ended                                                                                      | event, zoomableViewEventObject                           | void            |
