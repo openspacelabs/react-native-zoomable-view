@@ -201,12 +201,16 @@ const ReactNativeZoomableViewInner: ForwardRefRenderFunction<
   // long-press would also `_resolveAndHandleTap`, producing both `onLongPress`
   // and `onSingleTap` for one gesture. Reset on each `_handlePanResponderGrant`.
   const longPressFired = useSharedValue(false);
-  // Sentinel used to suppress tap classification when this touch cycle saw a
-  // 3+ finger force-end. Without it, the eventual real release of the fingers
-  // (after `onTouchesUp` with `numberOfTouches === 0`) would `_resolveAndHandleTap`,
-  // producing a spurious `onSingleTap`/`onDoubleTap*` for what was a multi-finger
-  // gesture. Reset on each non-recovery `_handlePanResponderGrant`.
-  const forceEndPending = useSharedValue(false);
+  // Sentinel used to suppress tap classification when this touch cycle ever
+  // saw `numberOfTouches >= 2` — covering BOTH the 3+ finger force-end path
+  // AND the 2-finger touch+release-with-no-movement path. Without it, the
+  // eventual real release (`onTouchesUp` with `numberOfTouches === 0`) of a
+  // multi-finger gesture that left `gestureType` undefined (no move event,
+  // or move-event force-ended before classification) would fall through to
+  // `_resolveAndHandleTap` and fire a spurious `onSingleTap`/`onDoubleTap*`.
+  // Set unconditionally in the multi-finger normalization block in
+  // `onTouchesDown`; reset on each non-recovery `_handlePanResponderGrant`.
+  const multiFingerTouchOccurred = useSharedValue(false);
   // Sentinel used to suppress tap classification when the consumer's
   // `onPanResponderMoveWorklet` returned truthy at any point during this touch
   // cycle. The early-return in `_handlePanResponderMove` happens BEFORE
@@ -650,11 +654,11 @@ const ReactNativeZoomableViewInner: ForwardRefRenderFunction<
       // consumer-visible grant + long-press timer. The recovery path (a 3+
       // finger transient that force-ended an active gesture, then dropped back
       // to ≤2 fingers without all touches lifting) is a continuation of the
-      // same gesture cycle — preserving `longPressFired` and `forceEndPending`
-      // is what suppresses spurious trailing tap events on the eventual real
-      // release.
+      // same gesture cycle — preserving `longPressFired`,
+      // `multiFingerTouchOccurred`, and `externallyHandled` is what suppresses
+      // spurious trailing tap events on the eventual real release.
       longPressFired.value = false;
-      forceEndPending.value = false;
+      multiFingerTouchOccurred.value = false;
       externallyHandled.value = false;
       // Long-press is a single-finger gesture. Don't arm the timer when this
       // grant is for a simultaneous 2+ finger touch (one batched UIEvent with
@@ -1137,18 +1141,19 @@ const ReactNativeZoomableViewInner: ForwardRefRenderFunction<
 
     if (wasReleased && !gestureType.value) {
       // Skip tap classification entirely if a long-press already fired during
-      // this touch cycle, if a 3+ finger force-end armed `forceEndPending`
-      // earlier in this cycle, or if the consumer's `onPanResponderMoveWorklet`
-      // returned truthy at any move during this cycle — otherwise the same
-      // release would produce a spurious single/double-tap event for what was
-      // a long-press, a multi-finger gesture, or a consumer-handled drag.
+      // this touch cycle, if `numberOfTouches >= 2` was ever observed (covers
+      // both 2-finger touch+release-without-movement and 3+ finger force-end),
+      // or if the consumer's `onPanResponderMoveWorklet` returned truthy at
+      // any move during this cycle — otherwise the same release would produce
+      // a spurious single/double-tap event for what was a long-press, a
+      // multi-finger gesture, or a consumer-handled drag.
       if (
         longPressFired.value ||
-        forceEndPending.value ||
+        multiFingerTouchOccurred.value ||
         externallyHandled.value
       ) {
         longPressFired.value = false;
-        forceEndPending.value = false;
+        multiFingerTouchOccurred.value = false;
         externallyHandled.value = false;
       } else {
         runOnJS(_resolveAndHandleTap)(e);
@@ -1242,14 +1247,12 @@ const ReactNativeZoomableViewInner: ForwardRefRenderFunction<
       if (gestureStarted.value) {
         // Forced end on `numberOfTouches > 2` — the user is still touching
         // the screen, just with too many fingers. Pass `wasReleased=false`
-        // (default) so this path does not run tap classification, and arm
-        // `forceEndPending` so the eventual real release of these fingers
-        // is also suppressed (per SPECS L178). Also clear stale double-tap
-        // state — the touch cycle aborted before it could combine into a
-        // double-tap with a future tap.
-        forceEndPending.value = true;
-        doubleTapFirstTapReleaseTimestamp.value = undefined;
-        doubleTapFirstTap.value = undefined;
+        // (default) so this path does not run tap classification. The
+        // eventual real release is suppressed by `multiFingerTouchOccurred`
+        // (per SPECS L178), set unconditionally in `onTouchesDown` whenever
+        // `numberOfTouches >= 2` and therefore already true by the time this
+        // 3+ finger move event runs. Stale double-tap state is likewise
+        // already cleared by the same `onTouchesDown` block.
         _handlePanResponderEnd(e);
       }
       return;
@@ -1337,6 +1340,13 @@ const ReactNativeZoomableViewInner: ForwardRefRenderFunction<
         // clear in `_handlePanResponderMove`).
         doubleTapFirstTapReleaseTimestamp.value = undefined;
         doubleTapFirstTap.value = undefined;
+        // Mark the cycle as multi-finger so the eventual single-touch
+        // release is not classified as a fresh first tap. Without this, a
+        // 2-finger touch+release with no intervening move event leaves
+        // `gestureType` undefined, falls through every other sentinel, and
+        // schedules `onSingleTap` (or sets the timestamp that a real single
+        // tap within `doubleTapDelay` then misclassifies as a double-tap).
+        multiFingerTouchOccurred.value = true;
       }
     })
     .onTouchesMove((e) => {
