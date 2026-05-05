@@ -142,7 +142,7 @@ If `delta` is falsy, falls back to `zoomStep`. Calls `zoomTo(zoom + delta)`.
 
 ### `moveTo(newOffsetX, newOffsetY)`
 
-Pans so `(newOffsetX, newOffsetY)` (subject-relative pixels) lands at the container centre. Cancels any in-flight `zoomTo()` first. No-op if measurements have not landed (`originalWidth`/`originalHeight` are `0`).
+Pans so `(newOffsetX, newOffsetY)` (subject-relative pixels) lands at the container centre. No-op if measurements have not landed (`originalWidth`/`originalHeight` are `0`); the no-op path leaves any in-flight `zoomTo()` running so a mount-time `useEffect(() => { ref.current.zoomTo(2); ref.current.moveTo(x, y); }, [])` does not silently cancel the zoom. When the move proceeds, cancels any in-flight `zoomTo()` first.
 
 ### `moveBy(offsetChangeX, offsetChangeY)`
 
@@ -150,7 +150,7 @@ Shifts by a pixel delta in container coordinates. Cancels any in-flight `zoomTo(
 
 ### `moveStaticPinTo(position, duration?)`
 
-Pans the view so the static pin aligns with `position` in **content coordinates**. Requires `staticPinPosition`, `originalWidth`/`originalHeight`, and `contentWidth`/`contentHeight` to all be set; otherwise no-op. Cancels any in-flight `zoomTo()` first. When `duration` is truthy, animates over that many ms; otherwise writes offsets instantly.
+Pans the view so the static pin aligns with `position` in **content coordinates**. Requires `staticPinPosition`, `originalWidth`/`originalHeight`, and `contentWidth`/`contentHeight` to all be set; otherwise no-op (the no-op path leaves any in-flight `zoomTo()` running). When the move proceeds, cancels any in-flight `zoomTo()` first. When `duration` is truthy, animates over that many ms; otherwise writes offsets instantly.
 
 ### `gestureStarted` (read-only)
 

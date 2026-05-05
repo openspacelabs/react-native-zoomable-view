@@ -1185,16 +1185,24 @@ const ReactNativeZoomableViewInner: ForwardRefRenderFunction<
   const publicMoveStaticPinTo = (position: Vec2D, duration?: number) => {
     'worklet';
 
+    // Pre-cancel guards: if we're going to bail (no pin / no measurements /
+    // no content size), leave any in-flight zoomTo() alive. The common
+    // mount-time pattern `useEffect(() => { ref.current.zoomTo(2);
+    // ref.current.moveStaticPinTo({x,y}); }, [])` lands both calls before
+    // measurement completes — cancelling the zoom and then no-op'ing the
+    // move would leave zoom stuck at an intermediate value with no
+    // onZoomEnd (withTiming bails on `!finished`). Cancellation runs only
+    // on the active path that will actually write offsets below.
+    if (!staticPinPosition.value) return;
+    if (!originalWidth.value || !originalHeight.value) return;
+    if (!contentWidth.value || !contentHeight.value) return;
+
     // Same hazard as publicMoveTo / publicMoveBy: a concurrent zoomTo would
     // keep recentering offsets via the unified transform reaction's
     // recompute branch, clobbering the offset writes below (direct `.value`
     // assignments cancel `withTiming` on the same SharedValue).
     cancelAnimation(zoom);
     zoomToDestination.value = undefined;
-
-    if (!staticPinPosition.value) return;
-    if (!originalWidth.value || !originalHeight.value) return;
-    if (!contentWidth.value || !contentHeight.value) return;
 
     // Offset for the static pin
     const pinX = staticPinPosition.value.x - originalWidth.value / 2;
@@ -1229,13 +1237,20 @@ const ReactNativeZoomableViewInner: ForwardRefRenderFunction<
   const publicMoveTo = (newOffsetX: number, newOffsetY: number) => {
     'worklet';
 
+    // Pre-cancel guard: if measurements haven't landed yet, bail without
+    // touching the zoom animation. Common mount-time pattern
+    // `useEffect(() => { ref.current.zoomTo(2); ref.current.moveTo(x,y); }, [])`
+    // lands both calls before measurement completes — cancelling zoom and
+    // then no-op'ing the move would leave zoom stuck at an intermediate
+    // value with no onZoomEnd. Cancellation runs only on the active path
+    // that will actually write offsets below.
+    if (!originalWidth.value || !originalHeight.value) return;
+
     // Cancel any in-flight zoomTo() so its zoom-centering reaction doesn't
     // fight the move we're about to apply — without this, a concurrent
     // zoomTo's per-tick offset recompute would clobber our final position.
     cancelAnimation(zoom);
     zoomToDestination.value = undefined;
-
-    if (!originalWidth.value || !originalHeight.value) return;
 
     const offsetX = (newOffsetX - originalWidth.value / 2) / zoom.value;
     const offsetY = (newOffsetY - originalHeight.value / 2) / zoom.value;
