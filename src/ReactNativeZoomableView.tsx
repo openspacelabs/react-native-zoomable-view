@@ -369,6 +369,12 @@ const ReactNativeZoomableViewInner: ForwardRefRenderFunction<
   const onStaticPinPositionChange = useLatestCallback(
     props.onStaticPinPositionChange || (() => undefined)
   );
+  // Post-unmount-safe wrapper invoked from the settle reaction's `runOnJS`
+  // hop — see the call site for the race rationale.
+  const _safeStaticPinPositionChange = useLatestCallback((p: Vec2D) => {
+    if (!isMounted.current) return;
+    onStaticPinPositionChange(p);
+  });
 
   // Mirror worklet-typed prop callbacks into SharedValues so worklet call
   // sites always invoke the LATEST consumer callback, not the first-render
@@ -455,7 +461,13 @@ const ReactNativeZoomableViewInner: ForwardRefRenderFunction<
       const last = lastFiredPosition.value;
       if (last && samePosition(current, last)) return;
       lastFiredPosition.value = current;
-      runOnJS(onStaticPinPositionChange)(current);
+      // Post-unmount guard — mirrors the `isMounted` checks in
+      // `scheduleLongPressTimeout` and `_resolveAndHandleTap`. The unmount
+      // cleanup queues `runOnUI(...)` to clear `settleTimer`, but `runOnUI`
+      // is asynchronous; if this 100ms timer fires before the cleanup hop
+      // drains on the UI thread, `runOnJS(onStaticPinPositionChange)` would
+      // otherwise land on the JS thread post-unmount with a stale Vec2D.
+      runOnJS(_safeStaticPinPositionChange)(current);
     }, SETTLE_QUIET_MS);
   });
 
@@ -466,7 +478,17 @@ const ReactNativeZoomableViewInner: ForwardRefRenderFunction<
   }, []);
 
   useLayoutEffect(() => {
-    if (!propZoomEnabled && initialZoom.value) {
+    if (!propZoomEnabled && propsInitialZoom) {
+      // Read `propsInitialZoom` directly (not the `initialZoom`
+      // `useDerivedValue` mirror): the mirror's SharedValue is updated by
+      // Reanimated's internal `useEffect`, which React runs strictly AFTER
+      // `useLayoutEffect` in the same commit. A consumer flipping both
+      // `zoomEnabled` (true→false) and `initialZoom` in the same render
+      // would otherwise snap to the OLD `initialZoom` here, then never
+      // correct (the unified transform reaction's selector doesn't watch
+      // `initialZoom`). Same fix shape as the `staticPinPosition`
+      // migration above.
+      //
       // Mirror the cancellation contract documented on publicZoomTo's
       // withTiming completion ("Each cancellation path is responsible for
       // its own zoomToDestination cleanup"): the direct `zoom.value =` write
@@ -476,9 +498,9 @@ const ReactNativeZoomableViewInner: ForwardRefRenderFunction<
       // be an instant snap.
       cancelAnimation(zoom);
       zoomToDestination.value = undefined;
-      zoom.value = initialZoom.value;
+      zoom.value = propsInitialZoom;
     }
-  }, [propZoomEnabled]);
+  }, [propZoomEnabled, propsInitialZoom]);
 
   // Component-level cleanup. Cancels every animation and pending timer the
   // component owns when it unmounts; without this, an in-flight `withTiming`
@@ -486,6 +508,15 @@ const ReactNativeZoomableViewInner: ForwardRefRenderFunction<
   // after the host has gone away — leaking refs and crashing on `setState`
   // against an unmounted component.
   useEffect(() => {
+    // Restore the mount-true invariant on every (re)mount. `useRef(true)`
+    // initialises once on construction; React 18 StrictMode dev simulates
+    // mount → unmount → remount, and the cleanup below flips
+    // `isMounted.current` to `false` on the simulated unmount. Without this
+    // re-set, the second mount observes the ref as permanently `false` and
+    // every `runOnJS(scheduleLongPressTimeout)` / `runOnJS(_resolveAndHandleTap)`
+    // short-circuits — silently breaking onLongPress, onSingleTap, the
+    // tap-to-pin animation, and double-tap classification in StrictMode dev.
+    isMounted.current = true;
     return () => {
       // Flip first so any queued `runOnJS(scheduleLongPressTimeout)` /
       // `runOnJS(_resolveAndHandleTap)` short-circuits when it drains.
@@ -1292,8 +1323,16 @@ const ReactNativeZoomableViewInner: ForwardRefRenderFunction<
     if (e.numberOfTouches === 2) {
       runOnJS(clearLongPressTimeout)();
 
-      // change some measurement states when switching gesture to ensure a smooth transition
-      if (gestureType.value !== 'pinch') {
+      // change some measurement states when switching gesture to ensure a smooth transition.
+      // The `=== null` clause covers fresh 2-finger sessions begun via a
+      // 2→1→2 finger transient where `gestureType` stayed `'pinch'` from
+      // the prior session — `onTouchesDown`'s multi-finger normalization
+      // nulls the references so this branch re-seeds them. See the comment
+      // in `onTouchesDown` for the full race.
+      if (
+        gestureType.value !== 'pinch' ||
+        lastGestureTouchDistance.value === null
+      ) {
         lastGestureCenterPosition.value = calcGestureCenterPoint(e);
         lastGestureTouchDistance.value = calcGestureTouchDistance(e);
         // Pinch starts → previous tap-release timestamp can no longer
@@ -1378,6 +1417,18 @@ const ReactNativeZoomableViewInner: ForwardRefRenderFunction<
         // schedules `onSingleTap` (or sets the timestamp that a real single
         // tap within `doubleTapDelay` then misclassifies as a double-tap).
         multiFingerTouchOccurred.value = true;
+        // Invalidate pinch reference state on every fresh 2-finger session.
+        // A 2→1→2 finger transient (lift one of two pinch fingers, hold the
+        // other still below the 2px shift threshold, place a new finger)
+        // leaves `gestureType.value === 'pinch'` from the prior session, so
+        // the move-handler's `gestureType !== 'pinch'` gate would skip the
+        // reset and `_handlePinching` would read the stale distance/centre
+        // from before the lift — producing a single-frame zoom snap on the
+        // first resumed-pinch frame. Nulling here forces the move handler
+        // (gate widened to `|| lastGestureTouchDistance.value === null`) to
+        // re-seed on the next 2-finger move.
+        lastGestureTouchDistance.value = null;
+        lastGestureCenterPosition.value = null;
       }
     })
     .onTouchesMove((e) => {
