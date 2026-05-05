@@ -431,45 +431,57 @@ const ReactNativeZoomableViewInner: ForwardRefRenderFunction<
     );
   };
 
-  useAnimatedReaction(_staticPinPosition, (current) => {
-    'worklet';
-    if (!current) {
-      // Pin/content went away — cancel any armed timer so it can't fire
-      // `onStaticPinPositionChange` with a closure-captured stale Vec2D after
-      // the consumer just unset the pin (or contentWidth/contentHeight
-      // collapsed to 0).
+  useAnimatedReaction(
+    _staticPinPosition,
+    (current) => {
+      'worklet';
+      if (!current) {
+        // Pin/content went away — cancel any armed timer so it can't fire
+        // `onStaticPinPositionChange` with a closure-captured stale Vec2D after
+        // the consumer just unset the pin (or contentWidth/contentHeight
+        // collapsed to 0).
+        if (settleTimer.value !== null) {
+          clearTimeout(settleTimer.value);
+          settleTimer.value = null;
+        }
+        return;
+      }
+
+      // Cancel any in-flight settle — motion is still happening.
       if (settleTimer.value !== null) {
         clearTimeout(settleTimer.value);
         settleTimer.value = null;
       }
-      return;
-    }
 
-    // Cancel any in-flight settle — motion is still happening.
-    if (settleTimer.value !== null) {
-      clearTimeout(settleTimer.value);
-      settleTimer.value = null;
-    }
-
-    // Schedule the JS-thread fire SETTLE_QUIET_MS after motion stops.
-    // Value-based dedup at fire time prevents redundant hops when the
-    // settled position equals the last fired one (e.g. a zoomTo whose
-    // visual end-state matches the start, or a pan that returns home).
-    settleTimer.value = setTimeout(() => {
-      'worklet';
-      settleTimer.value = null;
-      const last = lastFiredPosition.value;
-      if (last && samePosition(current, last)) return;
-      lastFiredPosition.value = current;
-      // Post-unmount guard — mirrors the `isMounted` checks in
-      // `scheduleLongPressTimeout` and `_resolveAndHandleTap`. The unmount
-      // cleanup queues `runOnUI(...)` to clear `settleTimer`, but `runOnUI`
-      // is asynchronous; if this 100ms timer fires before the cleanup hop
-      // drains on the UI thread, `runOnJS(onStaticPinPositionChange)` would
-      // otherwise land on the JS thread post-unmount with a stale Vec2D.
-      runOnJS(_safeStaticPinPositionChange)(current);
-    }, SETTLE_QUIET_MS);
-  });
+      // Schedule the JS-thread fire SETTLE_QUIET_MS after motion stops.
+      // Value-based dedup at fire time prevents redundant hops when the
+      // settled position equals the last fired one (e.g. a zoomTo whose
+      // visual end-state matches the start, or a pan that returns home).
+      settleTimer.value = setTimeout(() => {
+        'worklet';
+        settleTimer.value = null;
+        const last = lastFiredPosition.value;
+        if (last && samePosition(current, last)) return;
+        lastFiredPosition.value = current;
+        // Post-unmount guard — mirrors the `isMounted` checks in
+        // `scheduleLongPressTimeout` and `_resolveAndHandleTap`. The unmount
+        // cleanup queues `runOnUI(...)` to clear `settleTimer`, but `runOnUI`
+        // is asynchronous; if this 100ms timer fires before the cleanup hop
+        // drains on the UI thread, `runOnJS(onStaticPinPositionChange)` would
+        // otherwise land on the JS thread post-unmount with a stale Vec2D.
+        runOnJS(_safeStaticPinPositionChange)(current);
+      }, SETTLE_QUIET_MS);
+    },
+    // Auto-deps would include `samePosition` and `_getZoomableViewEventObject`
+    // (captured transitively via `_staticPinPosition`), both recreated each
+    // render. Without `[]`, every parent re-render unsubscribes and re-
+    // registers the mapper; the new mapper's initial run unconditionally
+    // clears `settleTimer` and re-arms a fresh 100ms timer. A parent that
+    // re-renders faster than `SETTLE_QUIET_MS` would clobber the timer
+    // indefinitely and `onStaticPinPositionChange` would never fire. Same
+    // pattern as the unified transform reaction below.
+    []
+  );
 
   useLayoutEffect(() => {
     if (props.initialZoom) zoom.value = props.initialZoom;
@@ -788,6 +800,20 @@ const ReactNativeZoomableViewInner: ForwardRefRenderFunction<
     'worklet';
 
     if (!zoomEnabled.value) return;
+
+    // Same hazard as publicMoveTo / publicMoveBy / publicMoveStaticPinTo and
+    // the zoomEnabled-toggle useLayoutEffect: a concurrent zoomTo() would
+    // keep the unified transform reaction's recompute branch armed via
+    // `zoomToDestination`, clobbering the gesture-midpoint-anchored offsets
+    // we are about to compute. The pinch-entry block in onTouchesMove only
+    // clears `zoomToDestination` on transition into pinch, not on subsequent
+    // frames; if zoomTo lands mid-pinch the recompute branch fires every
+    // frame until the gesture ends. Direct `zoom.value =` writes below
+    // cancel any in-flight withTiming, and per the cancellation contract on
+    // publicZoomTo each cancellation path owns its own zoomToDestination
+    // cleanup.
+    cancelAnimation(zoom);
+    zoomToDestination.value = undefined;
 
     const distance = calcGestureTouchDistance(e);
 

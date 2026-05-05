@@ -14,6 +14,7 @@ import {
   View,
   ViewProps,
 } from 'react-native';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { useDerivedValue, useSharedValue } from 'react-native-reanimated';
 import { ReText } from 'react-native-redash';
 
@@ -80,68 +81,77 @@ export default function App() {
 
   const Wrapper = modal ? PageSheetModal : View;
 
+  // `GestureHandlerRootView` lives INSIDE `Wrapper` so it covers both the
+  // non-modal and `Modal` (`presentationStyle="pageSheet"`) paths. `Modal`
+  // renders in a separate native window, so an outer root view above
+  // `Wrapper` would not reach the modal's content tree — RNGH gestures
+  // inside the modal would silently no-op. This is also the canonical
+  // root-wrapper pattern documented in the README; the library no longer
+  // self-wraps (see #49).
   return (
     <Wrapper style={styles.container}>
-      <Text>ReactNativeZoomableView</Text>
-      <View
-        style={styles.box}
-        onLayout={(e) => {
-          setSize(e.nativeEvent.layout);
-        }}
-      >
-        <ReactNativeZoomableView
-          ref={ref}
-          debug
-          onLongPress={() => {
-            Alert.alert('Long press detected');
+      <GestureHandlerRootView style={styles.container}>
+        <Text>ReactNativeZoomableView</Text>
+        <View
+          style={styles.box}
+          onLayout={(e) => {
+            setSize(e.nativeEvent.layout);
           }}
-          // Where to put the pin in the content view
-          staticPinPosition={staticPinPosition}
-          // Callback that returns the position of the pin
-          // on the actual source image
-          onStaticPinPositionChange={debouncedUpdatePin}
-          onStaticPinPositionMoveWorklet={(position) => {
-            'worklet';
-            movePinShared.value = position;
-          }}
-          maxZoom={30}
-          // Give these to the zoomable view so it can apply the boundaries around the actual content.
-          // Need to make sure the content is actually centered and the width and height are
-          // measured when it's rendered naturally. Not the intrinsic sizes.
-          contentWidth={contentSize?.width ?? 0}
-          contentHeight={contentSize?.height ?? 0}
         >
-          <View style={styles.contents}>
-            <Image style={styles.img} source={{ uri }} />
+          <ReactNativeZoomableView
+            ref={ref}
+            debug
+            onLongPress={() => {
+              Alert.alert('Long press detected');
+            }}
+            // Where to put the pin in the content view
+            staticPinPosition={staticPinPosition}
+            // Callback that returns the position of the pin
+            // on the actual source image
+            onStaticPinPositionChange={debouncedUpdatePin}
+            onStaticPinPositionMoveWorklet={(position) => {
+              'worklet';
+              movePinShared.value = position;
+            }}
+            maxZoom={30}
+            // Give these to the zoomable view so it can apply the boundaries around the actual content.
+            // Need to make sure the content is actually centered and the width and height are
+            // measured when it's rendered naturally. Not the intrinsic sizes.
+            contentWidth={contentSize?.width ?? 0}
+            contentHeight={contentSize?.height ?? 0}
+          >
+            <View style={styles.contents}>
+              <Image style={styles.img} source={{ uri }} />
 
-            {showMarkers &&
-              [20, 40, 60, 80].map((left) =>
-                [20, 40, 60, 80].map((top) => (
-                  <FixedSize left={left} top={top} key={`${left}x${top}`}>
-                    <View style={styles.marker} />
-                  </FixedSize>
-                ))
-              )}
-          </View>
-        </ReactNativeZoomableView>
-      </View>
-      <Text>onStaticPinPositionChange: {stringifyPoint(pin)}</Text>
-      <ReText text={movePinText} style={{ color: 'black' }} />
-      <Button
-        title={`${showMarkers ? 'Hide' : 'Show'} markers`}
-        onPress={() => {
-          setShowMarkers((value) => !value);
-        }}
-      />
+              {showMarkers &&
+                [20, 40, 60, 80].map((left) =>
+                  [20, 40, 60, 80].map((top) => (
+                    <FixedSize left={left} top={top} key={`${left}x${top}`}>
+                      <View style={styles.marker} />
+                    </FixedSize>
+                  ))
+                )}
+            </View>
+          </ReactNativeZoomableView>
+        </View>
+        <Text>onStaticPinPositionChange: {stringifyPoint(pin)}</Text>
+        <ReText text={movePinText} style={{ color: 'black' }} />
+        <Button
+          title={`${showMarkers ? 'Hide' : 'Show'} markers`}
+          onPress={() => {
+            setShowMarkers((value) => !value);
+          }}
+        />
 
-      <Button
-        // Toggle modal to test if zoomable view works correctly in modal,
-        // where pull-down-to-close gesture can interfere with pan gestures.
-        title={`Toggle Modal Mode`}
-        onPress={() => {
-          setModal((value) => !value);
-        }}
-      />
+        <Button
+          // Toggle modal to test if zoomable view works correctly in modal,
+          // where pull-down-to-close gesture can interfere with pan gestures.
+          title={`Toggle Modal Mode`}
+          onPress={() => {
+            setModal((value) => !value);
+          }}
+        />
+      </GestureHandlerRootView>
     </Wrapper>
   );
 }
