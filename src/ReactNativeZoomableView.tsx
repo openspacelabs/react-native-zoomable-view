@@ -230,6 +230,12 @@ const ReactNativeZoomableViewInner: ForwardRefRenderFunction<
   const externallyHandled = useSharedValue(false);
   const onTransformInvocationInitialized = useSharedValue(false);
   const singleTapTimeoutId = useRef<NodeJS.Timeout>();
+  // Guards JS-thread entry points reached via `runOnJS(...)` from a
+  // worklet against scheduling new `setTimeout`s post-unmount. The unmount
+  // cleanup only clears handles registered before unmount — a `runOnJS`
+  // that drains AFTER cleanup would otherwise register a fresh
+  // `onLongPress`/`onSingleTap` timer on a disposed component.
+  const isMounted = useRef(true);
   const touches = useSharedValue<TouchPoint[]>([]);
   const doubleTapFirstTap = useSharedValue<TouchPoint | undefined>(undefined);
   const gestureType = useSharedValue<'shift' | 'pinch' | undefined>(undefined);
@@ -246,8 +252,14 @@ const ReactNativeZoomableViewInner: ForwardRefRenderFunction<
   const staticPinPosition = useSharedValue<Vec2D | undefined>(
     propStaticPinPosition
   );
-  const contentWidth = useDerivedValue(() => propContentWidth);
-  const contentHeight = useDerivedValue(() => propContentHeight);
+  // Same JS-thread layout-effect rationale as `staticPinPosition` above:
+  // `_invokeOnTransform` reads these via `_staticPinPosition`, and the
+  // content-dim `useLayoutEffect` below hops to UI before a `useDerivedValue`
+  // mapper would have caught up. Image swap / rotation / modal open changes
+  // pin and dims in the same commit and would otherwise fire
+  // `onStaticPinPositionMoveWorklet` with NEW pin × STALE dims.
+  const contentWidth = useSharedValue(propContentWidth);
+  const contentHeight = useSharedValue(propContentHeight);
   const zoomEnabled = useDerivedValue(() => propZoomEnabled);
   const maxZoom = useDerivedValue(() => propMaxZoom);
   const minZoom = useDerivedValue(() => propMinZoom);
@@ -475,6 +487,9 @@ const ReactNativeZoomableViewInner: ForwardRefRenderFunction<
   // against an unmounted component.
   useEffect(() => {
     return () => {
+      // Flip first so any queued `runOnJS(scheduleLongPressTimeout)` /
+      // `runOnJS(_resolveAndHandleTap)` short-circuits when it drains.
+      isMounted.current = false;
       // `singleTapTimeoutId` and `longPressTimeout` are scheduled via JS-thread
       // `setTimeout` (the latter via `runOnJS(scheduleLongPressTimeout)` from a
       // worklet), so their handles belong to the JS runtime — clear from JS.
@@ -610,10 +625,17 @@ const ReactNativeZoomableViewInner: ForwardRefRenderFunction<
   // JS-thread `onStaticPinPositionChange` settle path, which already wakes
   // on content-dimension changes via its own reaction.
   useLayoutEffect(() => {
+    // Sync the SharedValues synchronously before the `runOnUI` hop so the
+    // UI-thread `_invokeOnTransform` reads the new dims. See the note on
+    // the `contentWidth`/`contentHeight` declarations.
+    contentWidth.value = propContentWidth;
+    contentHeight.value = propContentHeight;
     if (onTransformInvocationInitialized.value) runOnUI(_invokeOnTransform)();
   }, [propContentWidth, propContentHeight]);
 
   const scheduleLongPressTimeout = useLatestCallback((e: GestureTouchEvent) => {
+    // Post-unmount runOnJS guard; see `isMounted` declaration.
+    if (!isMounted.current) return;
     if (props.onLongPress && props.longPressDuration) {
       longPressTimeout.value = setTimeout(() => {
         // Invoke the stable `onLongPress` wrapper rather than the captured
@@ -966,6 +988,8 @@ const ReactNativeZoomableViewInner: ForwardRefRenderFunction<
    * @private
    */
   const _resolveAndHandleTap = (e: GestureTouchEvent) => {
+    // Post-unmount runOnJS guard; see `isMounted` declaration.
+    if (!isMounted.current) return;
     const now = Date.now();
     if (
       doubleTapFirstTapReleaseTimestamp.value &&

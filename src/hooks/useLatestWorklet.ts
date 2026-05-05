@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useLayoutEffect } from 'react';
 import { SharedValue, useSharedValue } from 'react-native-reanimated';
 
 // UI-thread no-op used when the consumer hasn't supplied a worklet. Marked
@@ -24,7 +24,13 @@ export const useLatestWorklet = <F extends (...args: never[]) => unknown>(
   worklet: F | undefined
 ): SharedValue<{ fn: F }> => {
   const ref = useSharedValue<{ fn: F }>({ fn: noopWorklet as unknown as F });
-  useEffect(() => {
+  // `useLayoutEffect`, not `useEffect`: a parent re-render that swaps the
+  // worklet identity in the same commit as another `useLayoutEffect`
+  // hopping to UI (e.g. `ReactNativeZoomableView`'s `staticPinPosition` /
+  // content-dim effects calling `runOnUI(_invokeOnTransform)()`) would
+  // otherwise queue the worklet read BEFORE the `useEffect` phase runs,
+  // invoking the OLD callback for the first fire after the swap.
+  useLayoutEffect(() => {
     ref.value = { fn: (worklet ?? noopWorklet) as F };
   }, [worklet, ref]);
   return ref;
