@@ -289,6 +289,45 @@ const ReactNativeZoomableViewInner: ForwardRefRenderFunction<
   const onShiftingEnd = useLatestCallback(
     props.onShiftingEnd || (() => undefined)
   );
+  // Post-unmount-safe wrappers for the gesture lifecycle callbacks dispatched
+  // from worklet contexts via `runOnJS`. `runOnJS` is asynchronous: a worklet
+  // dispatch followed by an unmount before the JS-thread queue drains would
+  // otherwise fire the consumer callback against an unmounted component.
+  // `useLatestCallback` (above) is a pure pass-through and does not auto-clear
+  // on unmount, so the guard must live here.
+  const _safeOnPanResponderGrant = useLatestCallback(
+    (e: Parameters<typeof onPanResponderGrant>[0], evt: ZoomableViewEvent) => {
+      if (!isMounted.current) return;
+      onPanResponderGrant(e, evt);
+    }
+  );
+  const _safeOnPanResponderEnd = useLatestCallback(
+    (e: Parameters<typeof onPanResponderEnd>[0], evt: ZoomableViewEvent) => {
+      if (!isMounted.current) return;
+      onPanResponderEnd(e, evt);
+    }
+  );
+  const _safeOnPanResponderTerminate = useLatestCallback(
+    (
+      e: Parameters<typeof onPanResponderTerminate>[0],
+      evt: ZoomableViewEvent
+    ) => {
+      if (!isMounted.current) return;
+      onPanResponderTerminate(e, evt);
+    }
+  );
+  const _safeOnZoomEnd = useLatestCallback(
+    (e: Parameters<typeof onZoomEnd>[0], evt: ZoomableViewEvent) => {
+      if (!isMounted.current) return;
+      onZoomEnd(e, evt);
+    }
+  );
+  const _safeOnShiftingEnd = useLatestCallback(
+    (e: Parameters<typeof onShiftingEnd>[0], evt: ZoomableViewEvent) => {
+      if (!isMounted.current) return;
+      onShiftingEnd(e, evt);
+    }
+  );
   // `onLongPress` and `onSingleTap` are read inside `setTimeout` bodies whose
   // closure captures `props` at schedule time (long-press: 700ms, single-tap:
   // 300ms). Without a stable wrapper, a parent re-render with new callback
@@ -763,7 +802,7 @@ const ReactNativeZoomableViewInner: ForwardRefRenderFunction<
     // the resumed gesture.
     runOnJS(setGestureStartedJS)(true);
     if (!isRecovery) {
-      runOnJS(onPanResponderGrant)(e, _getZoomableViewEventObject());
+      runOnJS(_safeOnPanResponderGrant)(e, _getZoomableViewEventObject());
     }
 
     cancelAnimation(zoom);
@@ -995,7 +1034,7 @@ const ReactNativeZoomableViewInner: ForwardRefRenderFunction<
 
       // == Zoom Animation Ends ==
       zoomToDestination.value = undefined;
-      runOnJS(onZoomEnd)(undefined, _getZoomableViewEventObject());
+      runOnJS(_safeOnZoomEnd)(undefined, _getZoomableViewEventObject());
     });
 
     return true;
@@ -1266,12 +1305,12 @@ const ReactNativeZoomableViewInner: ForwardRefRenderFunction<
 
     runOnJS(clearLongPressTimeout)();
 
-    runOnJS(onPanResponderEnd)(e, _getZoomableViewEventObject());
+    runOnJS(_safeOnPanResponderEnd)(e, _getZoomableViewEventObject());
 
     if (gestureType.value === 'pinch') {
-      runOnJS(onZoomEnd)(e, _getZoomableViewEventObject());
+      runOnJS(_safeOnZoomEnd)(e, _getZoomableViewEventObject());
     } else if (gestureType.value === 'shift') {
-      runOnJS(onShiftingEnd)(e, _getZoomableViewEventObject());
+      runOnJS(_safeOnShiftingEnd)(e, _getZoomableViewEventObject());
     }
 
     // RNGH cancellation: queue `onPanResponderTerminate` HERE — inside the
@@ -1280,7 +1319,7 @@ const ReactNativeZoomableViewInner: ForwardRefRenderFunction<
     // `ref.current.gestureStarted` from inside `onPanResponderTerminate`
     // observes `true`, matching SPECS L157 for the other end-callbacks.
     if (isCancellation) {
-      runOnJS(onPanResponderTerminate)(e, _getZoomableViewEventObject());
+      runOnJS(_safeOnPanResponderTerminate)(e, _getZoomableViewEventObject());
     }
 
     // `onStaticPinPositionChange` fires from the unified settle reaction
