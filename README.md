@@ -202,7 +202,7 @@ These events can be used to work with data after specific events.
 | onDoubleTapAfter  | Will be called at the end of a double tap                                                                                        | event, zoomableViewEventObject                           | void            |
 | onShiftingEnd     | Will be called when user stops a tap and move gesture                                                                            | event, zoomableViewEventObject                           | void            |
 | onZoomEnd         | Will be called after pinchzooming has ended                                                                                      | event, zoomableViewEventObject                           | void            |
-| onLongPress       | Will be called after the user pressed on the image for a while                                                                   | event                                                    | void            |
+| onLongPress       | Will be called after the user pressed on the image for a while                                                                   | event, zoomableViewEventObject                           | void            |
 | onLayoutWorklet   | Worklet called when the zoom subject's measured layout changes. Skipped while measurements are still zero (initial mount before `View.measure` lands). UI thread — must declare `'worklet';` | layout: { x, y, width, height }                          | void            |
 
 #### Methods
