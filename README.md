@@ -279,7 +279,7 @@ are no longer supported and made the rest backward compatible.
 
 | name                      | description                                                                    | params                         | expected return                                                                 |
 | ------------------------- | ------------------------------------------------------------------------------ | ------------------------------ | ------------------------------------------------------------------------------- |
-| onPanResponderGrant       | description                                                                    | event, zoomableViewEventObject | void                                                                            |
+| onPanResponderGrant       | Will be called when the pan gesture is granted (begins after RNGH activation)  | event, zoomableViewEventObject | void                                                                            |
 | onPanResponderEnd         | Will be called when gesture ends (more accurately, on pan responder "release") | event, zoomableViewEventObject | void                                                                            |
 | onPanResponderTerminate   | Will be called when the gesture is force-interrupted by another handler        | event, zoomableViewEventObject | void                                                                            |
 | onPanResponderMoveWorklet | Will be called when user moves while touching                                  | event, zoomableViewEventObject | {boolean} if true is returned, pinch and shift operations will not be processed |
