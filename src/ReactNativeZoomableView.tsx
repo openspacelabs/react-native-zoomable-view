@@ -1152,6 +1152,15 @@ const ReactNativeZoomableViewInner: ForwardRefRenderFunction<
 
         // Pan to the tapped location
         if (currentStaticPinPosition && doubleTapFirstTap.value) {
+          // Cancel any in-flight zoomTo() so its zoom-centering reaction
+          // doesn't fight the pan we're about to apply — without this, a
+          // concurrent zoomTo's per-tick offset recompute would clobber our
+          // withTiming writes (direct `.value =` assignment cancels
+          // withTiming on the same SharedValue). Mirrors the established
+          // pattern in publicMoveTo / publicMoveBy / publicMoveStaticPinTo.
+          cancelAnimation(zoom);
+          zoomToDestination.value = undefined;
+
           const tapX = currentStaticPinPosition.x - doubleTapFirstTap.value.x;
           const tapY = currentStaticPinPosition.y - doubleTapFirstTap.value.y;
 

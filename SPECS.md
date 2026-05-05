@@ -132,7 +132,7 @@ All methods are safe to call from JS callsites.
 
 Animates `zoom` to `newZoomLevel` over 250 ms (`Easing.out(Easing.ease)`). Returns `false` if `zoomEnabled` is `false` or if `newZoomLevel` is outside `[minZoom, maxZoom]`; otherwise returns `true`.
 
-`zoomCenter` is in subject-relative pixels with the top-left at `(0, 0)`. When provided, the view recomputes pan offsets each animation tick to keep that point visually fixed. Omit `zoomCenter` to zoom around the current top-left origin.
+`zoomCenter` is in subject-relative pixels with the top-left at `(0, 0)`. When provided, the view recomputes pan offsets each animation tick to keep that point visually fixed. Omit `zoomCenter` to zoom around the container's geometric centre.
 
 On natural completion, `onZoomEnd(undefined, …)` fires. On cancellation (any direct `zoom` write, any move method, unmount), the animation aborts silently and `onZoomEnd` does not fire.
 
