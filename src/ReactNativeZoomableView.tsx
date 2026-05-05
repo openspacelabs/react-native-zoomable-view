@@ -1431,8 +1431,24 @@ const ReactNativeZoomableViewInner: ForwardRefRenderFunction<
       if (e.numberOfTouches === 2) {
         lastGestureCenterPosition.value = calcGestureCenterPoint(e);
         lastGestureTouchDistance.value = calcGestureTouchDistance(e);
+        // A 2-finger session is never a long-press candidate. Mirrors the
+        // unconditional clear in the non-intercepted 2-touch branch below.
+        if (longPressTimeout.value) {
+          runOnJS(clearLongPressTimeout)();
+        }
       } else if (e.numberOfTouches === 1) {
         lastGestureCenterPosition.value = calcGestureCenterPoint(e);
+        // Disarm the long-press timer once the finger has moved past the
+        // 5px threshold, so an intercepted 1-finger drag held for
+        // `longPressDuration` does not fire a phantom `onLongPress` with
+        // the grant-time event mid-drag. Mirrors the gated clear in the
+        // non-intercepted 1-touch branch below.
+        if (
+          longPressTimeout.value &&
+          (Math.abs(gestureState.dx) > 5 || Math.abs(gestureState.dy) > 5)
+        ) {
+          runOnJS(clearLongPressTimeout)();
+        }
       }
       return;
     }
