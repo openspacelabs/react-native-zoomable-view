@@ -254,10 +254,10 @@ const ReactNativeZoomableViewInner: ForwardRefRenderFunction<
   );
   // Same JS-thread layout-effect rationale as `staticPinPosition` above:
   // `_invokeOnTransform` reads these via `_staticPinPosition`, and the
-  // content-dim `useLayoutEffect` below hops to UI before a `useDerivedValue`
-  // mapper would have caught up. Image swap / rotation / modal open changes
-  // pin and dims in the same commit and would otherwise fire
-  // `onStaticPinPositionMoveWorklet` with NEW pin × STALE dims.
+  // shared prop-change `useLayoutEffect` below hops to UI before a
+  // `useDerivedValue` mapper would have caught up. Image swap / rotation /
+  // modal open changes pin and dims in the same commit and would otherwise
+  // fire `onStaticPinPositionMoveWorklet` with NEW pin × STALE dims.
   const contentWidth = useSharedValue(propContentWidth);
   const contentHeight = useSharedValue(propContentHeight);
   const zoomEnabled = useDerivedValue(() => propZoomEnabled);
@@ -641,40 +641,49 @@ const ReactNativeZoomableViewInner: ForwardRefRenderFunction<
     }
   );
 
-  // Handle staticPinPosition changed
-  useLayoutEffect(() => {
-    // Sync the SharedValue synchronously before the `runOnUI` hop so the UI-
-    // thread `_invokeOnTransform` reads the new position. See the note on the
-    // `staticPinPosition` declaration for why this is not a `useDerivedValue`.
-    staticPinPosition.value = propStaticPinPosition;
-    // `_invokeOnTransform` is a worklet that calls the consumer's
-    // `onTransformWorklet` and `onStaticPinPositionMoveWorklet` (both
-    // documented as UI-thread). The primary call site is the unified
-    // transform reaction (UI thread); this prop-change path must hop to UI
-    // explicitly, otherwise the same callback runs on the JS thread here
-    // and on the UI thread elsewhere — producing inconsistent threading
-    // semantics for consumers using UI-thread APIs (e.g. `scheduleOnRN`)
-    // inside the callback.
-    if (onTransformInvocationInitialized.value) runOnUI(_invokeOnTransform)();
-  }, [props.staticPinPosition?.x, props.staticPinPosition?.y]);
-
-  // Handle contentWidth/contentHeight changed. The pin's content-space
-  // position depends on these dimensions (see `_staticPinPosition`), so a
-  // prop change moves the pin in content space without any zoom/offset/touch
-  // change. The unified transform reaction's selector reads only
+  // Handle staticPinPosition / contentWidth / contentHeight prop changes.
+  //
+  // Sync the three SharedValues synchronously before the `runOnUI` hop so
+  // the UI-thread `_invokeOnTransform` reads the new values. See the notes
+  // on the `staticPinPosition` / `contentWidth` / `contentHeight`
+  // declarations for why these are direct `useSharedValue`s rather than
+  // `useDerivedValue` mirrors.
+  //
+  // `_invokeOnTransform` is a worklet that calls the consumer's
+  // `onTransformWorklet` and `onStaticPinPositionMoveWorklet` (both
+  // documented as UI-thread). The primary call site is the unified
+  // transform reaction (UI thread); this prop-change path must hop to UI
+  // explicitly, otherwise the same callback runs on the JS thread here and
+  // on the UI thread elsewhere — producing inconsistent threading semantics
+  // for consumers using UI-thread APIs (e.g. `scheduleOnRN`) inside the
+  // callback. The pin's content-space position depends on these dimensions
+  // (see `_staticPinPosition`), so a content-dim prop change moves the pin
+  // in content space without any zoom/offset/touch change. The unified
+  // transform reaction's selector reads only
   // zoom/offset/originalWidth/originalHeight, so it does not retrigger on
-  // dimension changes — fire `_invokeOnTransform` explicitly so
-  // `onStaticPinPositionMoveWorklet` (and `onTransformWorklet`) match the
-  // JS-thread `onStaticPinPositionChange` settle path, which already wakes
-  // on content-dimension changes via its own reaction.
+  // these prop changes — this effect is the sole wake path.
+  //
+  // Pin position and content dimensions are merged into a single effect
+  // because a parent commit that changes both in the same render (image
+  // swap, rotation, modal open — exactly the layout-derived pattern in
+  // `example/App.tsx` where `staticPinPosition` and `contentWidth/Height`
+  // both depend on the same `size` state) would otherwise queue two
+  // `runOnUI(_invokeOnTransform)()` hops. `runOnUI` does not dedupe, so the
+  // UI thread would fire `onTransformWorklet` and
+  // `onStaticPinPositionMoveWorklet` twice with identical payloads. Merging
+  // guarantees one UI hop per commit regardless of which subset of these
+  // four deps changed.
   useLayoutEffect(() => {
-    // Sync the SharedValues synchronously before the `runOnUI` hop so the
-    // UI-thread `_invokeOnTransform` reads the new dims. See the note on
-    // the `contentWidth`/`contentHeight` declarations.
+    staticPinPosition.value = propStaticPinPosition;
     contentWidth.value = propContentWidth;
     contentHeight.value = propContentHeight;
     if (onTransformInvocationInitialized.value) runOnUI(_invokeOnTransform)();
-  }, [propContentWidth, propContentHeight]);
+  }, [
+    props.staticPinPosition?.x,
+    props.staticPinPosition?.y,
+    propContentWidth,
+    propContentHeight,
+  ]);
 
   const scheduleLongPressTimeout = useLatestCallback((e: GestureTouchEvent) => {
     // Post-unmount runOnJS guard; see `isMounted` declaration.
