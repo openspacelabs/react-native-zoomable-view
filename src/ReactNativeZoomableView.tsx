@@ -618,7 +618,23 @@ const ReactNativeZoomableViewInner: ForwardRefRenderFunction<
       if (
         zoomToDestination.value &&
         prev &&
-        curr.zoomLevel !== prev.zoomLevel
+        curr.zoomLevel !== prev.zoomLevel &&
+        // A consumer can call `ref.current.zoomTo(...)` from a parent
+        // `useEffect` at mount, before `useZoomSubject`'s deferred
+        // `measure()` chain (rAF + setTimeout(0) + native measure) has
+        // landed. With `originalWidth/Height` still 0, the recompute
+        // produces a small non-zero garbage offset that subsequent
+        // identity-preserving ticks then carry through to the end of
+        // the animation (visual error scales linearly with final zoom).
+        // Mirrors the same guard used by every other consumer of
+        // `originalWidth/Height` in this file (e.g. `_invokeOnTransform`,
+        // `_staticPinPosition`, `_handlePinching`, `publicMoveTo`,
+        // `onLayoutWorklet` reaction). The helper itself is incremental
+        // and identity-preserving, so skipping early ticks is safe —
+        // `prevZoom` stays at its `publicZoomTo`-seeded value and the
+        // first post-measurement tick recomputes the full offset.
+        originalWidth.value &&
+        originalHeight.value
       ) {
         offsetX.value = calcNewScaledOffsetForZoomCentering(
           offsetX.value,
@@ -1367,6 +1383,17 @@ const ReactNativeZoomableViewInner: ForwardRefRenderFunction<
       // `onSingleTap`. Mark the cycle as externally-handled so
       // `_handlePanResponderEnd`'s tap-classification gate suppresses it.
       externallyHandled.value = true;
+      // Also clear stale tap-release state — a consumer-handled drag
+      // cannot contribute to a double-tap. Without this, a tap →
+      // externally-handled-drag → tap sequence within `doubleTapDelay`
+      // misclassifies the second tap as a double-tap of the first
+      // (the externally-handled cycle preserves the first tap's
+      // timestamp, and `_handlePanResponderGrant` cancels the
+      // `singleTapTimeoutId` whose body would otherwise have cleared
+      // it). Mirrors the established clears in the multi-finger
+      // normalization, long-press timer body, and pinch/shift transitions.
+      doubleTapFirstTapReleaseTimestamp.value = undefined;
+      doubleTapFirstTap.value = undefined;
       return;
     }
 
