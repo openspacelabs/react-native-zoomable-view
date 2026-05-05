@@ -466,7 +466,17 @@ const ReactNativeZoomableViewInner: ForwardRefRenderFunction<
   }, []);
 
   useLayoutEffect(() => {
-    if (!propZoomEnabled && initialZoom.value) {
+    if (!propZoomEnabled && propsInitialZoom) {
+      // Read `propsInitialZoom` directly (not the `initialZoom`
+      // `useDerivedValue` mirror): the mirror's SharedValue is updated by
+      // Reanimated's internal `useEffect`, which React runs strictly AFTER
+      // `useLayoutEffect` in the same commit. A consumer flipping both
+      // `zoomEnabled` (true→false) and `initialZoom` in the same render
+      // would otherwise snap to the OLD `initialZoom` here, then never
+      // correct (the unified transform reaction's selector doesn't watch
+      // `initialZoom`). Same fix shape as the `staticPinPosition`
+      // migration above.
+      //
       // Mirror the cancellation contract documented on publicZoomTo's
       // withTiming completion ("Each cancellation path is responsible for
       // its own zoomToDestination cleanup"): the direct `zoom.value =` write
@@ -476,9 +486,9 @@ const ReactNativeZoomableViewInner: ForwardRefRenderFunction<
       // be an instant snap.
       cancelAnimation(zoom);
       zoomToDestination.value = undefined;
-      zoom.value = initialZoom.value;
+      zoom.value = propsInitialZoom;
     }
-  }, [propZoomEnabled]);
+  }, [propZoomEnabled, propsInitialZoom]);
 
   // Component-level cleanup. Cancels every animation and pending timer the
   // component owns when it unmounts; without this, an in-flight `withTiming`
