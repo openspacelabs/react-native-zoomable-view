@@ -1418,6 +1418,22 @@ const ReactNativeZoomableViewInner: ForwardRefRenderFunction<
       // normalization, long-press timer body, and pinch/shift transitions.
       doubleTapFirstTapReleaseTimestamp.value = undefined;
       doubleTapFirstTap.value = undefined;
+      // Keep gesture-tracking refs current on intercepted frames. The
+      // pinch/shift reseed gates below (`gestureType.value !== 'pinch'`,
+      // `gestureType.value !== 'shift'`) only fire on gesture-type
+      // transitions; once `gestureType` is latched, they no longer
+      // re-seed `lastGestureCenterPosition` / `lastGestureTouchDistance`.
+      // Without this update, a consumer toggling intercept off mid-gesture
+      // (zone-based gating, external-state-driven gating) would compute
+      // the resume frame's delta against a stale reference, collapsing
+      // every blocked frame's finger displacement into a single jump.
+      // Mirrors the writes used by the pinch/shift reseed sites.
+      if (e.numberOfTouches === 2) {
+        lastGestureCenterPosition.value = calcGestureCenterPoint(e);
+        lastGestureTouchDistance.value = calcGestureTouchDistance(e);
+      } else if (e.numberOfTouches === 1) {
+        lastGestureCenterPosition.value = calcGestureCenterPoint(e);
+      }
       return;
     }
 
