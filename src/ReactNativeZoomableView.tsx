@@ -600,6 +600,19 @@ const ReactNativeZoomableViewInner: ForwardRefRenderFunction<
     if (onTransformInvocationInitialized.value) runOnUI(_invokeOnTransform)();
   }, [props.staticPinPosition?.x, props.staticPinPosition?.y]);
 
+  // Handle contentWidth/contentHeight changed. The pin's content-space
+  // position depends on these dimensions (see `_staticPinPosition`), so a
+  // prop change moves the pin in content space without any zoom/offset/touch
+  // change. The unified transform reaction's selector reads only
+  // zoom/offset/originalWidth/originalHeight, so it does not retrigger on
+  // dimension changes — fire `_invokeOnTransform` explicitly so
+  // `onStaticPinPositionMoveWorklet` (and `onTransformWorklet`) match the
+  // JS-thread `onStaticPinPositionChange` settle path, which already wakes
+  // on content-dimension changes via its own reaction.
+  useLayoutEffect(() => {
+    if (onTransformInvocationInitialized.value) runOnUI(_invokeOnTransform)();
+  }, [propContentWidth, propContentHeight]);
+
   const scheduleLongPressTimeout = useLatestCallback((e: GestureTouchEvent) => {
     if (props.onLongPress && props.longPressDuration) {
       longPressTimeout.value = setTimeout(() => {
