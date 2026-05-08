@@ -13,7 +13,6 @@ import {
   GestureDetector,
   GestureTouchEvent,
 } from 'react-native-gesture-handler';
-import type { GestureStateManagerType } from 'react-native-gesture-handler/lib/typescript/handlers/gestures/gestureStateManager';
 import Animated, {
   cancelAnimation,
   runOnJS,
@@ -185,17 +184,6 @@ const ReactNativeZoomableViewInner: ForwardRefRenderFunction<
   const lastGestureCenterPosition = useSharedValue<Vec2D | null>(null);
   const lastGestureTouchDistance = useSharedValue<number | null>(150);
   const gestureStarted = useSharedValue(false);
-  // Tracks whether the parent gesture has claimed the touch (transitioned to
-  // ACTIVE on the RNGH state machine). Stays `false` while the parent is
-  // still in BEGAN, so nested child `GestureDetector`s placed inside
-  // `staticPinIcon` (or anywhere inside the zoom subject) get RNGH's default
-  // window to activate first. Until activation, `_handleShifting` /
-  // `_handlePinching` skip their offset writes so the canvas does not
-  // creep during the first ~10 pixels of a pan that a child gesture is
-  // about to claim. Activation triggers (set inside the manual gesture
-  // callbacks): 2nd finger touches down, 1-finger movement crosses
-  // `ACTIVATION_PX`, or the long-press timer fires. Reset in `onFinalize`.
-  const parentActivated = useSharedValue(false);
   // UI-thread synchronous "pause canvas" flag. Consumers nesting their own
   // gesture inside `staticPinIcon` can set this `true` from the very first
   // touch worklet (`onTouchesDown` / `onBegin`) so the parent skips canvas
@@ -769,14 +757,6 @@ const ReactNativeZoomableViewInner: ForwardRefRenderFunction<
     if (!isMounted.current) return;
     if (props.onLongPress && props.longPressDuration) {
       longPressTimeout.value = setTimeout(() => {
-        // Suppress when a consumer's nested gesture has paused the parent
-        // (`pauseCanvas`). Without this gate the parent's prop `onLongPress`
-        // would fire alongside the consumer's own LongPress 700ms into the
-        // gesture, producing two callbacks for one touch.
-        if (pauseCanvas.value) {
-          longPressTimeout.value = undefined;
-          return;
-        }
         // Invoke the stable `onLongPress` wrapper rather than the captured
         // `props.onLongPress` — the closure was captured at schedule time and
         // would fire a stale callback if the parent re-rendered during the
@@ -1035,13 +1015,6 @@ const ReactNativeZoomableViewInner: ForwardRefRenderFunction<
     });
     if (!shift) return;
 
-    // Synchronous UI-thread pause flag. A consumer's nested gesture sets
-    // this `true` from its first-touch worklet (`onTouchesDown`/`onBegin`)
-    // — that worklet runs on the UI thread before the parent's next
-    // `_handleShifting` worklet, so the parent reads the latest value with
-    // zero dispatch latency and skips its offset write.
-    if (pauseCanvas.value) return;
-
     const newOffsetX = offsetX.value + shift.x;
     const newOffsetY = offsetY.value + shift.y;
 
@@ -1150,10 +1123,6 @@ const ReactNativeZoomableViewInner: ForwardRefRenderFunction<
   const _resolveAndHandleTap = (e: GestureTouchEvent) => {
     // Post-unmount runOnJS guard; see `isMounted` declaration.
     if (!isMounted.current) return;
-    // Skip tap classification when a consumer's nested gesture paused the
-    // parent — otherwise the release of a touch a child handler claimed
-    // would fire a phantom `onSingleTap`/`onDoubleTap` on the canvas.
-    if (pauseCanvas.value) return;
     const now = Date.now();
     if (
       doubleTapFirstTapReleaseTimestamp.value &&
@@ -1576,15 +1545,16 @@ const ReactNativeZoomableViewInner: ForwardRefRenderFunction<
   };
 
   const firstTouch = useSharedValue<Vec2D | undefined>(undefined);
-  const activateIfNeeded = (stateManager: GestureStateManagerType) => {
-    'worklet';
-    if (!parentActivated.value) {
-      stateManager.activate();
-      parentActivated.value = true;
-    }
-  };
+  // While `pauseCanvas.value` is true (set by a consumer's nested gesture
+  // from its `onTouchesDown` worklet), the parent's manual gesture
+  // short-circuits all lifecycle handlers: no grant (long-press timer
+  // never armed), no move (no offset writes, no consumer move callback),
+  // no tap classification on release. The RNGH state machine still ends
+  // cleanly via `stateManager.end()` — only consumer-visible parent
+  // behaviors are suppressed.
   const gesture = Gesture.Manual()
     .onTouchesDown((e, stateManager) => {
+      if (pauseCanvas.value) return;
       if (!firstTouch.value) {
         // Parent only goes BEGAN — not ACTIVE. ACTIVE on touch-down would
         // claim exclusive RNGH ownership of the touch and cancel any nested
@@ -1612,7 +1582,7 @@ const ReactNativeZoomableViewInner: ForwardRefRenderFunction<
         // earlier started competing for the 1st finger — child gestures
         // inside `staticPinIcon` are expected to be single-touch (tap, long
         // press, drag); a 2-finger session is the parent's domain.
-        activateIfNeeded(stateManager);
+        stateManager.activate();
         // Long-press is a single-finger gesture — disarm any armed timer.
         // Safe no-op if the simultaneous-case long-press gate in
         // `_handlePanResponderGrant` already prevented arming.
@@ -1646,56 +1616,31 @@ const ReactNativeZoomableViewInner: ForwardRefRenderFunction<
       }
     })
     .onTouchesMove((e, stateManager) => {
+      if (pauseCanvas.value) return;
       const dx = e.allTouches[0].x - (firstTouch.value?.x || 0);
       const dy = e.allTouches[0].y - (firstTouch.value?.y || 0);
-      // Earn the gesture: once the user crosses the activation threshold
-      // (or has 2 fingers down), this is unambiguously a pan/pinch and the
-      // parent claims the touch. Below threshold the parent stays BEGAN so
-      // any nested child gesture (LongPress, Tap, Pan, Rotation, etc.) has
-      // a wide enough window to activate first.
-      //
-      // The threshold has to be large enough that a child Pan (which uses
-      // `.blocksExternalGesture(parentGestureRef)` to FAIL the parent on
-      // child activation) gets there first — otherwise the parent activates
-      // first and writes one or more frames of canvas pan before being
-      // blocked. Empirically with the default RN Pan minDistance of 0 plus
-      // iOS native slop, child Pan reliably activates well under 30 px;
-      // anything below ~25 px lets the parent slip in a frame of writes.
-      // 30 px is conservative — `_handleShifting` is also gated by
-      // `parentActivated`, so off-pin canvas pan kicks in cleanly the
-      // moment the threshold is crossed (no creep, no jump).
-      // Activate ONLY for multi-finger (pinch is unambiguous and the parent
-      // must own it). 1-finger moves stay BEGAN — `blocksExternalGesture`
-      // from any nested child gesture is what cancels the parent at the
-      // RNGH tree level. Canvas-pan suppression while a child is in BEGAN
-      // (before its native activation) is handled by the synchronous
-      // `pauseCanvas` SharedValue — see `_handleShifting`.
+      // 1-finger moves stay BEGAN. Multi-finger is unambiguous pinch and
+      // the parent must own it.
       if (e.numberOfTouches >= 2) {
-        activateIfNeeded(stateManager);
+        stateManager.activate();
       }
       _handlePanResponderMove(e, { dx, dy });
     })
     .onTouchesUp((e, stateManager) => {
-      // only end if this is the last touch being lifted
+      // Always end the RNGH state machine on the final release so the
+      // gesture cycle terminates cleanly, but suppress consumer callbacks
+      // and tap classification when paused.
       if (e.numberOfTouches === 0) {
-        // Genuine touch release — `wasReleased=true` enables tap
-        // classification (single/double/long press resolution).
-        _handlePanResponderEnd(e, true);
+        if (!pauseCanvas.value) _handlePanResponderEnd(e, true);
         stateManager.end();
       }
     })
     .onTouchesCancelled((e, stateManager) => {
-      // RNGH cancellation — gesture aborted, not released. Pass
-      // `wasReleased=false` so this path does not produce a spurious
-      // `onSingleTap`, and `isCancellation=true` so the terminate callback
-      // is queued from inside `_handlePanResponderEnd` (before the terminal
-      // mirror reset) — see the JSDoc on `_handlePanResponderEnd` for why.
-      _handlePanResponderEnd(e, false, true);
+      if (!pauseCanvas.value) _handlePanResponderEnd(e, false, true);
       stateManager.end();
     })
     .onFinalize(() => {
       firstTouch.value = undefined;
-      parentActivated.value = false;
     });
 
   const transformStyle = useAnimatedStyle(() => {
