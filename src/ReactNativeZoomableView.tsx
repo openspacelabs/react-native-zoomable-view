@@ -1632,58 +1632,62 @@ const ReactNativeZoomableViewInner: ForwardRefRenderFunction<
     <ReactNativeZoomableViewProvider
       value={{ zoom, inverseZoom, inverseZoomStyle, offsetX, offsetY }}
     >
-      <GestureDetector gesture={gesture}>
-        <View
-          // eslint-disable-next-line @typescript-eslint/no-use-before-define
-          style={styles.container}
-          ref={zoomSubjectWrapperRef}
-          onLayout={measureZoomSubject}
-        >
+      {/* `StaticPin` is a sibling of `<GestureDetector>` (not a descendant)
+          so iOS's gesture-recognizer ancestor walk skips canvas-pan for
+          touches that land on interactive pin subregions. Empty pin space
+          passes through via `pointerEvents="box-none"` in `StaticPin`. */}
+      <View
+        // eslint-disable-next-line @typescript-eslint/no-use-before-define
+        style={styles.container}
+        ref={zoomSubjectWrapperRef}
+        onLayout={measureZoomSubject}
+      >
+        <GestureDetector gesture={gesture}>
           <Animated.View
             // eslint-disable-next-line @typescript-eslint/no-use-before-define
             style={[styles.zoomSubject, props.style, transformStyle]}
           >
             {children}
           </Animated.View>
+        </GestureDetector>
 
-          {visualTouchFeedbackEnabled &&
-            stateTouches.map(
-              (touch) =>
-                // Coerce `doubleTapDelay` to a strict boolean — bare
-                // `doubleTapDelay && (...)` evaluates to `0` when delay is
-                // `0`, and React will then try to render the literal `0` as
-                // a text child outside a <Text>, crashing with the
-                // "Text strings must be rendered within a <Text> component"
-                // error.
-                !!doubleTapDelay && (
-                  <AnimatedTouchFeedback
-                    x={touch.x}
-                    y={touch.y}
-                    key={touch.id}
-                    animationDuration={doubleTapDelay}
-                    onAnimationDone={() => {
-                      _removeTouch(touch);
-                    }}
-                  />
-                )
-            )}
-
-          {/* For Debugging Only */}
-          {debugPoints.map(({ x, y }, index) => {
-            return <DebugTouchPoint key={index} x={x} y={y} />;
-          })}
-
-          {propStaticPinPosition && (
-            <StaticPin
-              staticPinIcon={staticPinIcon}
-              staticPinPosition={propStaticPinPosition}
-              pinSize={pinSize}
-              setPinSize={setPinSize}
-              pinProps={pinProps}
-            />
+        {visualTouchFeedbackEnabled &&
+          stateTouches.map(
+            (touch) =>
+              // Coerce `doubleTapDelay` to a strict boolean — bare
+              // `doubleTapDelay && (...)` evaluates to `0` when delay is
+              // `0`, and React will then try to render the literal `0` as
+              // a text child outside a <Text>, crashing with the
+              // "Text strings must be rendered within a <Text> component"
+              // error.
+              !!doubleTapDelay && (
+                <AnimatedTouchFeedback
+                  x={touch.x}
+                  y={touch.y}
+                  key={touch.id}
+                  animationDuration={doubleTapDelay}
+                  onAnimationDone={() => {
+                    _removeTouch(touch);
+                  }}
+                />
+              )
           )}
-        </View>
-      </GestureDetector>
+
+        {/* For Debugging Only */}
+        {debugPoints.map(({ x, y }, index) => {
+          return <DebugTouchPoint key={index} x={x} y={y} />;
+        })}
+
+        {propStaticPinPosition && (
+          <StaticPin
+            staticPinIcon={staticPinIcon}
+            staticPinPosition={propStaticPinPosition}
+            pinSize={pinSize}
+            setPinSize={setPinSize}
+            pinProps={pinProps}
+          />
+        )}
+      </View>
     </ReactNativeZoomableViewProvider>
   );
 };

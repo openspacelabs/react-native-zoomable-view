@@ -14,9 +14,18 @@ import {
   View,
   ViewProps,
 } from 'react-native';
-import { GestureHandlerRootView } from 'react-native-gesture-handler';
-import { useDerivedValue, useSharedValue } from 'react-native-reanimated';
+import {
+  Gesture,
+  GestureDetector,
+  GestureHandlerRootView,
+} from 'react-native-gesture-handler';
+import Animated, {
+  useAnimatedStyle,
+  useDerivedValue,
+  useSharedValue,
+} from 'react-native-reanimated';
 import { ReText } from 'react-native-redash';
+import { runOnJS } from 'react-native-worklets';
 
 import { applyContainResizeMode } from '../src/helper/coordinateConversion';
 import { styles } from './style';
@@ -27,6 +36,129 @@ const imageSize = { width: kittenSize, height: kittenSize };
 
 const stringifyPoint = (point?: { x: number; y: number }) =>
   point ? `${Math.round(point.x)}, ${Math.round(point.y)}` : 'Off map';
+
+const onPinLongPressJS = () => {
+  Alert.alert('Pin long-press fired');
+};
+
+/**
+ * Red main button claims `LongPress`, blue knob claims `Pan`. Empty pin
+ * space passes through to the canvas — no gesture composition needed.
+ */
+const DemoPin = () => {
+  const knobOffset = useSharedValue<{ x: number; y: number }>({ x: 0, y: 0 });
+
+  const pinLongPress = useMemo(
+    () =>
+      Gesture.LongPress()
+        .minDuration(400)
+        .onStart(() => {
+          'worklet';
+          runOnJS(onPinLongPressJS)();
+        }),
+    []
+  );
+
+  const knobPan = useMemo(
+    () =>
+      Gesture.Pan()
+        // Generous hit slop so the small knob is easier to grab — RNGH does
+        // not inflate the touch target by default.
+        .hitSlop({ top: 16, bottom: 16, left: 16, right: 16 })
+        .onUpdate((e) => {
+          'worklet';
+          knobOffset.value = { x: e.translationX, y: e.translationY };
+        })
+        .onEnd(() => {
+          'worklet';
+          knobOffset.value = { x: 0, y: 0 };
+        }),
+    [knobOffset]
+  );
+
+  const knobStyle = useAnimatedStyle(() => ({
+    transform: [
+      { translateX: knobOffset.value.x },
+      { translateY: knobOffset.value.y },
+    ],
+  }));
+
+  // 280x100 box, anchored bottom-center on staticPinPosition.
+  // knob 100x100 @ (0,0)  ·  red 48x48 @ (116,52)  ·  rail @ (100,75) 16x2
+  return (
+    <View
+      pointerEvents="box-none"
+      style={{
+        height: 100,
+        width: 280,
+      }}
+    >
+      {/* Rail (decorative) */}
+      <View
+        pointerEvents="none"
+        style={{
+          backgroundColor: 'rgba(0,0,0,0.4)',
+          height: 2,
+          left: 100,
+          position: 'absolute',
+          top: 75,
+          width: 16,
+        }}
+      />
+
+      {/* Main pin — LongPress claims this region */}
+      <GestureDetector gesture={pinLongPress}>
+        <View
+          style={{
+            height: 48,
+            left: 116,
+            position: 'absolute',
+            top: 52,
+            width: 48,
+          }}
+        >
+          <View
+            style={{
+              backgroundColor: 'red',
+              borderColor: 'white',
+              borderRadius: 24,
+              borderWidth: 2,
+              height: 48,
+              width: 48,
+            }}
+          />
+        </View>
+      </GestureDetector>
+
+      {/* Knob — Pan claims this region */}
+      <GestureDetector gesture={knobPan}>
+        <Animated.View
+          style={[
+            {
+              height: 100,
+              left: 0,
+              position: 'absolute',
+              top: 0,
+              width: 100,
+            },
+            knobStyle,
+          ]}
+        >
+          <View
+            style={{
+              backgroundColor: 'blue',
+              borderColor: 'white',
+              borderRadius: 50,
+              borderWidth: 2,
+              height: 100,
+              width: 100,
+            }}
+          />
+        </Animated.View>
+      </GestureDetector>
+    </View>
+  );
+};
 
 const PageSheetModal = ({
   children,
@@ -106,6 +238,7 @@ export default function App() {
             }}
             // Where to put the pin in the content view
             staticPinPosition={staticPinPosition}
+            staticPinIcon={<DemoPin />}
             // Callback that returns the position of the pin
             // on the actual source image
             onStaticPinPositionChange={debouncedUpdatePin}

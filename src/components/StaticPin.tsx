@@ -23,15 +23,19 @@ export const StaticPin = ({
 
   const opacity = pinSize.width && pinSize.height ? 1 : 0;
 
-  // Pull `style` out of `pinProps` so a caller-provided style merges into the
-  // pin's positioning array instead of replacing it. JSX prop-spreading is
-  // last-write-wins, so spreading `pinProps` after `style={[...]}` would let
-  // a caller's `pinProps.style` strip the absolute `left`/`top`, opacity, and
-  // anchor transforms.
-  const { style: pinStyle, ...restPinProps } = pinProps;
+  // Pull `style` and `pointerEvents` out of `pinProps` so the JSX spread
+  // can't last-write-wins over our defaults — both are load-bearing
+  // (positioning array, sibling-tree pass-through). Caller still gets to
+  // override deliberately.
+  const {
+    style: pinStyle,
+    pointerEvents = 'box-none',
+    ...restPinProps
+  } = pinProps;
 
   return (
     <View
+      pointerEvents={pointerEvents}
       style={[
         {
           left: staticPinPosition.x,
@@ -45,13 +49,22 @@ export const StaticPin = ({
       {...restPinProps}
     >
       <View
+        pointerEvents="box-none"
         onLayout={({ nativeEvent: { layout } }) => {
           setPinSize(layout);
         }}
       >
         {staticPinIcon || (
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment,@typescript-eslint/no-use-before-define
-          <Image source={require('../assets/pin.png')} style={styles.pin} />
+          // Default marker is non-interactive — pass-through so canvas
+          // pan/pinch still work on an unconfigured pin.
+          <View pointerEvents="none">
+            <Image
+              // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment,@typescript-eslint/no-use-before-define
+              source={require('../assets/pin.png')}
+              // eslint-disable-next-line @typescript-eslint/no-use-before-define
+              style={styles.pin}
+            />
+          </View>
         )}
       </View>
     </View>
