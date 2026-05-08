@@ -8,6 +8,7 @@ import { ReactNativeZoomableView } from './ReactNativeZoomableView';
 import {
   useZoomableViewContext,
   useZoomableViewParentGestureRef,
+  useZoomableViewPauseCanvas,
 } from './ReactNativeZoomableViewContext';
 import type {
   ReactNativeZoomableViewProps,
@@ -28,6 +29,7 @@ export {
   Size2D,
   useZoomableViewContext,
   useZoomableViewParentGestureRef,
+  useZoomableViewPauseCanvas,
   Vec2D,
   viewportPositionToImagePosition,
   ZoomableViewEvent,

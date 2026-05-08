@@ -197,6 +197,26 @@ const ReactNativeZoomableViewInner: ForwardRefRenderFunction<
   // callbacks): 2nd finger touches down, 1-finger movement crosses
   // `ACTIVATION_PX`, or the long-press timer fires. Reset in `onFinalize`.
   const parentActivated = useSharedValue(false);
+  // UI-thread synchronous "pause canvas" flag. Consumers nesting their own
+  // gesture inside `staticPinIcon` can set this `true` from the very first
+  // touch worklet (`onTouchesDown` / `onBegin`) so the parent skips canvas
+  // offset writes from frame 1. Both worklets run on the UI thread in the
+  // same JS context, so the parent reads the latest value with zero
+  // dispatch latency — closing the leak window where RNGH's cross-detector
+  // cancel via `.blocksExternalGesture(parentGestureRef)` had not yet
+  // arrived but the child gesture was still in BEGAN (so its `onUpdate`
+  // hadn't fired and the parent was the only handler writing state).
+  // Exposed via `useZoomableViewPauseCanvas()`. Consumers reset it on
+  // their gesture's `onEnd` / `onFinalize`.
+  const pauseCanvas = useSharedValue(false);
+  // Debug counters: `parentShiftAttemptCount` increments on every
+  // `_handleShifting` call past its panEnabled / shift-validity checks
+  // (i.e. every frame the parent would have written if not suppressed);
+  // `parentShiftCount` increments only on actual offset writes (after the
+  // `pauseCanvas` gate). The two together let the example distinguish
+  // "child suppressed the parent" from "parent never had touches".
+  const parentShiftAttemptCount = useSharedValue(0);
+  const parentShiftCount = useSharedValue(0);
   // JS-thread mirror of `gestureStarted` exposed via the imperative handle.
   // The UI-thread `gestureStarted` SharedValue must reset synchronously at
   // the end of `_handlePanResponderEnd` so subsequent `onTouchesMove`
@@ -1016,16 +1036,26 @@ const ReactNativeZoomableViewInner: ForwardRefRenderFunction<
     });
     if (!shift) return;
 
-    // Until the parent gesture has earned the touch (movement past the
-    // activation threshold, 2nd finger, or long-press), suppress the
-    // offset write. `_calcOffsetShiftSinceLastGestureState` above has
-    // already advanced `lastGestureCenterPosition` to the current point,
-    // so the first shift after activation produces a single-frame delta
-    // — no visual jump from the touch-down point to where the finger is
-    // when parent activates. This is what stops the canvas from "creeping"
-    // during the first ~10 pixels of a knob/pin pan that a child gesture
-    // is about to claim.
-    if (!parentActivated.value) return;
+    // Debug: count attempts (every _handleShifting call past the panEnabled
+    // / shift-validity checks) regardless of whether the pause/gate skips
+    // the write. Lets the example surface "parent tried to write but was
+    // suppressed" vs "parent actually wrote".
+    parentShiftAttemptCount.value = parentShiftAttemptCount.value + 1;
+
+    // Synchronous UI-thread pause flag. A consumer's nested gesture sets
+    // this `true` from its `onTouchesDown` / `onBegin` worklet — that
+    // worklet runs on the UI thread before the parent's next
+    // `_handleShifting` worklet, so the parent reads the latest value with
+    // zero dispatch latency and skips its offset write. RNGH's cross-detector
+    // cancel via `.blocksExternalGesture(parentGestureRef)` is what
+    // ultimately ends the parent gesture, but it arrives 1-N frames after
+    // the child finally activates; this flag closes the window where the
+    // child is still in BEGAN and the parent is still the sole handler
+    // writing to the canvas.
+    if (pauseCanvas.value) return;
+
+    // Debug: count parent shifts that actually wrote offsets.
+    parentShiftCount.value = parentShiftCount.value + 1;
 
     const newOffsetX = offsetX.value + shift.x;
     const newOffsetY = offsetY.value + shift.y;
@@ -1637,23 +1667,29 @@ const ReactNativeZoomableViewInner: ForwardRefRenderFunction<
     .onTouchesMove((e, stateManager) => {
       const dx = e.allTouches[0].x - (firstTouch.value?.x || 0);
       const dy = e.allTouches[0].y - (firstTouch.value?.y || 0);
-      // Earn the gesture: once the user crosses ~10px of movement (or has
-      // 2 fingers down), this is unambiguously a pan/pinch and the parent
-      // claims the touch. Below threshold the parent stays BEGAN so any
-      // nested child gesture (LongPress, Tap, Pan with default minDistance,
-      // etc.) has a wide enough window to activate first. The threshold is
-      // intentionally larger than the 2px shift-detection threshold used by
-      // `_handlePanResponderMove` for `gestureType='shift'` classification:
-      // shift classification gates internal panning math, while activation
-      // gates RNGH ownership of the touch — the latter needs slack so brief
-      // jitter at the start of a child Pan does not wrest the touch from
-      // the child before its own minDistance fires.
-      const ACTIVATION_PX = 10;
-      if (
-        e.numberOfTouches >= 2 ||
-        Math.abs(dx) > ACTIVATION_PX ||
-        Math.abs(dy) > ACTIVATION_PX
-      ) {
+      // Earn the gesture: once the user crosses the activation threshold
+      // (or has 2 fingers down), this is unambiguously a pan/pinch and the
+      // parent claims the touch. Below threshold the parent stays BEGAN so
+      // any nested child gesture (LongPress, Tap, Pan, Rotation, etc.) has
+      // a wide enough window to activate first.
+      //
+      // The threshold has to be large enough that a child Pan (which uses
+      // `.blocksExternalGesture(parentGestureRef)` to FAIL the parent on
+      // child activation) gets there first — otherwise the parent activates
+      // first and writes one or more frames of canvas pan before being
+      // blocked. Empirically with the default RN Pan minDistance of 0 plus
+      // iOS native slop, child Pan reliably activates well under 30 px;
+      // anything below ~25 px lets the parent slip in a frame of writes.
+      // 30 px is conservative — `_handleShifting` is also gated by
+      // `parentActivated`, so off-pin canvas pan kicks in cleanly the
+      // moment the threshold is crossed (no creep, no jump).
+      // Activate ONLY for multi-finger (pinch is unambiguous and the parent
+      // must own it). 1-finger moves stay BEGAN — `blocksExternalGesture`
+      // from any nested child gesture is what cancels the parent at the
+      // RNGH tree level. Canvas-pan suppression while a child is in BEGAN
+      // (before its native activation) is handled by the synchronous
+      // `pauseCanvas` SharedValue — see `_handleShifting`.
+      if (e.numberOfTouches >= 2) {
         activateIfNeeded(stateManager);
       }
       _handlePanResponderMove(e, { dx, dy });
@@ -1703,6 +1739,9 @@ const ReactNativeZoomableViewInner: ForwardRefRenderFunction<
         offsetX,
         offsetY,
         parentGestureRef,
+        parentShiftCount,
+        parentShiftAttemptCount,
+        pauseCanvas,
       }}
     >
       <GestureDetector gesture={gesture}>

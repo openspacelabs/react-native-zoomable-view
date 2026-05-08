@@ -2,7 +2,9 @@ import {
   FixedSize,
   ReactNativeZoomableView,
   ReactNativeZoomableViewRef,
+  useZoomableViewContext,
   useZoomableViewParentGestureRef,
+  useZoomableViewPauseCanvas,
 } from '@openspacelabs/react-native-zoomable-view';
 import { debounce } from 'lodash';
 import React, { ReactNode, useMemo, useRef, useState } from 'react';
@@ -56,8 +58,25 @@ const onPinLongPressJS = () => {
  * Must be rendered INSIDE `<ReactNativeZoomableView>` so
  * `useZoomableViewParentGestureRef()` reaches the provider.
  */
-const DemoPin = ({ knobPanCount }: { knobPanCount: SharedValue<number> }) => {
+const DemoPin = ({
+  knobPanCount,
+  knobBeginCount,
+  knobTouchDownCount,
+  parentShiftLabel,
+}: {
+  knobPanCount: SharedValue<number>;
+  knobBeginCount: SharedValue<number>;
+  knobTouchDownCount: SharedValue<number>;
+  parentShiftLabel: SharedValue<string>;
+}) => {
   const parentGestureRef = useZoomableViewParentGestureRef();
+  const pauseCanvas = useZoomableViewPauseCanvas();
+  const ctx = useZoomableViewContext();
+  // Mirror parentShiftCount from the lib context up to the App's text below
+  // the canvas (the parent's `_handleShifting` increments it).
+  useDerivedValue(() => {
+    parentShiftLabel.value = `parent attempts:${ctx.parentShiftAttemptCount.value} writes:${ctx.parentShiftCount.value}`;
+  });
 
   const knobOffset = useSharedValue<{ x: number; y: number }>({ x: 0, y: 0 });
 
@@ -90,6 +109,20 @@ const DemoPin = ({ knobPanCount }: { knobPanCount: SharedValue<number> }) => {
         // points both at the same install at runtime, so the cast is safe.
         // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-argument
         .blocksExternalGesture(parentGestureRef as any)
+        // Pause the parent's canvas pan from the very first touch — runs
+        // on the UI thread before the parent's next `_handleShifting`
+        // worklet, so the canvas never drifts while the child is still in
+        // BEGAN waiting to cross its native activation threshold.
+        .onTouchesDown(() => {
+          'worklet';
+          knobTouchDownCount.value = knobTouchDownCount.value + 1;
+          pauseCanvas.value = true;
+        })
+        .onBegin(() => {
+          'worklet';
+          knobBeginCount.value = knobBeginCount.value + 1;
+          pauseCanvas.value = true;
+        })
         .onStart(() => {
           'worklet';
           knobPanCount.value = knobPanCount.value + 1;
@@ -101,8 +134,19 @@ const DemoPin = ({ knobPanCount }: { knobPanCount: SharedValue<number> }) => {
         .onEnd(() => {
           'worklet';
           knobOffset.value = { x: 0, y: 0 };
+        })
+        .onFinalize(() => {
+          'worklet';
+          pauseCanvas.value = false;
         }),
-    [knobOffset, knobPanCount, parentGestureRef]
+    [
+      knobOffset,
+      knobPanCount,
+      knobBeginCount,
+      knobTouchDownCount,
+      parentGestureRef,
+      pauseCanvas,
+    ]
   );
 
   const knobStyle = useAnimatedStyle(() => ({
@@ -112,23 +156,21 @@ const DemoPin = ({ knobPanCount }: { knobPanCount: SharedValue<number> }) => {
     ],
   }));
 
-  // Pin bounding box is 180x96. StaticPin anchors the bottom-center of this
-  // box on `staticPinPosition`, so the red pin (sitting at the box's
-  // bottom-center) has its base on the requested map point. The knob hangs
-  // to the left at the same Y as the red-pin centre, joined by a horizontal
-  // rail.
+  // Pin bounding box is 280x100. StaticPin anchors the bottom-center on
+  // `staticPinPosition`, so the red pin's tip ends on the requested map
+  // point. The knob hangs left, both bottom-aligned.
   //
   // Layout (in box coords):
-  //   • red pin   left=66  top=48   48x48  → centre (90, 72), bottom y=96
-  //   • rail      left=32  top=71   34x2   → from knob right edge to pin
-  //                                          left edge, at red-pin centre y
-  //   • knob      left=0   top=56   32x32  → centre (16, 72), aligned w/ rail
+  //   • knob      left=0    top=0    100x100 → centre (50, 50)
+  //   • red pin   left=116  top=52    48x48  → centre (140, 76), tip y=100
+  //   • rail      left=100  top=75   16x2    → at red-pin centre y, joins
+  //                                            knob right edge to pin left
   return (
     <View
       pointerEvents="box-none"
       style={{
-        height: 96,
-        width: 180,
+        height: 100,
+        width: 280,
       }}
     >
       {/* Rail (decorative) */}
@@ -137,10 +179,10 @@ const DemoPin = ({ knobPanCount }: { knobPanCount: SharedValue<number> }) => {
         style={{
           backgroundColor: 'rgba(0,0,0,0.4)',
           height: 2,
-          left: 32,
+          left: 100,
           position: 'absolute',
-          top: 71,
-          width: 34,
+          top: 75,
+          width: 16,
         }}
       />
 
@@ -149,9 +191,9 @@ const DemoPin = ({ knobPanCount }: { knobPanCount: SharedValue<number> }) => {
         <View
           style={{
             height: 48,
-            left: 66,
+            left: 116,
             position: 'absolute',
-            top: 48,
+            top: 52,
             width: 48,
           }}
         >
@@ -173,11 +215,11 @@ const DemoPin = ({ knobPanCount }: { knobPanCount: SharedValue<number> }) => {
         <Animated.View
           style={[
             {
-              height: 32,
+              height: 100,
               left: 0,
               position: 'absolute',
-              top: 56,
-              width: 32,
+              top: 0,
+              width: 100,
             },
             knobStyle,
           ]}
@@ -186,10 +228,10 @@ const DemoPin = ({ knobPanCount }: { knobPanCount: SharedValue<number> }) => {
             style={{
               backgroundColor: 'blue',
               borderColor: 'white',
-              borderRadius: 16,
+              borderRadius: 50,
               borderWidth: 2,
-              height: 32,
-              width: 32,
+              height: 100,
+              width: 100,
             }}
           />
         </Animated.View>
@@ -256,9 +298,13 @@ export default function App() {
   // `ReactNativeZoomableView` so it sees the parent-gesture context, but the
   // counter text below the canvas does not.
   const knobPanCount = useSharedValue(0);
-  const knobPanCountText = useDerivedValue(
-    () => `knob pan starts: ${knobPanCount.value}`
+  const knobBeginCount = useSharedValue(0);
+  const knobTouchDownCount = useSharedValue(0);
+  const knobLabel = useDerivedValue(
+    () =>
+      `knob touchDown:${knobTouchDownCount.value} begin:${knobBeginCount.value} start:${knobPanCount.value}`
   );
+  const parentShiftLabel = useSharedValue('parent shifts: 0');
 
   // `GestureHandlerRootView` lives INSIDE `Wrapper` so it covers both the
   // non-modal and `Modal` (`presentationStyle="pageSheet"`) paths. `Modal`
@@ -285,7 +331,14 @@ export default function App() {
             }}
             // Where to put the pin in the content view
             staticPinPosition={staticPinPosition}
-            staticPinIcon={<DemoPin knobPanCount={knobPanCount} />}
+            staticPinIcon={
+              <DemoPin
+                knobPanCount={knobPanCount}
+                knobBeginCount={knobBeginCount}
+                knobTouchDownCount={knobTouchDownCount}
+                parentShiftLabel={parentShiftLabel}
+              />
+            }
             // Callback that returns the position of the pin
             // on the actual source image
             onStaticPinPositionChange={debouncedUpdatePin}
@@ -316,7 +369,8 @@ export default function App() {
         </View>
         <Text>onStaticPinPositionChange: {stringifyPoint(pin)}</Text>
         <ReText text={movePinText} style={{ color: 'black' }} />
-        <ReText text={knobPanCountText} style={{ color: 'black' }} />
+        <ReText text={knobLabel} style={{ color: 'black' }} />
+        <ReText text={parentShiftLabel} style={{ color: 'black' }} />
         <Button
           title={`${showMarkers ? 'Hide' : 'Show'} markers`}
           onPress={() => {
