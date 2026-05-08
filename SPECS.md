@@ -168,7 +168,7 @@ A parent re-render that hands a fresh callback identity is honored — there is 
 
 ## Gesture classification
 
-A single `Gesture.Manual()` from RNGH handles all touches.
+A single `Gesture.Manual()` from RNGH handles all touches that land on the zoom subject. Touches that land on `StaticPin`'s interactive subregions (consumer-provided `<GestureDetector>` inside `staticPinIcon`) are claimed by the consumer's gesture and never reach the canvas detector — see [Static pin](#static-pin).
 
 - **1 finger, moved >2 px** on either axis: `gestureType = 'shift'`
 - **2 fingers**: `gestureType = 'pinch'`
@@ -220,7 +220,11 @@ When `zoomStep` would yield no next step, `_handleDoubleTap` returns early *befo
 
 ## Static pin
 
-`StaticPin` is a pure presentational `View`. It does not own a gesture handler — all gestures, including taps/drags that land on the pin, go through the parent's `Gesture.Manual()` detector.
+`StaticPin` is a sibling of the canvas `<GestureDetector>`, not a descendant. iOS's gesture-recognizer ancestor walk skips canvas-pan for touches on the pin, so a consumer's interactive `staticPinIcon` subregions claim their own touches without the canvas also running.
+
+Wrapper defaults to `pointerEvents="box-none"`: empty pin space passes through to the canvas detector below. A consumer's `staticPinIcon` keeps its own pointer events — wrap interactive parts in `<GestureDetector>` to claim them, wrap pass-through parts in `pointerEvents="none"`. The default unconfigured icon is wrapped in `pointerEvents="none"` so canvas pan/pinch work on it.
+
+`pinProps.pointerEvents` overrides the wrapper default if a consumer sets it explicitly (`'auto'` = pin bounding box catches everything; `'none'` = pin disappears from hit-testing). JSX-spread accidents from unrelated `pinProps` keys can't reach this prop.
 
 ### Pin positioning
 
@@ -293,7 +297,7 @@ This major replaces the class-component PanResponder/Animated implementation wit
 - `onShiftingBefore`, `onShiftingAfter` — use `panEnabled`, `disablePanOnInitialZoom`, or `onPanResponderMoveWorklet` returning truthy
 - `onZoomBefore`, `onZoomAfter` — per-frame zoom callbacks are gone; use `zoomEnabled` and the sensitivity props
 - `onStartShouldSetPanResponder*`, `onMoveShouldSetPanResponderCapture`, `onPanResponderTerminationRequest`, `onShouldBlockNativeResponder` — integrate via RNGH gesture composition (e.g. `simultaneousWithExternalGesture`) instead
-- `onStaticPinPress`, `onStaticPinLongPress` — the pin no longer owns a gesture handler; the parent's tap/long-press callbacks fire whether or not the touch lands on the pin
+- `onStaticPinPress`, `onStaticPinLongPress` — the pin no longer owns a gesture handler. The canvas `Gesture.Manual()` runs for touches that fall through to the canvas detector (off-pin or in non-interactive `pointerEvents="box-none"`/`"none"` pin space). Touches that hit a consumer-provided interactive subregion in `staticPinIcon` (e.g. a nested `<GestureDetector>`) are claimed by the consumer's gesture and the canvas tap/long-press callbacks do not fire for those touches.
 - `onLayout` → `onLayoutWorklet` (UI thread; payload is the unwrapped `{ x, y, width, height }` object, not a synthetic `LayoutChangeEvent`)
 - `onTransform` → `onTransformWorklet` (UI thread)
 - `onPanResponderMove` → `onPanResponderMoveWorklet` (UI thread)

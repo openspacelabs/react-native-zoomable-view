@@ -42,15 +42,8 @@ const onPinLongPressJS = () => {
 };
 
 /**
- * Demo pin: red main button (`Gesture.LongPress` claims this region) and a
- * blue knob hanging on a rail (`Gesture.Pan` claims this region). Empty
- * bounding-box space falls through to the ZoomableView's own pan/pinch.
- *
- * Touches that hit either nested `<GestureDetector>` are claimed by the
- * consumer's gesture; touches that hit empty pin space pass through
- * (`pointerEvents="box-none"` on the pin wrapper) to the ZoomableView's
- * `<GestureDetector>` rendered as a sibling below. No explicit gesture
- * composition needed — the structural separation does it.
+ * Red main button claims `LongPress`, blue knob claims `Pan`. Empty pin
+ * space passes through to the canvas — no gesture composition needed.
  */
 const DemoPin = () => {
   const knobOffset = useSharedValue<{ x: number; y: number }>({ x: 0, y: 0 });
@@ -90,15 +83,8 @@ const DemoPin = () => {
     ],
   }));
 
-  // Pin bounding box is 280x100. StaticPin anchors the bottom-center on
-  // `staticPinPosition`, so the red pin's tip ends on the requested map
-  // point. The knob hangs left, both bottom-aligned.
-  //
-  // Layout (in box coords):
-  //   • knob      left=0    top=0    100x100 → centre (50, 50)
-  //   • red pin   left=116  top=52    48x48  → centre (140, 76), tip y=100
-  //   • rail      left=100  top=75   16x2    → at red-pin centre y, joins
-  //                                            knob right edge to pin left
+  // 280x100 box, anchored bottom-center on staticPinPosition.
+  // knob 100x100 @ (0,0)  ·  red 48x48 @ (116,52)  ·  rail @ (100,75) 16x2
   return (
     <View
       pointerEvents="box-none"

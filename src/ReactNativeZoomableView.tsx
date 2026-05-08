@@ -1632,17 +1632,10 @@ const ReactNativeZoomableViewInner: ForwardRefRenderFunction<
     <ReactNativeZoomableViewProvider
       value={{ zoom, inverseZoom, inverseZoomStyle, offsetX, offsetY }}
     >
-      {/*
-       * Outer wrapper sits OUTSIDE the `GestureDetector`. `StaticPin` is
-       * rendered as a sibling of the `GestureDetector` (not a descendant)
-       * so iOS's gesture-recognizer ancestor walk on a touch that lands
-       * on the pin does NOT pick up this view's canvas-pan recognizer —
-       * the pin's interactive subregions claim their own touches without
-       * the canvas ALSO running. Empty pin bounding-box space passes
-       * through (`pointerEvents="box-none"` in `StaticPin`) and lands on
-       * the `GestureDetector`'s wrapper below, so canvas pan/pinch still
-       * work everywhere off the pin (and on non-interactive pin space).
-       */}
+      {/* `StaticPin` is a sibling of `<GestureDetector>` (not a descendant)
+          so iOS's gesture-recognizer ancestor walk skips canvas-pan for
+          touches that land on interactive pin subregions. Empty pin space
+          passes through via `pointerEvents="box-none"` in `StaticPin`. */}
       <View
         // eslint-disable-next-line @typescript-eslint/no-use-before-define
         style={styles.container}
