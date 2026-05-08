@@ -43,17 +43,15 @@ const onPinLongPressJS = () => {
 };
 
 /**
- * Demo pin: red main button (LongPress claims this region) and a blue knob
- * hanging on a rail (Pan claims this region). Empty bounding-box space falls
- * through to the parent ReactNativeZoomableView's pan/pinch.
+ * Demo pin: red main button (`Gesture.LongPress` claims this region) and a
+ * blue knob hanging on a rail (`Gesture.Pan` claims this region). Empty
+ * bounding-box space falls through to the ZoomableView's own pan/pinch.
  *
- * Both gestures use `.blocksExternalGesture(parentGestureRef)` so the parent
- * FAILs while the child is active — without that, RNGH's two
- * `GestureDetector`s run independently and both write their state, which is
- * what causes "the canvas pans a little when I begin to drag the knob."
- *
- * Must be rendered INSIDE `<ReactNativeZoomableView>` so
- * `useZoomableViewParentGestureRef()` reaches the provider.
+ * Both gestures toggle `pauseCanvas` (from the ZoomableView context) so
+ * the ZoomableView's own pan/long-press/tap handling skips the touch
+ * while the consumer's gesture is active. Must be rendered INSIDE
+ * `<ReactNativeZoomableView>` so `useZoomableViewContext()` reaches the
+ * provider.
  */
 const DemoPin = () => {
   const { pauseCanvas } = useZoomableViewContext();
@@ -85,11 +83,12 @@ const DemoPin = () => {
         // Generous hit slop so the small knob is easier to grab — RNGH does
         // not inflate the touch target by default.
         .hitSlop({ top: 16, bottom: 16, left: 16, right: 16 })
-        // Pause the parent's canvas pan from the very first touch.
-        // Both worklets run on the UI thread in the same JS context, so
-        // the parent's next `_handleShifting` reads the latest value with
-        // zero dispatch latency — canvas never drifts while the child is
-        // still in BEGAN waiting to cross its native activation threshold.
+        // Pause the ZoomableView's own pan/long-press/tap handling from
+        // the very first touch. Both worklets run on the UI thread in
+        // the same JS context, so the ZoomableView's next gesture
+        // callback reads the latest value synchronously — canvas never
+        // drifts while this Pan is still in BEGAN waiting to cross its
+        // native activation threshold.
         .onTouchesDown(() => {
           'worklet';
           pauseCanvas.value = true;

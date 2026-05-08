@@ -12,15 +12,16 @@ type ZoomableViewContextValue = {
   inverseZoomStyle: { transform: { scale: SharedValue<number> }[] };
   offsetX: SharedValue<number>;
   offsetY: SharedValue<number>;
-  // Synchronous UI-thread "pause parent gesture" flag. A consumer nesting
-  // their own gesture inside `staticPinIcon` (or anywhere in the zoom
-  // subject) sets this `true` from their gesture's first-touch worklet
+  // Synchronous UI-thread flag that pauses the ZoomableView's own
+  // pan/pinch/tap/long-press handling. A consumer nesting their own
+  // gesture inside `staticPinIcon` (or anywhere in the zoom subject) sets
+  // this `true` from their gesture's first-touch worklet
   // (`onTouchesDown` / `onBegin`) and `false` on `onFinalize`. While set,
-  // the parent ZoomableView skips its canvas-pan offset writes, its
-  // long-press timer, and its tap classification — leaving the touch
-  // entirely to the consumer's gesture. Both worklets run on the same UI
-  // thread JS context, so the parent reads the latest value with zero
-  // dispatch latency (no native gesture-recognizer round-trip).
+  // the ZoomableView skips canvas pan offset writes, its long-press
+  // timer, and its tap classification — leaving the touch entirely to
+  // the consumer's gesture. Both worklets run on the same UI thread JS
+  // context, so the read here is synchronous (no native
+  // gesture-recognizer round-trip).
   pauseCanvas: SharedValue<boolean>;
 };
 

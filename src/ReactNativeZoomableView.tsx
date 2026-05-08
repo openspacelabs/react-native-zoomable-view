@@ -184,17 +184,16 @@ const ReactNativeZoomableViewInner: ForwardRefRenderFunction<
   const lastGestureCenterPosition = useSharedValue<Vec2D | null>(null);
   const lastGestureTouchDistance = useSharedValue<number | null>(150);
   const gestureStarted = useSharedValue(false);
-  // UI-thread synchronous "pause canvas" flag. Consumers nesting their own
-  // gesture inside `staticPinIcon` can set this `true` from the very first
-  // touch worklet (`onTouchesDown` / `onBegin`) so the parent skips canvas
-  // offset writes from frame 1. Both worklets run on the UI thread in the
-  // same JS context, so the parent reads the latest value with zero
-  // dispatch latency — closing the leak window where RNGH's cross-detector
-  // cancel via `.blocksExternalGesture(parentGestureRef)` had not yet
-  // arrived but the child gesture was still in BEGAN (so its `onUpdate`
-  // hadn't fired and the parent was the only handler writing state).
-  // Exposed via `useZoomableViewPauseCanvas()`. Consumers reset it on
-  // their gesture's `onEnd` / `onFinalize`.
+  // UI-thread synchronous "pause this ZoomableView" flag. Consumers nesting
+  // their own gesture inside `staticPinIcon` set this `true` from their
+  // gesture's first-touch worklet (`onTouchesDown` / `onBegin`) so the
+  // ZoomableView's own pan/pinch/tap/long-press handling skips the touch
+  // from frame 1. Both worklets run on the same UI thread JS context, so
+  // the read in this component's gesture callbacks is synchronous —
+  // closing the window where RNGH's cross-detector cancel hasn't yet
+  // arrived but the consumer's gesture is still in BEGAN (its `onUpdate`
+  // hasn't fired). Exposed on the ZoomableView context. Consumers reset
+  // it on their gesture's `onFinalize`.
   const pauseCanvas = useSharedValue(false);
   // JS-thread mirror of `gestureStarted` exposed via the imperative handle.
   // The UI-thread `gestureStarted` SharedValue must reset synchronously at
@@ -1546,22 +1545,21 @@ const ReactNativeZoomableViewInner: ForwardRefRenderFunction<
 
   const firstTouch = useSharedValue<Vec2D | undefined>(undefined);
   // While `pauseCanvas.value` is true (set by a consumer's nested gesture
-  // from its `onTouchesDown` worklet), the parent's manual gesture
-  // short-circuits all lifecycle handlers: no grant (long-press timer
-  // never armed), no move (no offset writes, no consumer move callback),
-  // no tap classification on release. The RNGH state machine still ends
-  // cleanly via `stateManager.end()` — only consumer-visible parent
+  // from its `onTouchesDown` worklet), this gesture short-circuits all
+  // lifecycle handlers: no grant (long-press timer never armed), no move
+  // (no offset writes, no consumer move callback), no tap classification
+  // on release. The RNGH state machine still ends cleanly via
+  // `stateManager.end()` — only the ZoomableView's own consumer-visible
   // behaviors are suppressed.
   const gesture = Gesture.Manual()
     .onTouchesDown((e, stateManager) => {
       if (pauseCanvas.value) return;
       if (!firstTouch.value) {
-        // Parent only goes BEGAN — not ACTIVE. ACTIVE on touch-down would
-        // claim exclusive RNGH ownership of the touch and cancel any nested
-        // child gesture (LongPress, Pan, etc.) inside `staticPinIcon` before
-        // it had a chance to activate. Children get RNGH's default
-        // child-priority window; parent activates later if/when it earns the
-        // gesture (movement threshold, 2nd finger, or long-press timer).
+        // Stay in BEGAN on touch-down. Going straight to ACTIVE would
+        // claim exclusive RNGH ownership of the touch and cancel any
+        // nested child gesture (LongPress, Pan, etc.) inside
+        // `staticPinIcon` before it had a chance to activate. Activation
+        // happens later, only on the unambiguous pinch case (2nd finger).
         stateManager.begin();
         firstTouch.value = { x: e.allTouches[0].x, y: e.allTouches[0].y };
         _handlePanResponderGrant(e);
@@ -1578,10 +1576,11 @@ const ReactNativeZoomableViewInner: ForwardRefRenderFunction<
       // reviewers kept finding gaps.
       if (e.numberOfTouches >= 2) {
         // Pinch is unambiguous from the moment the 2nd finger lands. Claim
-        // the touch now so the parent owns the pinch even if a child gesture
-        // earlier started competing for the 1st finger — child gestures
-        // inside `staticPinIcon` are expected to be single-touch (tap, long
-        // press, drag); a 2-finger session is the parent's domain.
+        // the touch now so the ZoomableView owns the pinch even if a
+        // nested gesture was competing for the 1st finger — nested
+        // gestures inside `staticPinIcon` are expected to be single-touch
+        // (tap, long press, drag); a 2-finger session is the ZoomableView's
+        // domain.
         stateManager.activate();
         // Long-press is a single-finger gesture — disarm any armed timer.
         // Safe no-op if the simultaneous-case long-press gate in
@@ -1620,7 +1619,7 @@ const ReactNativeZoomableViewInner: ForwardRefRenderFunction<
       const dx = e.allTouches[0].x - (firstTouch.value?.x || 0);
       const dy = e.allTouches[0].y - (firstTouch.value?.y || 0);
       // 1-finger moves stay BEGAN. Multi-finger is unambiguous pinch and
-      // the parent must own it.
+      // the ZoomableView must own it.
       if (e.numberOfTouches >= 2) {
         stateManager.activate();
       }
