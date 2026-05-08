@@ -1630,13 +1630,7 @@ const ReactNativeZoomableViewInner: ForwardRefRenderFunction<
 
   return (
     <ReactNativeZoomableViewProvider
-      value={{
-        zoom,
-        inverseZoom,
-        inverseZoomStyle,
-        offsetX,
-        offsetY,
-      }}
+      value={{ zoom, inverseZoom, inverseZoomStyle, offsetX, offsetY }}
     >
       {/*
        * Outer wrapper sits OUTSIDE the `GestureDetector`. `StaticPin` is
