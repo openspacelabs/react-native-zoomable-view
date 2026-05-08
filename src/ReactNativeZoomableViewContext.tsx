@@ -1,4 +1,5 @@
-import React, { createContext, ReactNode, useContext } from 'react';
+import React, { createContext, ReactNode, RefObject, useContext } from 'react';
+import type { GestureType } from 'react-native-gesture-handler';
 import { DerivedValue, SharedValue } from 'react-native-reanimated';
 
 type ZoomableViewContextValue = {
@@ -12,6 +13,16 @@ type ZoomableViewContextValue = {
   inverseZoomStyle: { transform: { scale: SharedValue<number> }[] };
   offsetX: SharedValue<number>;
   offsetY: SharedValue<number>;
+  // Stable RNGH ref for the parent's pan/pinch `Gesture.Manual()`, attached
+  // via `.withRef(parentGestureRef)`. Consumers nesting their own
+  // `GestureDetector` inside `staticPinIcon` (or anywhere inside the zoom
+  // subject) can compose against it — typically with
+  // `myGesture.blocksExternalGesture(parentGestureRef)` so the parent FAILs
+  // when the child activates, preventing the canvas from panning while a
+  // child Pan / Rotation / etc. is running. RNGH does NOT auto-coordinate
+  // across `GestureDetector` boundaries, so without this composition the
+  // parent and child both run concurrently and both write their state.
+  parentGestureRef: RefObject<GestureType | undefined>;
 };
 
 const ReactNativeZoomableViewContext =
@@ -39,3 +50,23 @@ export const useZoomableViewContext = () => {
   }
   return context;
 };
+
+/**
+ * Hook returning the parent `ReactNativeZoomableView`'s pan/pinch gesture
+ * ref. Use it to give a nested gesture priority on the regions it covers:
+ *
+ * ```tsx
+ * const parentRef = useZoomableViewParentGestureRef();
+ * const myPan = useMemo(
+ *   () => Gesture.Pan().onUpdate(...).blocksExternalGesture(parentRef),
+ *   [parentRef]
+ * );
+ * ```
+ *
+ * `blocksExternalGesture` makes the parent FAIL when this gesture activates,
+ * so the canvas does not pan while the nested gesture is running. Areas of
+ * the pin not wrapped in a child `GestureDetector` continue to forward
+ * touches to the parent — canvas pan still works there.
+ */
+export const useZoomableViewParentGestureRef = () =>
+  useZoomableViewContext().parentGestureRef;

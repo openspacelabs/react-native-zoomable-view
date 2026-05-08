@@ -8,6 +8,7 @@ import React, {
   useState,
 } from 'react';
 import { StyleSheet, View } from 'react-native';
+import type { GestureType } from 'react-native-gesture-handler';
 import {
   Gesture,
   GestureDetector,
@@ -1563,7 +1564,15 @@ const ReactNativeZoomableViewInner: ForwardRefRenderFunction<
       parentActivated.value = true;
     }
   };
+  // Stable RNGH ref so consumers nesting their own GestureDetector inside
+  // `staticPinIcon` (or anywhere inside the zoom subject) can give their
+  // gesture priority via `myGesture.blocksExternalGesture(parentGestureRef)`.
+  // Without that composition, RNGH does NOT auto-coordinate across nested
+  // `GestureDetector` boundaries — both the parent and the child run, and
+  // both write their state.
+  const parentGestureRef = useRef<GestureType | undefined>(undefined);
   const gesture = Gesture.Manual()
+    .withRef(parentGestureRef)
     .onTouchesDown((e, stateManager) => {
       if (!firstTouch.value) {
         // Parent only goes BEGAN — not ACTIVE. ACTIVE on touch-down would
@@ -1687,7 +1696,14 @@ const ReactNativeZoomableViewInner: ForwardRefRenderFunction<
 
   return (
     <ReactNativeZoomableViewProvider
-      value={{ zoom, inverseZoom, inverseZoomStyle, offsetX, offsetY }}
+      value={{
+        zoom,
+        inverseZoom,
+        inverseZoomStyle,
+        offsetX,
+        offsetY,
+        parentGestureRef,
+      }}
     >
       <GestureDetector gesture={gesture}>
         <View

@@ -2,6 +2,7 @@ import {
   FixedSize,
   ReactNativeZoomableView,
   ReactNativeZoomableViewRef,
+  useZoomableViewParentGestureRef,
 } from '@openspacelabs/react-native-zoomable-view';
 import { debounce } from 'lodash';
 import React, { ReactNode, useMemo, useRef, useState } from 'react';
@@ -20,6 +21,7 @@ import {
   GestureHandlerRootView,
 } from 'react-native-gesture-handler';
 import Animated, {
+  SharedValue,
   useAnimatedStyle,
   useDerivedValue,
   useSharedValue,
@@ -37,86 +39,42 @@ const imageSize = { width: kittenSize, height: kittenSize };
 const stringifyPoint = (point?: { x: number; y: number }) =>
   point ? `${Math.round(point.x)}, ${Math.round(point.y)}` : 'Off map';
 
-const PageSheetModal = ({
-  children,
-  style,
-}: {
-  children: ReactNode;
-  style?: ViewProps['style'];
-}) => {
-  return (
-    <Modal animationType="slide" presentationStyle="pageSheet">
-      <View style={style}>{children}</View>
-    </Modal>
-  );
+const onPinLongPressJS = () => {
+  Alert.alert('Pin long-press fired');
 };
 
-export default function App() {
-  const ref = useRef<ReactNativeZoomableViewRef>(null);
-  const [showMarkers, setShowMarkers] = useState(true);
-  const [modal, setModal] = useState(false);
-  const [size, setSize] = useState<{ width: number; height: number }>({
-    width: 0,
-    height: 0,
-  });
+/**
+ * Demo pin: red main button (LongPress claims this region) and a blue knob
+ * hanging on a rail (Pan claims this region). Empty bounding-box space falls
+ * through to the parent ReactNativeZoomableView's pan/pinch.
+ *
+ * Both gestures use `.blocksExternalGesture(parentGestureRef)` so the parent
+ * FAILs while the child is active — without that, RNGH's two
+ * `GestureDetector`s run independently and both write their state, which is
+ * what causes "the canvas pans a little when I begin to drag the knob."
+ *
+ * Must be rendered INSIDE `<ReactNativeZoomableView>` so
+ * `useZoomableViewParentGestureRef()` reaches the provider.
+ */
+const DemoPin = ({ knobPanCount }: { knobPanCount: SharedValue<number> }) => {
+  const parentGestureRef = useZoomableViewParentGestureRef();
 
-  // Use layout event to get centre point, to set the pin
-  const [pin, setPin] = useState({ x: 0, y: 0 });
-
-  // Debounce the change event to avoid layout event firing too often while
-  // dragging. `useMemo` caches the debounce instance across renders so its
-  // internal timer state actually batches calls — the previous
-  // `useCallback(() => debounce(...), [])()` invoked the memoized factory
-  // on every render, producing a fresh debounce each time and defeating
-  // the debouncing entirely. `setPin` is a stable `useState` setter, so the
-  // deps array effectively never re-creates the instance.
-  const debouncedUpdatePin = useMemo(() => debounce(setPin, 10), [setPin]);
-
-  // The move event fires every frame the pin position can change. Mirror it
-  // into a SharedValue and let ReText (via `useAnimatedProps` on a wrapped
-  // TextInput) write to the native view directly on the UI thread, without
-  // ever touching JS state or the React tree.
-  const movePinShared = useSharedValue<{ x: number; y: number }>({
-    x: 0,
-    y: 0,
-  });
-  const movePinText = useDerivedValue(() => {
-    const p = movePinShared.value;
-    return `onStaticPinPositionMove: ${Math.round(p.x)}, ${Math.round(p.y)}`;
-  });
-
-  const staticPinPosition = { x: size.width / 2, y: size.height / 2 };
-  const { size: contentSize } = applyContainResizeMode(imageSize, size);
-
-  const Wrapper = modal ? PageSheetModal : View;
-
-  // Reproduce client-gesture-on-pin scenario:
-  //   - main circle: LongPress (Alert)
-  //   - knob: Pan (drags the knob visually)
-  //   - rest of the pin's bounding box: should let canvas pan through
-  // Today none of the client gestures fire because the parent GestureDetector
-  // activates on the first touch and swallows everything.
   const knobOffset = useSharedValue<{ x: number; y: number }>({ x: 0, y: 0 });
 
-  const onPinLongPressJS = () => {
-    Alert.alert('Pin long-press fired');
-  };
   const pinLongPress = useMemo(
     () =>
       Gesture.LongPress()
         .minDuration(400)
+        // The lib's parentGestureRef is typed against the lib's RNGH copy;
+        // the example consumes it via its own RNGH copy. `metro.config.js`
+        // points both at the same install at runtime, so the cast is safe.
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-argument
+        .blocksExternalGesture(parentGestureRef as any)
         .onStart(() => {
           'worklet';
           runOnJS(onPinLongPressJS)();
         }),
-    []
-  );
-
-  // Counter incremented from the worklet onStart so the test can confirm the
-  // gesture fires without an Alert (Alerts steal focus mid-pan).
-  const knobPanCount = useSharedValue(0);
-  const knobPanCountText = useDerivedValue(
-    () => `knob pan starts: ${knobPanCount.value}`
+    [parentGestureRef]
   );
 
   const knobPan = useMemo(
@@ -125,6 +83,13 @@ export default function App() {
         // Generous hit slop so the small knob is easier to grab — RNGH does
         // not inflate the touch target by default.
         .hitSlop({ top: 16, bottom: 16, left: 16, right: 16 })
+        // Make the parent FAIL when this Pan activates, so the canvas does
+        // not pan while the knob is being dragged.
+        // The lib's parentGestureRef is typed against the lib's RNGH copy;
+        // the example consumes it via its own RNGH copy. `metro.config.js`
+        // points both at the same install at runtime, so the cast is safe.
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-argument
+        .blocksExternalGesture(parentGestureRef as any)
         .onStart(() => {
           'worklet';
           knobPanCount.value = knobPanCount.value + 1;
@@ -137,7 +102,7 @@ export default function App() {
           'worklet';
           knobOffset.value = { x: 0, y: 0 };
         }),
-    [knobOffset, knobPanCount]
+    [knobOffset, knobPanCount, parentGestureRef]
   );
 
   const knobStyle = useAnimatedStyle(() => ({
@@ -158,13 +123,13 @@ export default function App() {
   //   • rail      left=32  top=71   34x2   → from knob right edge to pin
   //                                          left edge, at red-pin centre y
   //   • knob      left=0   top=56   32x32  → centre (16, 72), aligned w/ rail
-  const pinIcon = (
+  return (
     <View
+      pointerEvents="box-none"
       style={{
         height: 96,
         width: 180,
       }}
-      pointerEvents="box-none"
     >
       {/* Rail (decorative) */}
       <View
@@ -231,6 +196,69 @@ export default function App() {
       </GestureDetector>
     </View>
   );
+};
+
+const PageSheetModal = ({
+  children,
+  style,
+}: {
+  children: ReactNode;
+  style?: ViewProps['style'];
+}) => {
+  return (
+    <Modal animationType="slide" presentationStyle="pageSheet">
+      <View style={style}>{children}</View>
+    </Modal>
+  );
+};
+
+export default function App() {
+  const ref = useRef<ReactNativeZoomableViewRef>(null);
+  const [showMarkers, setShowMarkers] = useState(true);
+  const [modal, setModal] = useState(false);
+  const [size, setSize] = useState<{ width: number; height: number }>({
+    width: 0,
+    height: 0,
+  });
+
+  // Use layout event to get centre point, to set the pin
+  const [pin, setPin] = useState({ x: 0, y: 0 });
+
+  // Debounce the change event to avoid layout event firing too often while
+  // dragging. `useMemo` caches the debounce instance across renders so its
+  // internal timer state actually batches calls — the previous
+  // `useCallback(() => debounce(...), [])()` invoked the memoized factory
+  // on every render, producing a fresh debounce each time and defeating
+  // the debouncing entirely. `setPin` is a stable `useState` setter, so the
+  // deps array effectively never re-creates the instance.
+  const debouncedUpdatePin = useMemo(() => debounce(setPin, 10), [setPin]);
+
+  // The move event fires every frame the pin position can change. Mirror it
+  // into a SharedValue and let ReText (via `useAnimatedProps` on a wrapped
+  // TextInput) write to the native view directly on the UI thread, without
+  // ever touching JS state or the React tree.
+  const movePinShared = useSharedValue<{ x: number; y: number }>({
+    x: 0,
+    y: 0,
+  });
+  const movePinText = useDerivedValue(() => {
+    const p = movePinShared.value;
+    return `onStaticPinPositionMove: ${Math.round(p.x)}, ${Math.round(p.y)}`;
+  });
+
+  const staticPinPosition = { x: size.width / 2, y: size.height / 2 };
+  const { size: contentSize } = applyContainResizeMode(imageSize, size);
+
+  const Wrapper = modal ? PageSheetModal : View;
+
+  // SharedValues that need to drive UI text outside the zoom subject must be
+  // hoisted above the provider — `<DemoPin>` lives INSIDE
+  // `ReactNativeZoomableView` so it sees the parent-gesture context, but the
+  // counter text below the canvas does not.
+  const knobPanCount = useSharedValue(0);
+  const knobPanCountText = useDerivedValue(
+    () => `knob pan starts: ${knobPanCount.value}`
+  );
 
   // `GestureHandlerRootView` lives INSIDE `Wrapper` so it covers both the
   // non-modal and `Modal` (`presentationStyle="pageSheet"`) paths. `Modal`
@@ -257,7 +285,7 @@ export default function App() {
             }}
             // Where to put the pin in the content view
             staticPinPosition={staticPinPosition}
-            staticPinIcon={pinIcon}
+            staticPinIcon={<DemoPin knobPanCount={knobPanCount} />}
             // Callback that returns the position of the pin
             // on the actual source image
             onStaticPinPositionChange={debouncedUpdatePin}
