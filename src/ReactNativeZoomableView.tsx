@@ -1537,9 +1537,9 @@ const ReactNativeZoomableViewInner: ForwardRefRenderFunction<
     .onTouchesDown((e, stateManager) => {
       if (!firstTouch.value) {
         // RNGH state machine order: UNDETERMINED → BEGAN (begin) → ACTIVE
-        // (activate). Calling activate() first relies on activate's
-        // force-true path to jump straight to ACTIVE, which makes the
-        // subsequent begin() a no-op (ACTIVE cannot regress to BEGAN).
+        // (activate). Calling activate() first relies on activate's force-true
+        // path to jump straight to ACTIVE, which makes the subsequent begin()
+        // a no-op (ACTIVE cannot regress to BEGAN).
         stateManager.begin();
         stateManager.activate();
         firstTouch.value = { x: e.allTouches[0].x, y: e.allTouches[0].y };
