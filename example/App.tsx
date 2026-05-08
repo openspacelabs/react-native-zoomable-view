@@ -2,7 +2,6 @@ import {
   FixedSize,
   ReactNativeZoomableView,
   ReactNativeZoomableViewRef,
-  useZoomableViewContext,
 } from '@openspacelabs/react-native-zoomable-view';
 import { debounce } from 'lodash';
 import React, { ReactNode, useMemo, useRef, useState } from 'react';
@@ -47,34 +46,24 @@ const onPinLongPressJS = () => {
  * blue knob hanging on a rail (`Gesture.Pan` claims this region). Empty
  * bounding-box space falls through to the ZoomableView's own pan/pinch.
  *
- * Both gestures toggle `pauseCanvas` (from the ZoomableView context) so
- * the ZoomableView's own pan/long-press/tap handling skips the touch
- * while the consumer's gesture is active. Must be rendered INSIDE
- * `<ReactNativeZoomableView>` so `useZoomableViewContext()` reaches the
- * provider.
+ * Touches that hit either nested `<GestureDetector>` are claimed by the
+ * consumer's gesture; touches that hit empty pin space pass through
+ * (`pointerEvents="box-none"` on the pin wrapper) to the ZoomableView's
+ * `<GestureDetector>` rendered as a sibling below. No explicit gesture
+ * composition needed — the structural separation does it.
  */
 const DemoPin = () => {
-  const { pauseCanvas } = useZoomableViewContext();
-
   const knobOffset = useSharedValue<{ x: number; y: number }>({ x: 0, y: 0 });
 
   const pinLongPress = useMemo(
     () =>
       Gesture.LongPress()
         .minDuration(400)
-        .onTouchesDown(() => {
-          'worklet';
-          pauseCanvas.value = true;
-        })
         .onStart(() => {
           'worklet';
           runOnJS(onPinLongPressJS)();
-        })
-        .onFinalize(() => {
-          'worklet';
-          pauseCanvas.value = false;
         }),
-    [pauseCanvas]
+    []
   );
 
   const knobPan = useMemo(
@@ -83,16 +72,6 @@ const DemoPin = () => {
         // Generous hit slop so the small knob is easier to grab — RNGH does
         // not inflate the touch target by default.
         .hitSlop({ top: 16, bottom: 16, left: 16, right: 16 })
-        // Pause the ZoomableView's own pan/long-press/tap handling from
-        // the very first touch. Both worklets run on the UI thread in
-        // the same JS context, so the ZoomableView's next gesture
-        // callback reads the latest value synchronously — canvas never
-        // drifts while this Pan is still in BEGAN waiting to cross its
-        // native activation threshold.
-        .onTouchesDown(() => {
-          'worklet';
-          pauseCanvas.value = true;
-        })
         .onUpdate((e) => {
           'worklet';
           knobOffset.value = { x: e.translationX, y: e.translationY };
@@ -100,12 +79,8 @@ const DemoPin = () => {
         .onEnd(() => {
           'worklet';
           knobOffset.value = { x: 0, y: 0 };
-        })
-        .onFinalize(() => {
-          'worklet';
-          pauseCanvas.value = false;
         }),
-    [knobOffset, pauseCanvas]
+    [knobOffset]
   );
 
   const knobStyle = useAnimatedStyle(() => ({

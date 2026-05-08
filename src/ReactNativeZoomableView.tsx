@@ -184,17 +184,6 @@ const ReactNativeZoomableViewInner: ForwardRefRenderFunction<
   const lastGestureCenterPosition = useSharedValue<Vec2D | null>(null);
   const lastGestureTouchDistance = useSharedValue<number | null>(150);
   const gestureStarted = useSharedValue(false);
-  // UI-thread synchronous "pause this ZoomableView" flag. Consumers nesting
-  // their own gesture inside `staticPinIcon` set this `true` from their
-  // gesture's first-touch worklet (`onTouchesDown` / `onBegin`) so the
-  // ZoomableView's own pan/pinch/tap/long-press handling skips the touch
-  // from frame 1. Both worklets run on the same UI thread JS context, so
-  // the read in this component's gesture callbacks is synchronous —
-  // closing the window where RNGH's cross-detector cancel hasn't yet
-  // arrived but the consumer's gesture is still in BEGAN (its `onUpdate`
-  // hasn't fired). Exposed on the ZoomableView context. Consumers reset
-  // it on their gesture's `onFinalize`.
-  const pauseCanvas = useSharedValue(false);
   // JS-thread mirror of `gestureStarted` exposed via the imperative handle.
   // The UI-thread `gestureStarted` SharedValue must reset synchronously at
   // the end of `_handlePanResponderEnd` so subsequent `onTouchesMove`
@@ -1544,23 +1533,15 @@ const ReactNativeZoomableViewInner: ForwardRefRenderFunction<
   };
 
   const firstTouch = useSharedValue<Vec2D | undefined>(undefined);
-  // While `pauseCanvas.value` is true (set by a consumer's nested gesture
-  // from its `onTouchesDown` worklet), this gesture short-circuits all
-  // lifecycle handlers: no grant (long-press timer never armed), no move
-  // (no offset writes, no consumer move callback), no tap classification
-  // on release. The RNGH state machine still ends cleanly via
-  // `stateManager.end()` — only the ZoomableView's own consumer-visible
-  // behaviors are suppressed.
   const gesture = Gesture.Manual()
     .onTouchesDown((e, stateManager) => {
-      if (pauseCanvas.value) return;
       if (!firstTouch.value) {
-        // Stay in BEGAN on touch-down. Going straight to ACTIVE would
-        // claim exclusive RNGH ownership of the touch and cancel any
-        // nested child gesture (LongPress, Pan, etc.) inside
-        // `staticPinIcon` before it had a chance to activate. Activation
-        // happens later, only on the unambiguous pinch case (2nd finger).
+        // RNGH state machine order: UNDETERMINED → BEGAN (begin) → ACTIVE
+        // (activate). Calling activate() first relies on activate's
+        // force-true path to jump straight to ACTIVE, which makes the
+        // subsequent begin() a no-op (ACTIVE cannot regress to BEGAN).
         stateManager.begin();
+        stateManager.activate();
         firstTouch.value = { x: e.allTouches[0].x, y: e.allTouches[0].y };
         _handlePanResponderGrant(e);
       }
@@ -1575,13 +1556,6 @@ const ReactNativeZoomableViewInner: ForwardRefRenderFunction<
       // future additions) had to be re-mirrored into both branches and
       // reviewers kept finding gaps.
       if (e.numberOfTouches >= 2) {
-        // Pinch is unambiguous from the moment the 2nd finger lands. Claim
-        // the touch now so the ZoomableView owns the pinch even if a
-        // nested gesture was competing for the 1st finger — nested
-        // gestures inside `staticPinIcon` are expected to be single-touch
-        // (tap, long press, drag); a 2-finger session is the ZoomableView's
-        // domain.
-        stateManager.activate();
         // Long-press is a single-finger gesture — disarm any armed timer.
         // Safe no-op if the simultaneous-case long-press gate in
         // `_handlePanResponderGrant` already prevented arming.
@@ -1614,28 +1588,27 @@ const ReactNativeZoomableViewInner: ForwardRefRenderFunction<
         lastGestureCenterPosition.value = null;
       }
     })
-    .onTouchesMove((e, stateManager) => {
-      if (pauseCanvas.value) return;
+    .onTouchesMove((e) => {
       const dx = e.allTouches[0].x - (firstTouch.value?.x || 0);
       const dy = e.allTouches[0].y - (firstTouch.value?.y || 0);
-      // 1-finger moves stay BEGAN. Multi-finger is unambiguous pinch and
-      // the ZoomableView must own it.
-      if (e.numberOfTouches >= 2) {
-        stateManager.activate();
-      }
       _handlePanResponderMove(e, { dx, dy });
     })
     .onTouchesUp((e, stateManager) => {
-      // Always end the RNGH state machine on the final release so the
-      // gesture cycle terminates cleanly, but suppress consumer callbacks
-      // and tap classification when paused.
+      // only end if this is the last touch being lifted
       if (e.numberOfTouches === 0) {
-        if (!pauseCanvas.value) _handlePanResponderEnd(e, true);
+        // Genuine touch release — `wasReleased=true` enables tap
+        // classification (single/double/long press resolution).
+        _handlePanResponderEnd(e, true);
         stateManager.end();
       }
     })
     .onTouchesCancelled((e, stateManager) => {
-      if (!pauseCanvas.value) _handlePanResponderEnd(e, false, true);
+      // RNGH cancellation — gesture aborted, not released. Pass
+      // `wasReleased=false` so this path does not produce a spurious
+      // `onSingleTap`, and `isCancellation=true` so the terminate callback
+      // is queued from inside `_handlePanResponderEnd` (before the terminal
+      // mirror reset) — see the JSDoc on `_handlePanResponderEnd` for why.
+      _handlePanResponderEnd(e, false, true);
       stateManager.end();
     })
     .onFinalize(() => {
@@ -1663,61 +1636,71 @@ const ReactNativeZoomableViewInner: ForwardRefRenderFunction<
         inverseZoomStyle,
         offsetX,
         offsetY,
-        pauseCanvas,
       }}
     >
-      <GestureDetector gesture={gesture}>
-        <View
-          // eslint-disable-next-line @typescript-eslint/no-use-before-define
-          style={styles.container}
-          ref={zoomSubjectWrapperRef}
-          onLayout={measureZoomSubject}
-        >
+      {/*
+       * Outer wrapper sits OUTSIDE the `GestureDetector`. `StaticPin` is
+       * rendered as a sibling of the `GestureDetector` (not a descendant)
+       * so iOS's gesture-recognizer ancestor walk on a touch that lands
+       * on the pin does NOT pick up this view's canvas-pan recognizer —
+       * the pin's interactive subregions claim their own touches without
+       * the canvas ALSO running. Empty pin bounding-box space passes
+       * through (`pointerEvents="box-none"` in `StaticPin`) and lands on
+       * the `GestureDetector`'s wrapper below, so canvas pan/pinch still
+       * work everywhere off the pin (and on non-interactive pin space).
+       */}
+      <View
+        // eslint-disable-next-line @typescript-eslint/no-use-before-define
+        style={styles.container}
+        ref={zoomSubjectWrapperRef}
+        onLayout={measureZoomSubject}
+      >
+        <GestureDetector gesture={gesture}>
           <Animated.View
             // eslint-disable-next-line @typescript-eslint/no-use-before-define
             style={[styles.zoomSubject, props.style, transformStyle]}
           >
             {children}
           </Animated.View>
+        </GestureDetector>
 
-          {visualTouchFeedbackEnabled &&
-            stateTouches.map(
-              (touch) =>
-                // Coerce `doubleTapDelay` to a strict boolean — bare
-                // `doubleTapDelay && (...)` evaluates to `0` when delay is
-                // `0`, and React will then try to render the literal `0` as
-                // a text child outside a <Text>, crashing with the
-                // "Text strings must be rendered within a <Text> component"
-                // error.
-                !!doubleTapDelay && (
-                  <AnimatedTouchFeedback
-                    x={touch.x}
-                    y={touch.y}
-                    key={touch.id}
-                    animationDuration={doubleTapDelay}
-                    onAnimationDone={() => {
-                      _removeTouch(touch);
-                    }}
-                  />
-                )
-            )}
-
-          {/* For Debugging Only */}
-          {debugPoints.map(({ x, y }, index) => {
-            return <DebugTouchPoint key={index} x={x} y={y} />;
-          })}
-
-          {propStaticPinPosition && (
-            <StaticPin
-              staticPinIcon={staticPinIcon}
-              staticPinPosition={propStaticPinPosition}
-              pinSize={pinSize}
-              setPinSize={setPinSize}
-              pinProps={pinProps}
-            />
+        {visualTouchFeedbackEnabled &&
+          stateTouches.map(
+            (touch) =>
+              // Coerce `doubleTapDelay` to a strict boolean — bare
+              // `doubleTapDelay && (...)` evaluates to `0` when delay is
+              // `0`, and React will then try to render the literal `0` as
+              // a text child outside a <Text>, crashing with the
+              // "Text strings must be rendered within a <Text> component"
+              // error.
+              !!doubleTapDelay && (
+                <AnimatedTouchFeedback
+                  x={touch.x}
+                  y={touch.y}
+                  key={touch.id}
+                  animationDuration={doubleTapDelay}
+                  onAnimationDone={() => {
+                    _removeTouch(touch);
+                  }}
+                />
+              )
           )}
-        </View>
-      </GestureDetector>
+
+        {/* For Debugging Only */}
+        {debugPoints.map(({ x, y }, index) => {
+          return <DebugTouchPoint key={index} x={x} y={y} />;
+        })}
+
+        {propStaticPinPosition && (
+          <StaticPin
+            staticPinIcon={staticPinIcon}
+            staticPinPosition={propStaticPinPosition}
+            pinSize={pinSize}
+            setPinSize={setPinSize}
+            pinProps={pinProps}
+          />
+        )}
+      </View>
     </ReactNativeZoomableViewProvider>
   );
 };
