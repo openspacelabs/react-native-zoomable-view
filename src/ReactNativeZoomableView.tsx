@@ -13,6 +13,7 @@ import {
   GestureDetector,
   GestureTouchEvent,
 } from 'react-native-gesture-handler';
+import type { GestureStateManagerType } from 'react-native-gesture-handler/lib/typescript/handlers/gestures/gestureStateManager';
 import Animated, {
   cancelAnimation,
   runOnJS,
@@ -184,6 +185,17 @@ const ReactNativeZoomableViewInner: ForwardRefRenderFunction<
   const lastGestureCenterPosition = useSharedValue<Vec2D | null>(null);
   const lastGestureTouchDistance = useSharedValue<number | null>(150);
   const gestureStarted = useSharedValue(false);
+  // Tracks whether the parent gesture has claimed the touch (transitioned to
+  // ACTIVE on the RNGH state machine). Stays `false` while the parent is
+  // still in BEGAN, so nested child `GestureDetector`s placed inside
+  // `staticPinIcon` (or anywhere inside the zoom subject) get RNGH's default
+  // window to activate first. Until activation, `_handleShifting` /
+  // `_handlePinching` skip their offset writes so the canvas does not
+  // creep during the first ~10 pixels of a pan that a child gesture is
+  // about to claim. Activation triggers (set inside the manual gesture
+  // callbacks): 2nd finger touches down, 1-finger movement crosses
+  // `ACTIVATION_PX`, or the long-press timer fires. Reset in `onFinalize`.
+  const parentActivated = useSharedValue(false);
   // JS-thread mirror of `gestureStarted` exposed via the imperative handle.
   // The UI-thread `gestureStarted` SharedValue must reset synchronously at
   // the end of `_handlePanResponderEnd` so subsequent `onTouchesMove`
@@ -1003,6 +1015,17 @@ const ReactNativeZoomableViewInner: ForwardRefRenderFunction<
     });
     if (!shift) return;
 
+    // Until the parent gesture has earned the touch (movement past the
+    // activation threshold, 2nd finger, or long-press), suppress the
+    // offset write. `_calcOffsetShiftSinceLastGestureState` above has
+    // already advanced `lastGestureCenterPosition` to the current point,
+    // so the first shift after activation produces a single-frame delta
+    // — no visual jump from the touch-down point to where the finger is
+    // when parent activates. This is what stops the canvas from "creeping"
+    // during the first ~10 pixels of a knob/pin pan that a child gesture
+    // is about to claim.
+    if (!parentActivated.value) return;
+
     const newOffsetX = offsetX.value + shift.x;
     const newOffsetY = offsetY.value + shift.y;
 
@@ -1533,15 +1556,23 @@ const ReactNativeZoomableViewInner: ForwardRefRenderFunction<
   };
 
   const firstTouch = useSharedValue<Vec2D | undefined>(undefined);
+  const activateIfNeeded = (stateManager: GestureStateManagerType) => {
+    'worklet';
+    if (!parentActivated.value) {
+      stateManager.activate();
+      parentActivated.value = true;
+    }
+  };
   const gesture = Gesture.Manual()
     .onTouchesDown((e, stateManager) => {
       if (!firstTouch.value) {
-        // RNGH state machine order: UNDETERMINED → BEGAN (begin) → ACTIVE
-        // (activate). Calling activate() first relies on activate's force-true
-        // path to jump straight to ACTIVE, which makes the subsequent begin()
-        // a no-op (ACTIVE cannot regress to BEGAN).
+        // Parent only goes BEGAN — not ACTIVE. ACTIVE on touch-down would
+        // claim exclusive RNGH ownership of the touch and cancel any nested
+        // child gesture (LongPress, Pan, etc.) inside `staticPinIcon` before
+        // it had a chance to activate. Children get RNGH's default
+        // child-priority window; parent activates later if/when it earns the
+        // gesture (movement threshold, 2nd finger, or long-press timer).
         stateManager.begin();
-        stateManager.activate();
         firstTouch.value = { x: e.allTouches[0].x, y: e.allTouches[0].y };
         _handlePanResponderGrant(e);
       }
@@ -1556,6 +1587,12 @@ const ReactNativeZoomableViewInner: ForwardRefRenderFunction<
       // future additions) had to be re-mirrored into both branches and
       // reviewers kept finding gaps.
       if (e.numberOfTouches >= 2) {
+        // Pinch is unambiguous from the moment the 2nd finger lands. Claim
+        // the touch now so the parent owns the pinch even if a child gesture
+        // earlier started competing for the 1st finger — child gestures
+        // inside `staticPinIcon` are expected to be single-touch (tap, long
+        // press, drag); a 2-finger session is the parent's domain.
+        activateIfNeeded(stateManager);
         // Long-press is a single-finger gesture — disarm any armed timer.
         // Safe no-op if the simultaneous-case long-press gate in
         // `_handlePanResponderGrant` already prevented arming.
@@ -1588,9 +1625,28 @@ const ReactNativeZoomableViewInner: ForwardRefRenderFunction<
         lastGestureCenterPosition.value = null;
       }
     })
-    .onTouchesMove((e) => {
+    .onTouchesMove((e, stateManager) => {
       const dx = e.allTouches[0].x - (firstTouch.value?.x || 0);
       const dy = e.allTouches[0].y - (firstTouch.value?.y || 0);
+      // Earn the gesture: once the user crosses ~10px of movement (or has
+      // 2 fingers down), this is unambiguously a pan/pinch and the parent
+      // claims the touch. Below threshold the parent stays BEGAN so any
+      // nested child gesture (LongPress, Tap, Pan with default minDistance,
+      // etc.) has a wide enough window to activate first. The threshold is
+      // intentionally larger than the 2px shift-detection threshold used by
+      // `_handlePanResponderMove` for `gestureType='shift'` classification:
+      // shift classification gates internal panning math, while activation
+      // gates RNGH ownership of the touch — the latter needs slack so brief
+      // jitter at the start of a child Pan does not wrest the touch from
+      // the child before its own minDistance fires.
+      const ACTIVATION_PX = 10;
+      if (
+        e.numberOfTouches >= 2 ||
+        Math.abs(dx) > ACTIVATION_PX ||
+        Math.abs(dy) > ACTIVATION_PX
+      ) {
+        activateIfNeeded(stateManager);
+      }
       _handlePanResponderMove(e, { dx, dy });
     })
     .onTouchesUp((e, stateManager) => {
@@ -1613,6 +1669,7 @@ const ReactNativeZoomableViewInner: ForwardRefRenderFunction<
     })
     .onFinalize(() => {
       firstTouch.value = undefined;
+      parentActivated.value = false;
     });
 
   const transformStyle = useAnimatedStyle(() => {

@@ -14,9 +14,18 @@ import {
   View,
   ViewProps,
 } from 'react-native';
-import { GestureHandlerRootView } from 'react-native-gesture-handler';
-import { useDerivedValue, useSharedValue } from 'react-native-reanimated';
+import {
+  Gesture,
+  GestureDetector,
+  GestureHandlerRootView,
+} from 'react-native-gesture-handler';
+import Animated, {
+  useAnimatedStyle,
+  useDerivedValue,
+  useSharedValue,
+} from 'react-native-reanimated';
 import { ReText } from 'react-native-redash';
+import { runOnJS } from 'react-native-worklets';
 
 import { applyContainResizeMode } from '../src/helper/coordinateConversion';
 import { styles } from './style';
@@ -81,6 +90,148 @@ export default function App() {
 
   const Wrapper = modal ? PageSheetModal : View;
 
+  // Reproduce client-gesture-on-pin scenario:
+  //   - main circle: LongPress (Alert)
+  //   - knob: Pan (drags the knob visually)
+  //   - rest of the pin's bounding box: should let canvas pan through
+  // Today none of the client gestures fire because the parent GestureDetector
+  // activates on the first touch and swallows everything.
+  const knobOffset = useSharedValue<{ x: number; y: number }>({ x: 0, y: 0 });
+
+  const onPinLongPressJS = () => {
+    Alert.alert('Pin long-press fired');
+  };
+  const pinLongPress = useMemo(
+    () =>
+      Gesture.LongPress()
+        .minDuration(400)
+        .onStart(() => {
+          'worklet';
+          runOnJS(onPinLongPressJS)();
+        }),
+    []
+  );
+
+  // Counter incremented from the worklet onStart so the test can confirm the
+  // gesture fires without an Alert (Alerts steal focus mid-pan).
+  const knobPanCount = useSharedValue(0);
+  const knobPanCountText = useDerivedValue(
+    () => `knob pan starts: ${knobPanCount.value}`
+  );
+
+  const knobPan = useMemo(
+    () =>
+      Gesture.Pan()
+        // Generous hit slop so the small knob is easier to grab — RNGH does
+        // not inflate the touch target by default.
+        .hitSlop({ top: 16, bottom: 16, left: 16, right: 16 })
+        .onStart(() => {
+          'worklet';
+          knobPanCount.value = knobPanCount.value + 1;
+        })
+        .onUpdate((e) => {
+          'worklet';
+          knobOffset.value = { x: e.translationX, y: e.translationY };
+        })
+        .onEnd(() => {
+          'worklet';
+          knobOffset.value = { x: 0, y: 0 };
+        }),
+    [knobOffset, knobPanCount]
+  );
+
+  const knobStyle = useAnimatedStyle(() => ({
+    transform: [
+      { translateX: knobOffset.value.x },
+      { translateY: knobOffset.value.y },
+    ],
+  }));
+
+  // Pin bounding box is 180x96. StaticPin anchors the bottom-center of this
+  // box on `staticPinPosition`, so the red pin (sitting at the box's
+  // bottom-center) has its base on the requested map point. The knob hangs
+  // to the left at the same Y as the red-pin centre, joined by a horizontal
+  // rail.
+  //
+  // Layout (in box coords):
+  //   • red pin   left=66  top=48   48x48  → centre (90, 72), bottom y=96
+  //   • rail      left=32  top=71   34x2   → from knob right edge to pin
+  //                                          left edge, at red-pin centre y
+  //   • knob      left=0   top=56   32x32  → centre (16, 72), aligned w/ rail
+  const pinIcon = (
+    <View
+      style={{
+        height: 96,
+        width: 180,
+      }}
+      pointerEvents="box-none"
+    >
+      {/* Rail (decorative) */}
+      <View
+        pointerEvents="none"
+        style={{
+          backgroundColor: 'rgba(0,0,0,0.4)',
+          height: 2,
+          left: 32,
+          position: 'absolute',
+          top: 71,
+          width: 34,
+        }}
+      />
+
+      {/* Main pin — LongPress claims this region */}
+      <GestureDetector gesture={pinLongPress}>
+        <View
+          style={{
+            height: 48,
+            left: 66,
+            position: 'absolute',
+            top: 48,
+            width: 48,
+          }}
+        >
+          <View
+            style={{
+              backgroundColor: 'red',
+              borderColor: 'white',
+              borderRadius: 24,
+              borderWidth: 2,
+              height: 48,
+              width: 48,
+            }}
+          />
+        </View>
+      </GestureDetector>
+
+      {/* Knob — Pan claims this region */}
+      <GestureDetector gesture={knobPan}>
+        <Animated.View
+          style={[
+            {
+              height: 32,
+              left: 0,
+              position: 'absolute',
+              top: 56,
+              width: 32,
+            },
+            knobStyle,
+          ]}
+        >
+          <View
+            style={{
+              backgroundColor: 'blue',
+              borderColor: 'white',
+              borderRadius: 16,
+              borderWidth: 2,
+              height: 32,
+              width: 32,
+            }}
+          />
+        </Animated.View>
+      </GestureDetector>
+    </View>
+  );
+
   // `GestureHandlerRootView` lives INSIDE `Wrapper` so it covers both the
   // non-modal and `Modal` (`presentationStyle="pageSheet"`) paths. `Modal`
   // renders in a separate native window, so an outer root view above
@@ -106,6 +257,7 @@ export default function App() {
             }}
             // Where to put the pin in the content view
             staticPinPosition={staticPinPosition}
+            staticPinIcon={pinIcon}
             // Callback that returns the position of the pin
             // on the actual source image
             onStaticPinPositionChange={debouncedUpdatePin}
@@ -136,6 +288,7 @@ export default function App() {
         </View>
         <Text>onStaticPinPositionChange: {stringifyPoint(pin)}</Text>
         <ReText text={movePinText} style={{ color: 'black' }} />
+        <ReText text={knobPanCountText} style={{ color: 'black' }} />
         <Button
           title={`${showMarkers ? 'Hide' : 'Show'} markers`}
           onPress={() => {
