@@ -8,7 +8,6 @@ import React, {
   useState,
 } from 'react';
 import { StyleSheet, View } from 'react-native';
-import type { GestureType } from 'react-native-gesture-handler';
 import {
   Gesture,
   GestureDetector,
@@ -209,14 +208,6 @@ const ReactNativeZoomableViewInner: ForwardRefRenderFunction<
   // Exposed via `useZoomableViewPauseCanvas()`. Consumers reset it on
   // their gesture's `onEnd` / `onFinalize`.
   const pauseCanvas = useSharedValue(false);
-  // Debug counters: `parentShiftAttemptCount` increments on every
-  // `_handleShifting` call past its panEnabled / shift-validity checks
-  // (i.e. every frame the parent would have written if not suppressed);
-  // `parentShiftCount` increments only on actual offset writes (after the
-  // `pauseCanvas` gate). The two together let the example distinguish
-  // "child suppressed the parent" from "parent never had touches".
-  const parentShiftAttemptCount = useSharedValue(0);
-  const parentShiftCount = useSharedValue(0);
   // JS-thread mirror of `gestureStarted` exposed via the imperative handle.
   // The UI-thread `gestureStarted` SharedValue must reset synchronously at
   // the end of `_handlePanResponderEnd` so subsequent `onTouchesMove`
@@ -778,6 +769,14 @@ const ReactNativeZoomableViewInner: ForwardRefRenderFunction<
     if (!isMounted.current) return;
     if (props.onLongPress && props.longPressDuration) {
       longPressTimeout.value = setTimeout(() => {
+        // Suppress when a consumer's nested gesture has paused the parent
+        // (`pauseCanvas`). Without this gate the parent's prop `onLongPress`
+        // would fire alongside the consumer's own LongPress 700ms into the
+        // gesture, producing two callbacks for one touch.
+        if (pauseCanvas.value) {
+          longPressTimeout.value = undefined;
+          return;
+        }
         // Invoke the stable `onLongPress` wrapper rather than the captured
         // `props.onLongPress` — the closure was captured at schedule time and
         // would fire a stale callback if the parent re-rendered during the
@@ -1036,26 +1035,12 @@ const ReactNativeZoomableViewInner: ForwardRefRenderFunction<
     });
     if (!shift) return;
 
-    // Debug: count attempts (every _handleShifting call past the panEnabled
-    // / shift-validity checks) regardless of whether the pause/gate skips
-    // the write. Lets the example surface "parent tried to write but was
-    // suppressed" vs "parent actually wrote".
-    parentShiftAttemptCount.value = parentShiftAttemptCount.value + 1;
-
     // Synchronous UI-thread pause flag. A consumer's nested gesture sets
-    // this `true` from its `onTouchesDown` / `onBegin` worklet — that
-    // worklet runs on the UI thread before the parent's next
+    // this `true` from its first-touch worklet (`onTouchesDown`/`onBegin`)
+    // — that worklet runs on the UI thread before the parent's next
     // `_handleShifting` worklet, so the parent reads the latest value with
-    // zero dispatch latency and skips its offset write. RNGH's cross-detector
-    // cancel via `.blocksExternalGesture(parentGestureRef)` is what
-    // ultimately ends the parent gesture, but it arrives 1-N frames after
-    // the child finally activates; this flag closes the window where the
-    // child is still in BEGAN and the parent is still the sole handler
-    // writing to the canvas.
+    // zero dispatch latency and skips its offset write.
     if (pauseCanvas.value) return;
-
-    // Debug: count parent shifts that actually wrote offsets.
-    parentShiftCount.value = parentShiftCount.value + 1;
 
     const newOffsetX = offsetX.value + shift.x;
     const newOffsetY = offsetY.value + shift.y;
@@ -1165,6 +1150,10 @@ const ReactNativeZoomableViewInner: ForwardRefRenderFunction<
   const _resolveAndHandleTap = (e: GestureTouchEvent) => {
     // Post-unmount runOnJS guard; see `isMounted` declaration.
     if (!isMounted.current) return;
+    // Skip tap classification when a consumer's nested gesture paused the
+    // parent — otherwise the release of a touch a child handler claimed
+    // would fire a phantom `onSingleTap`/`onDoubleTap` on the canvas.
+    if (pauseCanvas.value) return;
     const now = Date.now();
     if (
       doubleTapFirstTapReleaseTimestamp.value &&
@@ -1594,15 +1583,7 @@ const ReactNativeZoomableViewInner: ForwardRefRenderFunction<
       parentActivated.value = true;
     }
   };
-  // Stable RNGH ref so consumers nesting their own GestureDetector inside
-  // `staticPinIcon` (or anywhere inside the zoom subject) can give their
-  // gesture priority via `myGesture.blocksExternalGesture(parentGestureRef)`.
-  // Without that composition, RNGH does NOT auto-coordinate across nested
-  // `GestureDetector` boundaries — both the parent and the child run, and
-  // both write their state.
-  const parentGestureRef = useRef<GestureType | undefined>(undefined);
   const gesture = Gesture.Manual()
-    .withRef(parentGestureRef)
     .onTouchesDown((e, stateManager) => {
       if (!firstTouch.value) {
         // Parent only goes BEGAN — not ACTIVE. ACTIVE on touch-down would
@@ -1738,9 +1719,6 @@ const ReactNativeZoomableViewInner: ForwardRefRenderFunction<
         inverseZoomStyle,
         offsetX,
         offsetY,
-        parentGestureRef,
-        parentShiftCount,
-        parentShiftAttemptCount,
         pauseCanvas,
       }}
     >

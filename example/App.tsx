@@ -3,8 +3,6 @@ import {
   ReactNativeZoomableView,
   ReactNativeZoomableViewRef,
   useZoomableViewContext,
-  useZoomableViewParentGestureRef,
-  useZoomableViewPauseCanvas,
 } from '@openspacelabs/react-native-zoomable-view';
 import { debounce } from 'lodash';
 import React, { ReactNode, useMemo, useRef, useState } from 'react';
@@ -23,7 +21,6 @@ import {
   GestureHandlerRootView,
 } from 'react-native-gesture-handler';
 import Animated, {
-  SharedValue,
   useAnimatedStyle,
   useDerivedValue,
   useSharedValue,
@@ -58,25 +55,8 @@ const onPinLongPressJS = () => {
  * Must be rendered INSIDE `<ReactNativeZoomableView>` so
  * `useZoomableViewParentGestureRef()` reaches the provider.
  */
-const DemoPin = ({
-  knobPanCount,
-  knobBeginCount,
-  knobTouchDownCount,
-  parentShiftLabel,
-}: {
-  knobPanCount: SharedValue<number>;
-  knobBeginCount: SharedValue<number>;
-  knobTouchDownCount: SharedValue<number>;
-  parentShiftLabel: SharedValue<string>;
-}) => {
-  const parentGestureRef = useZoomableViewParentGestureRef();
-  const pauseCanvas = useZoomableViewPauseCanvas();
-  const ctx = useZoomableViewContext();
-  // Mirror parentShiftCount from the lib context up to the App's text below
-  // the canvas (the parent's `_handleShifting` increments it).
-  useDerivedValue(() => {
-    parentShiftLabel.value = `parent attempts:${ctx.parentShiftAttemptCount.value} writes:${ctx.parentShiftCount.value}`;
-  });
+const DemoPin = () => {
+  const { pauseCanvas } = useZoomableViewContext();
 
   const knobOffset = useSharedValue<{ x: number; y: number }>({ x: 0, y: 0 });
 
@@ -84,16 +64,19 @@ const DemoPin = ({
     () =>
       Gesture.LongPress()
         .minDuration(400)
-        // The lib's parentGestureRef is typed against the lib's RNGH copy;
-        // the example consumes it via its own RNGH copy. `metro.config.js`
-        // points both at the same install at runtime, so the cast is safe.
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-argument
-        .blocksExternalGesture(parentGestureRef as any)
+        .onTouchesDown(() => {
+          'worklet';
+          pauseCanvas.value = true;
+        })
         .onStart(() => {
           'worklet';
           runOnJS(onPinLongPressJS)();
+        })
+        .onFinalize(() => {
+          'worklet';
+          pauseCanvas.value = false;
         }),
-    [parentGestureRef]
+    [pauseCanvas]
   );
 
   const knobPan = useMemo(
@@ -102,30 +85,14 @@ const DemoPin = ({
         // Generous hit slop so the small knob is easier to grab — RNGH does
         // not inflate the touch target by default.
         .hitSlop({ top: 16, bottom: 16, left: 16, right: 16 })
-        // Make the parent FAIL when this Pan activates, so the canvas does
-        // not pan while the knob is being dragged.
-        // The lib's parentGestureRef is typed against the lib's RNGH copy;
-        // the example consumes it via its own RNGH copy. `metro.config.js`
-        // points both at the same install at runtime, so the cast is safe.
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-argument
-        .blocksExternalGesture(parentGestureRef as any)
-        // Pause the parent's canvas pan from the very first touch — runs
-        // on the UI thread before the parent's next `_handleShifting`
-        // worklet, so the canvas never drifts while the child is still in
-        // BEGAN waiting to cross its native activation threshold.
+        // Pause the parent's canvas pan from the very first touch.
+        // Both worklets run on the UI thread in the same JS context, so
+        // the parent's next `_handleShifting` reads the latest value with
+        // zero dispatch latency — canvas never drifts while the child is
+        // still in BEGAN waiting to cross its native activation threshold.
         .onTouchesDown(() => {
           'worklet';
-          knobTouchDownCount.value = knobTouchDownCount.value + 1;
           pauseCanvas.value = true;
-        })
-        .onBegin(() => {
-          'worklet';
-          knobBeginCount.value = knobBeginCount.value + 1;
-          pauseCanvas.value = true;
-        })
-        .onStart(() => {
-          'worklet';
-          knobPanCount.value = knobPanCount.value + 1;
         })
         .onUpdate((e) => {
           'worklet';
@@ -139,14 +106,7 @@ const DemoPin = ({
           'worklet';
           pauseCanvas.value = false;
         }),
-    [
-      knobOffset,
-      knobPanCount,
-      knobBeginCount,
-      knobTouchDownCount,
-      parentGestureRef,
-      pauseCanvas,
-    ]
+    [knobOffset, pauseCanvas]
   );
 
   const knobStyle = useAnimatedStyle(() => ({
@@ -293,19 +253,6 @@ export default function App() {
 
   const Wrapper = modal ? PageSheetModal : View;
 
-  // SharedValues that need to drive UI text outside the zoom subject must be
-  // hoisted above the provider — `<DemoPin>` lives INSIDE
-  // `ReactNativeZoomableView` so it sees the parent-gesture context, but the
-  // counter text below the canvas does not.
-  const knobPanCount = useSharedValue(0);
-  const knobBeginCount = useSharedValue(0);
-  const knobTouchDownCount = useSharedValue(0);
-  const knobLabel = useDerivedValue(
-    () =>
-      `knob touchDown:${knobTouchDownCount.value} begin:${knobBeginCount.value} start:${knobPanCount.value}`
-  );
-  const parentShiftLabel = useSharedValue('parent shifts: 0');
-
   // `GestureHandlerRootView` lives INSIDE `Wrapper` so it covers both the
   // non-modal and `Modal` (`presentationStyle="pageSheet"`) paths. `Modal`
   // renders in a separate native window, so an outer root view above
@@ -331,14 +278,7 @@ export default function App() {
             }}
             // Where to put the pin in the content view
             staticPinPosition={staticPinPosition}
-            staticPinIcon={
-              <DemoPin
-                knobPanCount={knobPanCount}
-                knobBeginCount={knobBeginCount}
-                knobTouchDownCount={knobTouchDownCount}
-                parentShiftLabel={parentShiftLabel}
-              />
-            }
+            staticPinIcon={<DemoPin />}
             // Callback that returns the position of the pin
             // on the actual source image
             onStaticPinPositionChange={debouncedUpdatePin}
@@ -369,8 +309,6 @@ export default function App() {
         </View>
         <Text>onStaticPinPositionChange: {stringifyPoint(pin)}</Text>
         <ReText text={movePinText} style={{ color: 'black' }} />
-        <ReText text={knobLabel} style={{ color: 'black' }} />
-        <ReText text={parentShiftLabel} style={{ color: 'black' }} />
         <Button
           title={`${showMarkers ? 'Hide' : 'Show'} markers`}
           onPress={() => {

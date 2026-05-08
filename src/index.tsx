@@ -5,11 +5,7 @@ import {
   viewportPositionToImagePosition,
 } from './helper/coordinateConversion';
 import { ReactNativeZoomableView } from './ReactNativeZoomableView';
-import {
-  useZoomableViewContext,
-  useZoomableViewParentGestureRef,
-  useZoomableViewPauseCanvas,
-} from './ReactNativeZoomableViewContext';
+import { useZoomableViewContext } from './ReactNativeZoomableViewContext';
 import type {
   ReactNativeZoomableViewProps,
   ReactNativeZoomableViewRef,
@@ -28,8 +24,6 @@ export {
   ReactNativeZoomableViewRef,
   Size2D,
   useZoomableViewContext,
-  useZoomableViewParentGestureRef,
-  useZoomableViewPauseCanvas,
   Vec2D,
   viewportPositionToImagePosition,
   ZoomableViewEvent,
