@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import { View } from 'react-native';
+import { LayoutChangeEvent, View } from 'react-native';
 import { useSharedValue } from 'react-native-reanimated';
 
 import { useLatestCallback } from './useLatestCallback';
@@ -10,75 +10,62 @@ export const useZoomSubject = () => {
   const originalHeight = useSharedValue(0);
   const originalX = useSharedValue(0);
   const originalY = useSharedValue(0);
-  const measureZoomSubjectInterval = useRef<NodeJS.Timer>();
   const isMounted = useRef(true);
 
   /**
-   * Get the original box dimensions and save them for later use.
-   * (They will be used to calculate boxBorders)
+   * `onLayout` handler for the wrapper `<View>` that hosts `<GestureDetector>`
+   * as a child. We must measure the wrapper (NOT a child of `<GestureDetector>`)
+   * because callback refs do not propagate through `<GestureDetector>` reliably
+   * under Reanimated/Fabric — `wrapperRef.current` stays `null` when the ref is
+   * placed on a `<GestureDetector>` descendant, which silently breaks every
+   * downstream consumer of `originalWidth/Height` (`_invokeOnTransform`,
+   * `onTransformWorklet`, `onStaticPinPositionMoveWorklet`, pinch zoom math).
    *
-   * @private
+   * `onLayout` is the structural fix: it fires natively on every layout pass
+   * (mount + future resize) without relying on a JS-side ref measurement chain.
+   * It also delivers the layout rect synchronously in the event payload, so
+   * we don't need the rAF + setTimeout(0) deferral the old `measure()` chain
+   * required to dodge the iOS post-keyboard-close measurement-zeroing bug.
+   *
+   * `event.nativeEvent.layout` provides PARENT-RELATIVE x/y/width/height. The
+   * old imperative chain wrote `pageX/pageY` to `originalX/Y`; consumers
+   * (`onLayoutWorklet`) only treat width/height as load-bearing, so the
+   * coordinate-space shift is a no-op for the gating reactions. The
+   * `_invokeOnTransform` guard, the static-pin guard, and the pinch handler
+   * all key off `originalWidth/Height` exclusively.
    */
-  const measure = useLatestCallback(() => {
-    // make sure we measure after animations are complete
-    requestAnimationFrame(() => {
-      if (!isMounted.current) return;
-      // this setTimeout is here to fix a weird issue on iOS where the measurements are all `0`
-      // when navigating back (react-navigation stack) from another view
-      // while closing the keyboard at the same time
-      setTimeout(() => {
-        if (!isMounted.current) return;
-        // In normal conditions, we're supposed to measure zoomSubject instead of its wrapper.
-        // However, our zoomSubject may have been transformed by an initial zoomLevel or offset,
-        // in which case these measurements will not represent the true "original" measurements.
-        // We just need to make sure the zoomSubjectWrapper perfectly aligns with the zoomSubject
-        // (no border, space, or anything between them)
-        wrapperRef.current?.measure((x, y, width, height, pageX, pageY) => {
-          if (!isMounted.current) return;
-          // When the component is off-screen, these become all 0s, so we don't set them
-          // to avoid messing up calculations, especially ones that are done right after
-          // the component transitions from hidden to visible.
-          if (!pageX && !pageY && !width && !height) return;
-          if (
-            originalX.value === x &&
-            originalY.value === y &&
-            originalWidth.value === width &&
-            originalHeight.value === height
-          ) {
-            return;
-          }
-
-          originalX.value = x;
-          originalY.value = y;
-          originalWidth.value = width;
-          originalHeight.value = height;
-        });
-      });
-    });
+  const measureZoomSubject = useLatestCallback((event: LayoutChangeEvent) => {
+    if (!isMounted.current) return;
+    const { x, y, width, height } = event.nativeEvent.layout;
+    // When the component is off-screen, these become all 0s, so we don't set
+    // them to avoid messing up calculations, especially ones that are done
+    // right after the component transitions from hidden to visible. Mirrors
+    // the guard in the previous imperative-measure path.
+    if (!x && !y && !width && !height) return;
+    if (
+      originalX.value === x &&
+      originalY.value === y &&
+      originalWidth.value === width &&
+      originalHeight.value === height
+    ) {
+      return;
+    }
+    originalX.value = x;
+    originalY.value = y;
+    originalWidth.value = width;
+    originalHeight.value = height;
   });
 
   useEffect(() => {
     isMounted.current = true;
-    measure();
-    // We've already run `grabZoomSubjectOriginalMeasurements` at various events
-    // to make sure the measurements are promptly updated.
-    // However, there might be cases we haven't accounted for, especially when
-    // native processes are involved. To account for those cases,
-    // we'll use an interval here to ensure we're always up-to-date.
-    // The `setState` in `grabZoomSubjectOriginalMeasurements` won't trigger a rerender
-    // if the values given haven't changed, so we're not running performance risk here.
-    measureZoomSubjectInterval.current = setInterval(measure, 1e3);
-
     return () => {
-      measureZoomSubjectInterval.current &&
-        clearInterval(measureZoomSubjectInterval.current);
       isMounted.current = false;
     };
   }, []);
 
   return {
     wrapperRef,
-    measure,
+    measureZoomSubject,
     originalWidth,
     originalHeight,
     originalX,

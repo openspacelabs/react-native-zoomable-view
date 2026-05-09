@@ -66,7 +66,7 @@ const ReactNativeZoomableViewInner: ForwardRefRenderFunction<
 > = (props, ref) => {
   const {
     wrapperRef: zoomSubjectWrapperRef,
-    measure: measureZoomSubject,
+    measureZoomSubject,
     originalWidth,
     originalHeight,
     originalX,
@@ -620,9 +620,10 @@ const ReactNativeZoomableViewInner: ForwardRefRenderFunction<
         prev &&
         curr.zoomLevel !== prev.zoomLevel &&
         // A consumer can call `ref.current.zoomTo(...)` from a parent
-        // `useEffect` at mount, before `useZoomSubject`'s deferred
-        // `measure()` chain (rAF + setTimeout(0) + native measure) has
-        // landed. With `originalWidth/Height` still 0, the recompute
+        // `useEffect` at mount, before `useZoomSubject`'s `onLayout`
+        // handler has fired its first measurement (native layout pass
+        // is async wrt JS mount). With `originalWidth/Height` still 0,
+        // the recompute
         // produces a small non-zero garbage offset that subsequent
         // identity-preserving ticks then carry through to the end of
         // the animation (visual error scales linearly with final zoom).
@@ -1643,12 +1644,17 @@ const ReactNativeZoomableViewInner: ForwardRefRenderFunction<
         onLayout={measureZoomSubject}
       >
         <GestureDetector gesture={gesture}>
-          <Animated.View
+          <View
             // eslint-disable-next-line @typescript-eslint/no-use-before-define
-            style={[styles.zoomSubject, props.style, transformStyle]}
+            style={styles.zoomSubject}
           >
-            {children}
-          </Animated.View>
+            <Animated.View
+              // eslint-disable-next-line @typescript-eslint/no-use-before-define
+              style={[styles.zoomSubject, props.style, transformStyle]}
+            >
+              {children}
+            </Animated.View>
+          </View>
         </GestureDetector>
 
         {visualTouchFeedbackEnabled &&
