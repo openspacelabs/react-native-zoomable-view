@@ -1633,17 +1633,26 @@ const ReactNativeZoomableViewInner: ForwardRefRenderFunction<
     <ReactNativeZoomableViewProvider
       value={{ zoom, inverseZoom, inverseZoomStyle, offsetX, offsetY }}
     >
-      {/* `StaticPin` is a sibling of `<GestureDetector>` (not a descendant)
-          so iOS's gesture-recognizer ancestor walk skips canvas-pan for
-          touches that land on interactive pin subregions. Empty pin space
-          passes through via `pointerEvents="box-none"` in `StaticPin`. */}
       <View
         // eslint-disable-next-line @typescript-eslint/no-use-before-define
         style={styles.container}
         ref={zoomSubjectWrapperRef}
         onLayout={measureZoomSubject}
       >
+        {/* GestureDetector is placed as a sibling of StaticPin (not an
+            ancestor) so RNGH's gesture-recognizer ancestor walk treats
+            canvas-pan and pin-touch as competing siblings rather than
+            parent/child. Touches that land on interactive pin subregions
+            cleanly skip canvas-pan, and empty pin space falls through via
+            `pointerEvents="box-none"` on StaticPin. */}
         <GestureDetector gesture={gesture}>
+          {/* Stable wrapper between GestureDetector and the transformed
+              Animated.View. Anchoring GestureDetector directly on the
+              Animated.View causes RNGH's hit-test region to ride the live
+              transform — producing visible ghost lag as the gesture context
+              re-resolves against the moving view each frame. The
+              intermediate static View keeps the recognizer's bounds stable
+              while the inner Animated.View carries the transform. */}
           <View
             // eslint-disable-next-line @typescript-eslint/no-use-before-define
             style={styles.zoomSubject}
