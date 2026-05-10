@@ -30,7 +30,13 @@ import { applyContainResizeMode } from '../src/helper/coordinateConversion';
 import { styles } from './style';
 
 const kittenSize = 800;
-const uri = `https://placekitten.com/${kittenSize}/${kittenSize}`;
+// `placekitten.com` has been offline for an extended period. Lorem Picsum
+// is the reliable drop-in (CDN-backed via Cloudflare, accepts the same
+// `/<W>/<H>` URL shape). Loses the cat theme — placecats.com is the
+// cat-themed alternative — but Picsum's reliability matters more for an
+// example app that needs to actually render the image on every fresh
+// install.
+const uri = `https://picsum.photos/${kittenSize}/${kittenSize}`;
 const imageSize = { width: kittenSize, height: kittenSize };
 
 const stringifyPoint = (point?: { x: number; y: number }) =>
