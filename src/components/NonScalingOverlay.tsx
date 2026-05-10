@@ -85,11 +85,11 @@ export const NonScalingOverlay = ({
   }, [contentWidth, contentHeight, wrapperWidth, wrapperHeight]);
 
   // Fake context with zoom=1 / offsets=0 / inverseZoom=1 so any consumer of
-  // `useZoomableViewContext` rendered INSIDE the overlay (e.g. `FixedSize`)
-  // becomes a no-op. Without this, `FixedSize` would apply its
-  // `inverseZoomStyle` (`scale: 1/zoom`) on top of the translate-only model
-  // here, double-counteracting zoom and shrinking children toward 0 at high
-  // zoom levels.
+  // `useZoomableViewContext` rendered INSIDE the overlay becomes a no-op.
+  // Without this, a nested consumer that applies the outer context's
+  // `inverseZoomStyle` (`scale: 1/zoom`) would multiply on top of the
+  // translate-only model here, double-counteracting zoom and shrinking
+  // children toward 0 at high zoom levels.
   const unitZoom = useSharedValue(1);
   const unitInverseZoom = useDerivedValue(() => 1);
   const unitScale = useSharedValue(1);
