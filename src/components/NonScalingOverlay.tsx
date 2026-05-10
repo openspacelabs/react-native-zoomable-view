@@ -58,50 +58,29 @@ export const NonScalingOverlay = ({
   rotation,
 }: NonScalingOverlayProps) => {
   const overlayStyle = useAnimatedStyle(() => {
-    const z = zoom.value;
-    const ox = offsetX.value;
-    const oy = offsetY.value;
+    const currentZoom = zoom.value;
+    const currentOffsetX = offsetX.value;
+    const currentOffsetY = offsetY.value;
+    const currentRotation = rotation ? rotation.value : 0;
 
+    // Transform composes right-to-left: re-center the z-scaled box on
+    // the wrapper midpoint, rotate around that center, then translate
+    // by the pan IN THE ROTATED FRAME (post-rotate). Folding pan into
+    // the centering translate would apply it pre-rotation and desync
+    // from the rotated content underneath. When rotation is absent,
+    // currentRotation=0 collapses the rotate to identity and the
+    // 5-element list reduces to a single combined translate per axis.
     return {
       position: 'absolute',
-      // Box grows with zoom so a child at `left:50%, top:50%` (content-
-      // percentage space) lands at the right screen pixel without any
-      // per-child inverse-scale; the translates below align the grown box
-      // with the wrapper's transformed content layer.
-      width: contentWidth * z,
-      height: contentHeight * z,
-      transform: rotation
-        ? [
-            // The 5-element form is REQUIRED when rotation can be non-zero
-            // and cannot be collapsed to the 2-translate form. RN applies
-            // transforms right-to-left as matrix multiplications:
-            //   1) The two leading translates re-center the (z-scaled)
-            //      overlay box on the wrapper midpoint, so the subsequent
-            //      `rotate` pivots around the overlay's geometric center
-            //      (matching the inner zoom layer's rotation pivot).
-            //   2) `rotate` then rotates the now-centered frame.
-            //   3) The trailing `z*ox` / `z*oy` translates run AFTER the
-            //      rotate in source order but BEFORE it under right-to-left
-            //      composition — applying pan in the rotated frame, which
-            //      is what keeps the overlay aligned with the rotated
-            //      content underneath. Folding `z*ox` into the first
-            //      translate would apply pan in the pre-rotation frame and
-            //      desync from the inner layer.
-            { translateX: wrapperWidth / 2 - (z * contentWidth) / 2 },
-            { translateY: wrapperHeight / 2 - (z * contentHeight) / 2 },
-            { rotate: `${rotation.value}rad` },
-            { translateX: z * ox },
-            { translateY: z * oy },
-          ]
-        : [
-            // Same math as above with rotation=0 collapsed into a single
-            // translate per axis: re-center the z-scaled box, then add the
-            // pan offset (scaled by z, because pan is content-space units).
-            { translateX: wrapperWidth / 2 - (z * contentWidth) / 2 + z * ox },
-            {
-              translateY: wrapperHeight / 2 - (z * contentHeight) / 2 + z * oy,
-            },
-          ],
+      width: contentWidth * currentZoom,
+      height: contentHeight * currentZoom,
+      transform: [
+        { translateX: wrapperWidth / 2 - (currentZoom * contentWidth) / 2 },
+        { translateY: wrapperHeight / 2 - (currentZoom * contentHeight) / 2 },
+        { rotate: `${currentRotation}rad` },
+        { translateX: currentZoom * currentOffsetX },
+        { translateY: currentZoom * currentOffsetY },
+      ],
     };
   }, [contentWidth, contentHeight, wrapperWidth, wrapperHeight]);
 
