@@ -18,10 +18,7 @@
       "**/*"
     ],
     "ios": {
-      "supportsTablet": true,
-      "infoPlist": {
-        "NSLocalNetworkUsageDescription": "Used to connect to the Metro development server during local development."
-      }
+      "supportsTablet": true
     },
     "android": {
       "adaptiveIcon": {
