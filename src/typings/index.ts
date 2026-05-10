@@ -97,6 +97,23 @@ export interface ReactNativeZoomableViewProps {
   staticPinPosition?: Vec2D;
   staticPinIcon?: React.ReactElement;
   /**
+   * Optional render-prop that returns markers to display in a non-scaling
+   * overlay layered above the zoomed content. The returned tree is mounted
+   * inside a `NonScalingOverlay` (see `components/NonScalingOverlay.tsx`)
+   * as a sibling of the zoom-transformed layer — children translate with
+   * pan/zoom but render at 1:1 screen size at every zoom level.
+   *
+   * Children should position themselves with `left: 'X%' / top: 'Y%'` in
+   * content-percentage space, use fixed pt dimensions, and self-center via
+   * negative `marginLeft` / `marginTop`. The overlay is `pointerEvents="none"`.
+   *
+   * Pair this with `contentWidth` / `contentHeight` props so the overlay
+   * knows the intrinsic content dimensions to scale percentage positions
+   * against. With `contentWidth` / `contentHeight` unset, the overlay
+   * renders nothing.
+   */
+  renderOverlay?: () => ReactNode;
+  /**
    * Called on the JS thread once the static pin position has settled
    * (~100ms after the last motion). Use for state updates that should not
    * fire mid-gesture (e.g. persisting the final pin location).

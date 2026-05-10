@@ -1,5 +1,4 @@
 import {
-  FixedSize,
   ReactNativeZoomableView,
   ReactNativeZoomableViewRef,
 } from '@openspacelabs/react-native-zoomable-view';
@@ -252,18 +251,31 @@ export default function App() {
             // measured when it's rendered naturally. Not the intrinsic sizes.
             contentWidth={contentSize?.width ?? 0}
             contentHeight={contentSize?.height ?? 0}
+            renderOverlay={
+              showMarkers
+                ? () => (
+                    <>
+                      {[20, 40, 60, 80].map((left) =>
+                        [20, 40, 60, 80].map((top) => (
+                          <View
+                            key={`${left}x${top}`}
+                            style={[
+                              styles.marker,
+                              {
+                                left: `${left}%`,
+                                top: `${top}%`,
+                              },
+                            ]}
+                          />
+                        ))
+                      )}
+                    </>
+                  )
+                : undefined
+            }
           >
             <View style={styles.contents}>
               <Image style={styles.img} source={{ uri }} />
-
-              {showMarkers &&
-                [20, 40, 60, 80].map((left) =>
-                  [20, 40, 60, 80].map((top) => (
-                    <FixedSize left={left} top={top} key={`${left}x${top}`}>
-                      <View style={styles.marker} />
-                    </FixedSize>
-                  ))
-                )}
             </View>
           </ReactNativeZoomableView>
         </View>
