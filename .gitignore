@@ -40,13 +40,6 @@ android.iml
 #
 example/ios/Pods
 
-# Expo prebuild output (example app) — `expo prebuild` regenerates the
-# entire iOS project from `example/app.json`. Tracking these files would
-# create merge churn on every prebuild and let stale artifacts mask
-# config drift. Anything that must persist across prebuilds goes in
-# `example/app.json` under `expo.ios.*` and gets re-emitted.
-example/ios/
-
 # node.js
 #
 node_modules/
