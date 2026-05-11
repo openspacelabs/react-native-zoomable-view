@@ -746,20 +746,28 @@ const ReactNativeZoomableViewInner: ForwardRefRenderFunction<
     if (!isMounted.current) return;
     if (props.onLongPress && props.longPressDuration) {
       longPressTimeout.value = setTimeout(() => {
-        // Invoke the stable `onLongPress` wrapper rather than the captured
-        // `props.onLongPress` — the closure was captured at schedule time and
-        // would fire a stale callback if the parent re-rendered during the
-        // 700ms timer window.
-        onLongPress(e, _getZoomableViewEventObject());
-        longPressTimeout.value = undefined;
-        // Mark long-press as fired so `_handlePanResponderEnd` skips
-        // tap classification — otherwise the same touch release would
-        // fire both `onLongPress` and `onSingleTap`.
+        // Set the long-press-fired sentinel BEFORE invoking the consumer
+        // callback. If the user releases their finger while the consumer
+        // is still executing, `_handlePanResponderEnd` runs on the UI
+        // thread and queues `runOnJS(_resolveAndHandleTap)` — that drain
+        // happens whether `longPressFired` is checked there or not, and
+        // `_resolveAndHandleTap` only short-circuits when the sentinel is
+        // already true. Setting it post-callback (and post-await of the
+        // consumer's potentially-slow work) leaves a window where
+        // `_handlePanResponderEnd` reads `false` and a spurious
+        // `onSingleTap` fires alongside the legitimate `onLongPress`.
+        // Same reasoning for `doubleTapFirstTapReleaseTimestamp`: clear
+        // it before user code runs so any release mid-callback is
+        // classified as a fresh first-tap, not the second of a
+        // double-tap straddling the long-press.
         longPressFired.value = true;
-        // Also clear `doubleTapFirstTapReleaseTimestamp` so a subsequent
-        // tap is classified as the FIRST tap, not the second of a double-tap
-        // straddling the long-press.
         doubleTapFirstTapReleaseTimestamp.value = undefined;
+        longPressTimeout.value = undefined;
+        // Invoke the stable `onLongPress` wrapper rather than the captured
+        // `props.onLongPress` — the closure was captured at schedule time
+        // and would fire a stale callback if the parent re-rendered during
+        // the timer window.
+        onLongPress(e, _getZoomableViewEventObject());
       }, props.longPressDuration);
     }
   });
@@ -1508,7 +1516,13 @@ const ReactNativeZoomableViewInner: ForwardRefRenderFunction<
     } else if (e.numberOfTouches === 1) {
       const { dx, dy } = gestureState;
 
-      if (longPressTimeout.value && (Math.abs(dx) > 5 || Math.abs(dy) > 5)) {
+      // Use the same 2px threshold as `isShiftGesture` below so we never
+      // enter a state where shift-pan is running (view is moving) while
+      // the long-press timer is still armed. The previous 5px threshold
+      // created a 2-5px dead zone in which a finger drifting just past
+      // 2px would pan but still fire `onLongPress` after 500ms — a
+      // phantom long-press while the user clearly intended to pan.
+      if (longPressTimeout.value && (Math.abs(dx) > 2 || Math.abs(dy) > 2)) {
         runOnJS(clearLongPressTimeout)();
       }
 

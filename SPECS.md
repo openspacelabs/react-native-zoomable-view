@@ -98,7 +98,7 @@ All event-receiving callbacks accept `(event: GestureTouchEvent, zoomableViewEve
 
 | Callback | Thread | When |
 |----------|--------|------|
-| `onLayoutWorklet` | UI | Internal measurements (origin/size of zoom subject) change. Receives `{ x, y, width, height }`. Skipped while measurements are zero (initial mount before `View.measure` lands). See [Worklet callback contract](#worklet-callback-contract). |
+| `onLayoutWorklet` | UI | Internal measurements (origin/size of zoom subject) change. Receives `{ x, y, width, height }`. Skipped while measurements are zero (initial mount before the wrapper's `onLayout` fires). See [Worklet callback contract](#worklet-callback-contract). |
 | `onTransformWorklet` | UI | Every transform tick. See [Worklet callback contract](#worklet-callback-contract). |
 | `onPanResponderGrant` | JS | Gesture starts. Not re-fired during 3+ finger recovery. |
 | `onPanResponderEnd` | JS | Gesture ends — natural release, RNGH cancellation, or 3+ finger force-end. Always fires. |

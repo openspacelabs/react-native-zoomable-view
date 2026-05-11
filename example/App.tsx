@@ -20,12 +20,12 @@ import {
   GestureHandlerRootView,
 } from 'react-native-gesture-handler';
 import Animated, {
+  runOnJS,
   useAnimatedStyle,
   useDerivedValue,
   useSharedValue,
 } from 'react-native-reanimated';
 import { ReText } from 'react-native-redash';
-import { runOnJS } from 'react-native-worklets';
 
 import { applyContainResizeMode } from '../src/helper/coordinateConversion';
 import { styles } from './style';
