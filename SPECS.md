@@ -87,7 +87,7 @@ Exported from `src/index.tsx`:
 | Prop | Type | Notes |
 |------|------|-------|
 | `staticPinPosition` | `Vec2D` | Pin position in **viewport coordinates**. Setting this enables the pin and makes it the pinch zoom centre. |
-| `staticPinIcon` | `ReactElement` | Custom pin icon. Default is a built-in 64×48 pin image. |
+| `staticPinIcon` | `ReactElement` | Custom pin icon. Default is a built-in 48×64 pin image (48 wide × 64 tall — standard map-pin teardrop shape). |
 | `pinProps` | `ViewProps` | Forwarded to the pin wrapper. `pinProps.style` is applied **after** the internal style array, so a consumer-supplied `transform` will replace the internal anchor transforms — wrap your icon in an inner `View` if you need to rotate or scale it. |
 | `onStaticPinPositionChange` | `(pos: Vec2D) => void` | JS thread. Fires once after the pin's content position has settled (~100 ms quiet period). Position-equality dedup suppresses no-op fires. Cancelled when `staticPinPosition`, `contentWidth`, or `contentHeight` becomes falsy. |
 | `onStaticPinPositionMoveWorklet` | `(pos: Vec2D) => void` | UI-thread worklet. Fires whenever the pin's content position changes — see [Worklet callback contract](#worklet-callback-contract). |
@@ -323,7 +323,7 @@ This major replaces the class-component PanResponder/Animated implementation wit
 
 ### `ZoomableViewEvent` shape change
 
-`originalPageX` and `originalPageY` are no longer in `ZoomableViewEvent`. Consumers needing absolute page coordinates should read them from `onLayoutWorklet` or via the `View`'s `measure()` API directly.
+`originalPageX` and `originalPageY` are no longer in `ZoomableViewEvent`. Consumers needing absolute page coordinates should call `View.measure()` (or `measureInWindow()`) on their own ref — RN's standard API for page-space measurement. Note: `onLayoutWorklet`'s payload is **parent-relative** `{ x, y, width, height }` (sourced from React Native's `onLayout` event), not page-space; it is the wrong source for absolute page coordinates.
 
 ### Default `zoomTo` animation
 
