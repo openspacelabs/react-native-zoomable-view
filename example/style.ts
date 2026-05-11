@@ -26,8 +26,18 @@ export const styles = StyleSheet.create({
     padding: 20,
   },
   contents: {
+    // `alignSelf: 'stretch'` anchors the cross-axis (width) to the
+    // parent's full width; the `aspectRatio` set inline at render time
+    // from the loaded image's source dims then derives the main-axis
+    // (height). Together they size the contents View to match the
+    // image's aspect exactly — resizeMode:contain produces zero
+    // letterbox, so the element frame == the rendered-pixel frame.
+    // The parent's `justifyContent: 'center'` centers it vertically.
+    // (Suitable when the child fits within the parent's main-axis at
+    // parent-width × aspect — true for the picsum square in 340×590.
+    // For arbitrary aspects, additionally clamp via
+    // `maxHeight: '100%'` and pre-compute the binding axis externally.)
     alignSelf: 'stretch',
-    flex: 1,
   },
   img: {
     height: '100%',
@@ -59,5 +69,18 @@ export const styles = StyleSheet.create({
     position: 'absolute',
     right: 0,
     top: 0,
+  },
+  // Floating HUD anchored to the overlay's top-left corner — shows the
+  // wrapper / content / translate numbers used by NonScalingOverlay's
+  // transform math, so visual misalignment can be cross-checked against
+  // raw values without leaving the screen.
+  overlayDebugHud: {
+    backgroundColor: 'yellow',
+    color: 'black',
+    fontSize: 9,
+    left: 0,
+    position: 'absolute',
+    top: 0,
+    width: 280,
   },
 });

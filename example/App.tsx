@@ -26,7 +26,6 @@ import Animated, {
 } from 'react-native-reanimated';
 import { ReText } from 'react-native-redash';
 
-import { applyContainResizeMode } from '../src/helper/coordinateConversion';
 import { styles } from './style';
 
 const kittenSize = 800;
@@ -214,33 +213,21 @@ export default function App() {
 
   const staticPinPosition = { x: size.width / 2, y: size.height / 2 };
 
-  // Measure the <Image>'s actual rendered frame (post resizeMode:contain
-  // fit) to drive `NonScalingOverlay` placement. The <Image> element's
-  // onLayout reports its ELEMENT box (fills the wrapper minus border), but
-  // resizeMode:contain letterboxes the pixels at the source aspect inside
-  // that box. We must pass the rendered-pixel frame (not the element box)
-  // so dots at 20%/40%/60%/80% land on the image, not on letterbox.
-  const [imageElementBox, setImageElementBox] = useState<{
-    width: number;
-    height: number;
-  }>({ width: 0, height: 0 });
-  // Source dims are known from the URL but capture via onLoad in case
-  // picsum returns a different size than requested.
+  // Capture the source dims via `onLoad` so the contents View can be
+  // sized to match the image's aspect ratio. With matching aspect, RN's
+  // resizeMode 'contain' produces zero letterbox — the rendered-pixel
+  // frame equals the element frame — and the contents View's onLayout
+  // gives `NonScalingOverlay` the exact `contentWidth`/`contentHeight`
+  // it needs (no separate `applyContainResizeMode` step).
   const [imageSourceSize, setImageSourceSize] = useState<{
     width: number;
     height: number;
   }>({ width: kittenSize, height: kittenSize });
-  const contentSize = useMemo(() => {
-    if (!imageElementBox.width || !imageElementBox.height) {
-      return { width: 0, height: 0 };
-    }
-    return (
-      applyContainResizeMode(imageSourceSize, imageElementBox).size ?? {
-        width: 0,
-        height: 0,
-      }
-    );
-  }, [imageElementBox, imageSourceSize]);
+  const sourceAspect = imageSourceSize.width / imageSourceSize.height;
+  const [contentSize, setContentSize] = useState<{
+    width: number;
+    height: number;
+  }>({ width: 0, height: 0 });
 
   const Wrapper = modal ? PageSheetModal : View;
 
@@ -285,45 +272,81 @@ export default function App() {
             contentHeight={contentSize.height}
             renderOverlay={
               showMarkers
-                ? () => (
-                    <>
-                      {/* DEBUG: visualize the overlay's bounding box.
-                          Sized 100% × 100% of the overlay so it tracks
-                          contentSize × zoom and reveals where the
-                          translate-only overlay is actually painting on
-                          screen. Example-only — remove for production. */}
-                      <View style={styles.overlayDebugBox} />
-                      {[20, 40, 60, 80].map((left) =>
-                        [20, 40, 60, 80].map((top) => (
-                          <View
-                            key={`${left}x${top}`}
-                            style={[
-                              styles.marker,
-                              {
-                                left: `${left}%`,
-                                top: `${top}%`,
-                              },
-                            ]}
-                          />
-                        ))
-                      )}
-                    </>
-                  )
+                ? () => {
+                    // Wrapper ≈ box minus its 5pt border each side. The
+                    // lib doesn't expose its `wrapperSize` directly, but
+                    // `box.width/height - 10` reproduces it on this
+                    // example. Used only for the debug HUD.
+                    const wrapperApproxW = Math.max(0, size.width - 10);
+                    const wrapperApproxH = Math.max(0, size.height - 10);
+                    return (
+                      <>
+                        {/* DEBUG: visualize the overlay's bounding box.
+                            Sized 100% × 100% of the overlay so it tracks
+                            contentSize × zoom and reveals where the
+                            translate-only overlay is actually painting on
+                            screen. Example-only — remove for production. */}
+                        <View style={styles.overlayDebugBox} />
+                        {/* DEBUG HUD pinned to overlay's top-left so it
+                            tracks the overlay's transform and provides
+                            the live numbers used by the translate math
+                            (translateX/Y at z=1, ox=oy=0). */}
+                        <Text style={styles.overlayDebugHud}>
+                          NSOL wW≈{Math.round(wrapperApproxW)} wH≈
+                          {Math.round(wrapperApproxH)} cW=
+                          {Math.round(contentSize.width)} cH=
+                          {Math.round(contentSize.height)} tXjs=
+                          {Math.round(
+                            wrapperApproxW / 2 - contentSize.width / 2
+                          )}{' '}
+                          tYjs=
+                          {Math.round(
+                            wrapperApproxH / 2 - contentSize.height / 2
+                          )}
+                        </Text>
+                        {[20, 40, 60, 80].map((left) =>
+                          [20, 40, 60, 80].map((top) => (
+                            <View
+                              key={`${left}x${top}`}
+                              style={[
+                                styles.marker,
+                                {
+                                  left: `${left}%`,
+                                  top: `${top}%`,
+                                },
+                              ]}
+                            />
+                          ))
+                        )}
+                      </>
+                    );
+                  }
                 : undefined
             }
           >
-            <View style={styles.contents}>
+            <View
+              // `aspectRatio` constrains the contents View to the
+              // source's aspect, so resizeMode:contain produces zero
+              // letterbox — the element frame == the rendered-pixel
+              // frame. Combined with `maxWidth/maxHeight: '100%'` and
+              // `alignSelf: 'center'`, the element fits within the
+              // wrapper on whichever axis is binding (width on a tall
+              // wrapper, height on a wide wrapper) without overflow.
+              // `onLayout` then gives `NonScalingOverlay` the exact
+              // contentSize directly — no extra contain math required.
+              style={[styles.contents, { aspectRatio: sourceAspect }]}
+              onLayout={(e) => {
+                const { width, height } = e.nativeEvent.layout;
+                setContentSize((prev) =>
+                  prev.width === width && prev.height === height
+                    ? prev
+                    : { width, height }
+                );
+              }}
+            >
               <Image
                 style={styles.img}
                 source={{ uri }}
-                onLayout={(e) => {
-                  const { width, height } = e.nativeEvent.layout;
-                  setImageElementBox((prev) =>
-                    prev.width === width && prev.height === height
-                      ? prev
-                      : { width, height }
-                  );
-                }}
                 onLoad={(e) => {
                   const src = e.nativeEvent.source;
                   setImageSourceSize((prev) =>
