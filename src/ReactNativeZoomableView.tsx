@@ -178,17 +178,6 @@ const ReactNativeZoomableViewInner: ForwardRefRenderFunction<
   // the worklet must see initialised values.
   const prevZoom = useSharedValue<number>(1);
   const zoomToDestination = useSharedValue<Vec2D | undefined>(undefined);
-  const inverseZoom = useDerivedValue(() => 1 / zoom.value);
-  // Inline-shared-value style: Reanimated subscribes to the SharedValue when
-  // applied to `Animated.View` (no `useAnimatedStyle` needed). The
-  // `inverseZoomStyle` shape advertises `SharedValue<number>` so applying it
-  // to a plain RN `<View>` is a TypeScript error rather than a silent
-  // first-render-snapshot no-op. `useRef` keeps the object identity stable
-  // across renders since `inverseZoom` itself is stable.
-  const inverseZoomStyleRef = useRef({
-    transform: [{ scale: inverseZoom }],
-  });
-  const inverseZoomStyle = inverseZoomStyleRef.current;
 
   const lastGestureCenterPosition = useSharedValue<Vec2D | null>(null);
   const lastGestureTouchDistance = useSharedValue<number | null>(150);
@@ -1659,9 +1648,7 @@ const ReactNativeZoomableViewInner: ForwardRefRenderFunction<
   });
 
   return (
-    <ReactNativeZoomableViewProvider
-      value={{ zoom, inverseZoom, inverseZoomStyle, offsetX, offsetY }}
-    >
+    <ReactNativeZoomableViewProvider value={{ zoom, offsetX, offsetY }}>
       <View
         // eslint-disable-next-line @typescript-eslint/no-use-before-define
         style={styles.container}

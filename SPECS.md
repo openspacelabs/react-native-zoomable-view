@@ -38,7 +38,7 @@ Exported from `src/index.tsx`:
 - `ReactNativeZoomableViewProps` — prop type
 - `ReactNativeZoomableViewRef` — imperative handle
 - `ZoomableViewEvent` — `{ zoomLevel, offsetX, offsetY, originalWidth, originalHeight }`
-- `useZoomableViewContext()` — hook returning `{ zoom, inverseZoom, inverseZoomStyle, offsetX, offsetY }` for descendants
+- `useZoomableViewContext()` — hook returning `{ zoom, offsetX, offsetY }` for descendants
 - `NonScalingOverlay` — translate-only overlay component; markers position via `left: 'X%' / top: 'Y%'` and render at 1:1 screen size at every zoom level. Typically used via the `renderOverlay` prop on `ReactNativeZoomableView`; can also be mounted manually with explicit `contentWidth`/`contentHeight`/`wrapperWidth`/`wrapperHeight` numeric props plus SharedValue `zoom`/`offsetX`/`offsetY` (and optional `rotation`).
 - `applyContainResizeMode`, `getImageOriginOnTransformSubject`, `viewportPositionToImagePosition` — coordinate helpers
 

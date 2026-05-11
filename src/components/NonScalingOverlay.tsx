@@ -1,13 +1,10 @@
-import React, { useMemo } from 'react';
+import React from 'react';
 import { StyleSheet } from 'react-native';
 import Animated, {
   SharedValue,
   useAnimatedStyle,
-  useDerivedValue,
   useSharedValue,
 } from 'react-native-reanimated';
-
-import { ReactNativeZoomableViewProvider } from '../ReactNativeZoomableViewContext';
 
 export type NonScalingOverlayProps = {
   children: React.ReactNode;
@@ -105,41 +102,19 @@ export const NonScalingOverlay = ({
     };
   }, [contentWidth, contentHeight, wrapperWidth, wrapperHeight]);
 
-  // Fake context with zoom=1 / offsets=0 / inverseZoom=1 so any consumer of
-  // `useZoomableViewContext` rendered INSIDE the overlay becomes a no-op.
-  // Without this, a consumer that applied an `inverseZoomStyle`
-  // (`scale: 1/zoom`) would double-counteract zoom and shrink children
-  // toward 0 at high zoom levels.
-  const unitZoom = useSharedValue(1);
-  const unitInverseZoom = useDerivedValue(() => 1);
-  const unitScale = useSharedValue(1);
-  const zeroOffset = useSharedValue(0);
-  const fakeContext = useMemo(
-    () => ({
-      zoom: unitZoom,
-      inverseZoom: unitInverseZoom,
-      inverseZoomStyle: { transform: [{ scale: unitScale }] },
-      offsetX: zeroOffset,
-      offsetY: zeroOffset,
-    }),
-    [unitZoom, unitInverseZoom, unitScale, zeroOffset]
-  );
-
   // The translate math (`wrapperW/2 - z*contentW/2 + z*ox`) requires real
   // dimensions; with 0s it resolves to 0 and paints the overlay at the
   // wrong location for one frame before measurements arrive.
   if (!contentWidth || !contentHeight) return null;
 
   return (
-    <ReactNativeZoomableViewProvider value={fakeContext}>
-      <Animated.View
-        // eslint-disable-next-line @typescript-eslint/no-use-before-define
-        style={[overlayStyle, styles.overlay]}
-        pointerEvents="none"
-      >
-        {children}
-      </Animated.View>
-    </ReactNativeZoomableViewProvider>
+    <Animated.View
+      // eslint-disable-next-line @typescript-eslint/no-use-before-define
+      style={[overlayStyle, styles.overlay]}
+      pointerEvents="none"
+    >
+      {children}
+    </Animated.View>
   );
 };
 
