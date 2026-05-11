@@ -37,7 +37,6 @@ const kittenSize = 800;
 // example app that needs to actually render the image on every fresh
 // install.
 const uri = `https://picsum.photos/${kittenSize}/${kittenSize}`;
-const imageSize = { width: kittenSize, height: kittenSize };
 
 const stringifyPoint = (point?: { x: number; y: number }) =>
   point ? `${Math.round(point.x)}, ${Math.round(point.y)}` : 'Off map';
@@ -214,7 +213,34 @@ export default function App() {
   });
 
   const staticPinPosition = { x: size.width / 2, y: size.height / 2 };
-  const { size: contentSize } = applyContainResizeMode(imageSize, size);
+
+  // Measure the <Image>'s actual rendered frame (post resizeMode:contain
+  // fit) to drive `NonScalingOverlay` placement. The <Image> element's
+  // onLayout reports its ELEMENT box (fills the wrapper minus border), but
+  // resizeMode:contain letterboxes the pixels at the source aspect inside
+  // that box. We must pass the rendered-pixel frame (not the element box)
+  // so dots at 20%/40%/60%/80% land on the image, not on letterbox.
+  const [imageElementBox, setImageElementBox] = useState<{
+    width: number;
+    height: number;
+  }>({ width: 0, height: 0 });
+  // Source dims are known from the URL but capture via onLoad in case
+  // picsum returns a different size than requested.
+  const [imageSourceSize, setImageSourceSize] = useState<{
+    width: number;
+    height: number;
+  }>({ width: kittenSize, height: kittenSize });
+  const contentSize = useMemo(() => {
+    if (!imageElementBox.width || !imageElementBox.height) {
+      return { width: 0, height: 0 };
+    }
+    return (
+      applyContainResizeMode(imageSourceSize, imageElementBox).size ?? {
+        width: 0,
+        height: 0,
+      }
+    );
+  }, [imageElementBox, imageSourceSize]);
 
   const Wrapper = modal ? PageSheetModal : View;
 
@@ -255,12 +281,18 @@ export default function App() {
             // Give these to the zoomable view so it can apply the boundaries around the actual content.
             // Need to make sure the content is actually centered and the width and height are
             // measured when it's rendered naturally. Not the intrinsic sizes.
-            contentWidth={contentSize?.width ?? 0}
-            contentHeight={contentSize?.height ?? 0}
+            contentWidth={contentSize.width}
+            contentHeight={contentSize.height}
             renderOverlay={
               showMarkers
                 ? () => (
                     <>
+                      {/* DEBUG: visualize the overlay's bounding box.
+                          Sized 100% × 100% of the overlay so it tracks
+                          contentSize × zoom and reveals where the
+                          translate-only overlay is actually painting on
+                          screen. Example-only — remove for production. */}
+                      <View style={styles.overlayDebugBox} />
                       {[20, 40, 60, 80].map((left) =>
                         [20, 40, 60, 80].map((top) => (
                           <View
@@ -281,10 +313,34 @@ export default function App() {
             }
           >
             <View style={styles.contents}>
-              <Image style={styles.img} source={{ uri }} />
+              <Image
+                style={styles.img}
+                source={{ uri }}
+                onLayout={(e) => {
+                  const { width, height } = e.nativeEvent.layout;
+                  setImageElementBox((prev) =>
+                    prev.width === width && prev.height === height
+                      ? prev
+                      : { width, height }
+                  );
+                }}
+                onLoad={(e) => {
+                  const src = e.nativeEvent.source;
+                  setImageSourceSize((prev) =>
+                    prev.width === src.width && prev.height === src.height
+                      ? prev
+                      : { width: src.width, height: src.height }
+                  );
+                }}
+              />
             </View>
           </ReactNativeZoomableView>
         </View>
+        <Text>
+          DBG contentSize: {Math.round(contentSize.width)}×
+          {Math.round(contentSize.height)} box: {Math.round(size.width)}×
+          {Math.round(size.height)}
+        </Text>
         <Text>onStaticPinPositionChange: {stringifyPoint(pin)}</Text>
         <ReText text={movePinText} style={{ color: 'black' }} />
         <Button

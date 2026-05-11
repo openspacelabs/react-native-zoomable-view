@@ -26,9 +26,9 @@ export type NonScalingOverlayProps = {
   offsetX: SharedValue<number>;
   /** Current pan offset Y (Reanimated SharedValue). */
   offsetY: SharedValue<number>;
-  /** Optional rotation in radians (Reanimated SharedValue). When provided, the
-   *  overlay's transform list pivots around the overlay center and pan is
-   *  applied in the rotated frame. */
+  /** Optional rotation in radians (Reanimated SharedValue). When omitted,
+   *  rotation defaults to 0; the same 5-element transform list is used
+   *  either way. */
   rotation?: SharedValue<number>;
 };
 
@@ -57,39 +57,59 @@ export const NonScalingOverlay = ({
   offsetY,
   rotation,
 }: NonScalingOverlayProps) => {
-  const overlayStyle = useAnimatedStyle(() => {
-    const currentZoom = zoom.value;
-    const currentOffsetX = offsetX.value;
-    const currentOffsetY = offsetY.value;
-    const currentRotation = rotation ? rotation.value : 0;
+  // A constant-zero `SharedValue` used when no rotation prop is provided,
+  // so the worklet always reads from a `SharedValue<number>` and the
+  // transform list shape is identical in both cases. Hook order is fixed
+  // by always calling `useSharedValue` here.
+  const zeroRotation = useSharedValue(0);
+  const rotationValue = rotation ?? zeroRotation;
 
-    // Transform composes right-to-left: re-center the z-scaled box on
-    // the wrapper midpoint, rotate around that center, then translate
-    // by the pan IN THE ROTATED FRAME (post-rotate). Folding pan into
-    // the centering translate would apply it pre-rotation and desync
-    // from the rotated content underneath. When rotation is absent,
-    // currentRotation=0 collapses the rotate to identity and the
-    // 5-element list reduces to a single combined translate per axis.
+  const overlayStyle = useAnimatedStyle(() => {
+    const z = zoom.value;
+    const ox = offsetX.value;
+    const oy = offsetY.value;
+    const r = rotationValue.value;
+
     return {
       position: 'absolute',
-      width: contentWidth * currentZoom,
-      height: contentHeight * currentZoom,
+      // Box grows with zoom so a child at `left:50%, top:50%` (content-
+      // percentage space) lands at the right screen pixel without any
+      // per-child inverse-scale; the translates below align the grown box
+      // with the wrapper's transformed content layer.
+      width: contentWidth * z,
+      height: contentHeight * z,
+      // RN composes transforms RIGHT-to-LEFT as matrix multiplications.
+      //   1) The two leading translates re-center the (z-scaled) overlay
+      //      box on the wrapper midpoint, so the subsequent `rotate`
+      //      pivots around the overlay's geometric center (matching the
+      //      inner zoom layer's rotation pivot).
+      //   2) `rotate` then rotates the centered frame.
+      //   3) The trailing `z*ox` / `z*oy` translates appear AFTER the
+      //      rotate in source order but apply BEFORE it under
+      //      right-to-left composition — so pan is applied in the
+      //      rotated frame, which keeps the overlay aligned with the
+      //      rotated content underneath. Folding `z*ox` into the first
+      //      translate would apply pan in the pre-rotation frame and
+      //      desync from the inner layer.
+      // The same 5-element list is used whether rotation is supplied or
+      // not (rotation defaults to 0); the no-rotation case is just the
+      // matrix product with `rotate(0) = I`, which collapses to the
+      // 2-translate form mathematically without forking the code path.
       transform: [
-        { translateX: wrapperWidth / 2 - (currentZoom * contentWidth) / 2 },
-        { translateY: wrapperHeight / 2 - (currentZoom * contentHeight) / 2 },
-        { rotate: `${currentRotation}rad` },
-        { translateX: currentZoom * currentOffsetX },
-        { translateY: currentZoom * currentOffsetY },
+        { translateX: wrapperWidth / 2 - (z * contentWidth) / 2 },
+        { translateY: wrapperHeight / 2 - (z * contentHeight) / 2 },
+        { rotate: `${r}rad` },
+        { translateX: z * ox },
+        { translateY: z * oy },
       ],
     };
   }, [contentWidth, contentHeight, wrapperWidth, wrapperHeight]);
 
   // Fake context with zoom=1 / offsets=0 / inverseZoom=1 so any consumer of
   // `useZoomableViewContext` rendered INSIDE the overlay becomes a no-op.
-  // Without this, a nested consumer that applies the outer context's
-  // `inverseZoomStyle` (`scale: 1/zoom`) would multiply on top of the
-  // translate-only model here, double-counteracting zoom and shrinking
-  // children toward 0 at high zoom levels.
+  // Without this, a consumer that applied an `inverseZoomStyle`
+  // (`scale: 1/zoom`) would double-counteract zoom and shrink children
+  // toward 0 at high zoom levels.
   const unitZoom = useSharedValue(1);
   const unitInverseZoom = useDerivedValue(() => 1);
   const unitScale = useSharedValue(1);
@@ -106,9 +126,8 @@ export const NonScalingOverlay = ({
   );
 
   // The translate math (`wrapperW/2 - z*contentW/2 + z*ox`) requires real
-  // dimensions; with 0s it resolves to 0 (no-rotation case) or NaN-adjacent
-  // intermediate values, painting the overlay at the wrong location for one
-  // frame before measurements arrive.
+  // dimensions; with 0s it resolves to 0 and paints the overlay at the
+  // wrong location for one frame before measurements arrive.
   if (!contentWidth || !contentHeight) return null;
 
   return (
@@ -126,11 +145,24 @@ export const NonScalingOverlay = ({
 
 const styles = StyleSheet.create({
   overlay: {
-    // Markers anchored to content edges typically apply negative margins
-    // (`marginLeft: -size/2, marginTop: -size/2`) to self-center on the
-    // anchor point — they extend past the overlay's bounding box. iOS
-    // defaults to clipping subviews to their parent's bounds, so without
-    // `visible` here those edge markers disappear at high zoom levels.
+    // Anchor the overlay at the wrapper's top-left. Without explicit
+    // top/left, Yoga in RN positions `position: 'absolute'` children
+    // using the parent's `alignItems` / `justifyContent` whenever the
+    // child has a measurable size — and the lib's wrapper uses
+    // `'center'` for both axes. Yoga would center the (animated)
+    // contentW × contentH overlay inside the wrapper BEFORE the
+    // `useAnimatedStyle` `transform` translated it, producing a doubled
+    // offset (≈ +125pt vertical on iPhone 12 Pro). Forcing top: 0 /
+    // left: 0 overrides the parent's alignment so the transform's
+    // translates are the SOLE source of position.
+    left: 0,
+    // Markers anchored to content edges typically apply negative
+    // margins (`marginLeft: -size/2, marginTop: -size/2`) to self-
+    // center on the anchor point — they extend past the overlay's
+    // bounding box. iOS defaults to clipping subviews to their parent's
+    // bounds, so without `visible` here those edge markers disappear at
+    // high zoom levels.
     overflow: 'visible',
+    top: 0,
   },
 });

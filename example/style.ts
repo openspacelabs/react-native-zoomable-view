@@ -1,11 +1,22 @@
-import { StyleSheet } from 'react-native';
+import { Dimensions, StyleSheet } from 'react-native';
+
+// Box width must fit the device viewport. A fixed pt width (e.g. 480)
+// exceeds smaller screens (iPhone 12 Pro = 390pt), pushing part of the
+// rendered image off-screen. The overlay places dots as percentages of
+// contentSize (the rendered-image frame); when contentSize is wider
+// than the visible screen, dots at 20%/80% of content land at ~14%/86%
+// of what the user sees. `width: '100%'` doesn't work here because the
+// nested container chain uses `alignItems: 'center'`, which leaves the
+// parent's cross-axis intrinsic-sized — '100%' resolves to 0.
+// Subtracting 40 leaves a 20pt margin from each screen edge.
+const BOX_WIDTH = Dimensions.get('window').width - 40;
 
 export const styles = StyleSheet.create({
   box: {
     borderWidth: 5,
     flexShrink: 1,
     height: 600,
-    width: 480,
+    width: BOX_WIDTH,
   },
   container: {
     alignItems: 'center',
@@ -34,5 +45,19 @@ export const styles = StyleSheet.create({
     position: 'absolute',
     top: '50%',
     width: 20,
+  },
+  // Example-only debug visualization for NonScalingOverlay's bounding
+  // box. Filling 100% × 100% of the overlay shows where the
+  // translate-only layer is actually painting — useful for verifying
+  // alignment at every zoom level. Not exported by the library.
+  overlayDebugBox: {
+    backgroundColor: 'rgba(255,0,0,0.18)',
+    borderColor: 'magenta',
+    borderWidth: 2,
+    bottom: 0,
+    left: 0,
+    position: 'absolute',
+    right: 0,
+    top: 0,
   },
 });
