@@ -78,7 +78,7 @@ Exported from `src/index.tsx`:
 
 | Prop | Type | Default | Notes |
 |------|------|---------|-------|
-| `longPressDuration` | `number` | `700` | Long-press timer is only armed when `onLongPress` is provided. Disarmed when a second finger arrives, when a 1-finger move exceeds 5px on either axis, or on touch end. |
+| `longPressDuration` | `number` | `700` | Long-press timer is only armed when `onLongPress` is provided. Disarmed when a second finger arrives, when a 1-finger move exceeds 2px on either axis, or on touch end. |
 | `visualTouchFeedbackEnabled` | `boolean` | `true` | Renders an `AnimatedTouchFeedback` circle for each tap. Disabling it skips the entire feedback pipeline (no leak). |
 | `debug` | `boolean` | `undefined` | Renders touch / pinch debug markers. |
 
