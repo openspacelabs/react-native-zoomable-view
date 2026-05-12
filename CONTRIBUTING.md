@@ -90,31 +90,34 @@ You don't need to run build commands locally unless testing the built output.
 
 ### Publishing to npm
 
-We use [release-it](https://github.com/release-it/release-it) to create releases and [GitHub Actions](.github/workflows/release.yml) to build and publish to npm.
+Releases are cut by creating a GitHub Release. Publishing to npm is handled automatically by [`.github/workflows/release.yml`](.github/workflows/release.yml), which is triggered by the `release: published` event.
 
-To publish new versions:
+End-to-end flow:
 
-1. Run `yarn release` locally (creates git tag and GitHub release)
-2. GitHub Actions automatically builds and publishes to npm
+1. **Bump the version** on `master`. Edit `package.json` `version` to the new `X.Y.Z`, commit as `chore: release X.Y.Z`, and push.
+2. **Create the GitHub Release** against the bump commit:
+   ```sh
+   gh release create vX.Y.Z --title "Release X.Y.Z" --generate-notes --target master
+   ```
+   `--generate-notes` builds the release body from merged PRs using the categories and exclusions in [`.github/release.yml`](.github/release.yml). Review the generated draft (add `--draft` above if you want to edit before publishing) and publish when it looks right.
+3. **CI publishes to npm.** The `release: published` event triggers the release workflow, which runs `yarn install` (which builds `lib/` via the `prepare` script), then `npm publish --access public --provenance`. The `--provenance` flag signs the publish with a GitHub OIDC attestation; this is why the workflow needs `permissions: id-token: write`.
 
 Only maintainers with permission to create releases can publish. The repository must have an `NPM_TOKEN` secret configured (Settings → Secrets and variables → Actions) for CI to publish to npm.
 
-> **Note:** GitHub pre-releases (e.g. `v3.0.0-beta.1`) intentionally skip the npm publish step to prevent beta versions from being tagged as `latest`. The CI job will show as "Skipped" — this is expected. To publish a pre-release manually, build locally and run `npm publish --tag beta --access public`.
+> **Pre-releases:** Tag pre-releases as `vX.Y.Z-beta.N` (or similar) and check the "Set as a pre-release" box (or pass `--prerelease` to `gh release create`). The publish workflow has `if: ${{ !github.event.release.prerelease }}` so it skips pre-releases — the CI job will show as "Skipped", which is expected. To publish a pre-release manually, build locally and run `npm publish --tag beta --access public`.
 
 ### Changelog and Release Notes
 
-Release notes are automatically generated from merged pull requests using GitHub's release notes feature. Labels control which category a PR appears under in the release notes — they do not affect version numbering. The maintainer chooses the version (major/minor/patch) interactively when running `yarn release`.
+Release notes are auto-generated from merged pull requests by GitHub's release notes feature, driven by [`.github/release.yml`](.github/release.yml). PR labels control which category a PR appears under — they do **not** affect version numbering. The version is chosen by the maintainer at bump time (step 1 above).
 
-Please label your PRs with:
+Please label your PRs with one of:
 
 - `breaking`: Breaking changes
 - `enhancement`: New features
 - `bug`: Bug fixes
 - `documentation`: Documentation updates
 
-PRs labeled with `ignore-for-release` or `dependencies` are excluded from release notes.
-
-Release notes categories are configured in `.github/release.yml`.
+PRs labeled `ignore-for-release` or `dependencies` are excluded from release notes entirely. The [`.github/workflows/pr-labels.yml`](.github/workflows/pr-labels.yml) workflow enforces that every PR carries at least one of these labels.
 
 ### Scripts
 
