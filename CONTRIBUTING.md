@@ -90,25 +90,29 @@ You don't need to run build commands locally unless testing the built output.
 
 ### Publishing to npm
 
-Releases are cut by creating a GitHub Release. Publishing to npm is handled automatically by [`.github/workflows/release.yml`](.github/workflows/release.yml), which is triggered by the `release: published` event.
+Releases are cut with [release-it](https://github.com/release-it/release-it) locally; publishing to npm is handled automatically by [`.github/workflows/release.yml`](.github/workflows/release.yml).
 
 End-to-end flow:
 
-1. **Bump the version** on `master`. Edit `package.json` `version` to the new `X.Y.Z`, commit as `chore: release X.Y.Z`, and push.
-2. **Create the GitHub Release** against the bump commit:
+1. **Cut the release locally:**
    ```sh
-   gh release create vX.Y.Z --title "Release X.Y.Z" --generate-notes --target master
+   yarn release
    ```
-   `--generate-notes` builds the release body from merged PRs using the categories and exclusions in [`.github/release.yml`](.github/release.yml). Review the generated draft (add `--draft` above if you want to edit before publishing) and publish when it looks right.
-3. **CI publishes to npm.** The `release: published` event triggers the release workflow, which runs `yarn install` (which builds `lib/` via the `prepare` script), then `npm publish --access public --provenance`. The `--provenance` flag signs the publish with a GitHub OIDC attestation; this is why the workflow needs `permissions: id-token: write`.
+   release-it (configured in `package.json` under `"release-it"`) interactively prompts for the next version (major/minor/patch), then in one pass:
+   - bumps `package.json`, commits as `chore: release X.Y.Z`, tags `vX.Y.Z`, and pushes,
+   - creates the GitHub Release via the GitHub API with `autoGenerate: true`, which asks GitHub to build the release body from merged PRs using the categories and exclusions in [`.github/release.yml`](.github/release.yml).
+
+   `npm.publish` is set to `false` in the release-it config — release-it itself does **not** publish to npm. The next step does.
+
+2. **CI publishes to npm.** When release-it creates the GitHub Release, GitHub fires a `release: published` event that triggers the release workflow. The job runs `yarn install` (which builds `lib/` via the `prepare` script), then `npm publish --access public --provenance`. The `--provenance` flag signs the publish with a GitHub OIDC attestation; that is why the workflow declares `permissions: id-token: write`.
 
 Only maintainers with permission to create releases can publish. The repository must have an `NPM_TOKEN` secret configured (Settings → Secrets and variables → Actions) for CI to publish to npm.
 
-> **Pre-releases:** Tag pre-releases as `vX.Y.Z-beta.N` (or similar) and check the "Set as a pre-release" box (or pass `--prerelease` to `gh release create`). The publish workflow has `if: ${{ !github.event.release.prerelease }}` so it skips pre-releases — the CI job will show as "Skipped", which is expected. To publish a pre-release manually, build locally and run `npm publish --tag beta --access public`.
+> **Pre-releases:** Pass a pre-release identifier to release-it, e.g. `yarn release --preRelease=beta` to produce `vX.Y.Z-beta.N`. The publish workflow gates on `if: ${{ !github.event.release.prerelease }}`, so the npm publish step is skipped for pre-releases — the CI job will show as "Skipped", which is expected. To publish a pre-release manually, build locally and run `npm publish --tag beta --access public`.
 
 ### Changelog and Release Notes
 
-Release notes are auto-generated from merged pull requests by GitHub's release notes feature, driven by [`.github/release.yml`](.github/release.yml). PR labels control which category a PR appears under — they do **not** affect version numbering. The version is chosen by the maintainer at bump time (step 1 above).
+Release notes are auto-generated from merged pull requests by GitHub's release notes feature, driven by [`.github/release.yml`](.github/release.yml) — release-it sets `github.autoGenerate: true` so GitHub itself builds the body when the release is created. PR labels control which category a PR appears under in the notes; they do **not** affect version numbering. The version is chosen interactively by the maintainer when running `yarn release`.
 
 Please label your PRs with one of:
 
