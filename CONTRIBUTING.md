@@ -100,7 +100,7 @@ That's it. release-it bumps `package.json`, tags, pushes, and creates a GitHub R
 
 Pre-releases: `yarn release --preRelease=beta`. The publish workflow skips them — to ship a beta, run `npm publish --tag beta --access public` manually.
 
-Needs `NPM_TOKEN` configured in repo secrets.
+Only maintainers with permission to create releases can publish. Requires `NPM_TOKEN` configured in repo secrets (Settings → Secrets and variables → Actions).
 
 ### Changelog and Release Notes
 
