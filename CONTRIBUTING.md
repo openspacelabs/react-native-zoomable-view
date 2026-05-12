@@ -94,17 +94,35 @@ Releases are cut with [release-it](https://github.com/release-it/release-it) loc
 
 End-to-end flow:
 
-1. **Cut the release locally:**
+1. **Decide the bump type** based on what merged since the previous release. We follow [semver](https://semver.org/) and the decision tracks the PR labels we already use for changelog categorization:
+
+   | Bump | When to pick it | Trigger |
+   |---|---|---|
+   | **major** (`X+1.0.0`) | Any backwards-incompatible change to the public API of `ReactNativeZoomableView` / `StaticPin` — removed/renamed props, removed methods, changed callback signatures, raised peer-dep floors. | At least one PR labeled `breaking`. |
+   | **minor** (`X.Y+1.0`) | New backwards-compatible feature — new prop, new method, new optional callback, new export. | No `breaking` PRs, but at least one labeled `enhancement`. |
+   | **patch** (`X.Y.Z+1`) | Bug fixes, internal refactors, docs, dependency bumps, build/CI changes — anything that doesn't change observable consumer behavior outside fixing a bug. | Only `bug`, `documentation`, `dependencies`, or `ignore-for-release` PRs in the range. |
+
+   Quick way to see what's in the range:
    ```sh
-   yarn release
+   gh pr list --repo openspacelabs/react-native-zoomable-view \
+     --state merged --search "merged:>$(gh release view --json publishedAt --jq .publishedAt)" \
+     --json number,title,labels
    ```
-   release-it (configured in `package.json` under `"release-it"`) interactively prompts for the next version (major/minor/patch), then in one pass:
+
+2. **Cut the release locally:**
+   ```sh
+   yarn release            # prompts for the bump; pick per the table above
+   yarn release patch      # or pass it non-interactively
+   yarn release minor
+   yarn release major
+   ```
+   release-it (configured in `package.json` under `"release-it"`) then does the rest in one pass:
    - bumps `package.json`, commits as `chore: release X.Y.Z`, tags `vX.Y.Z`, and pushes,
    - creates the GitHub Release via the GitHub API with `autoGenerate: true`, which asks GitHub to build the release body from merged PRs using the categories and exclusions in [`.github/release.yml`](.github/release.yml).
 
    `npm.publish` is set to `false` in the release-it config — release-it itself does **not** publish to npm. The next step does.
 
-2. **CI publishes to npm.** When release-it creates the GitHub Release, GitHub fires a `release: published` event that triggers the release workflow. The job runs `yarn install` (which builds `lib/` via the `prepare` script), then `npm publish --access public --provenance`. The `--provenance` flag signs the publish with a GitHub OIDC attestation; that is why the workflow declares `permissions: id-token: write`.
+3. **CI publishes to npm.** When release-it creates the GitHub Release, GitHub fires a `release: published` event that triggers the release workflow. The job runs `yarn install` (which builds `lib/` via the `prepare` script), then `npm publish --access public --provenance`. The `--provenance` flag signs the publish with a GitHub OIDC attestation; that is why the workflow declares `permissions: id-token: write`.
 
 Only maintainers with permission to create releases can publish. The repository must have an `NPM_TOKEN` secret configured (Settings → Secrets and variables → Actions) for CI to publish to npm.
 
