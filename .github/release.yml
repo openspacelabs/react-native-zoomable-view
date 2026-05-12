@@ -4,7 +4,7 @@ changelog:
       - ignore-for-release
       - dependencies
     authors:
-      - dependabot
+      - dependabot[bot]
   categories:
     - title: Breaking Changes 🛠
       labels:
