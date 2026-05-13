@@ -443,7 +443,7 @@ const ReactNativeZoomableView: ForwardRefRenderFunction<
   });
 
   /**
-   * Calculates pinch distance
+   * Handles the pan responder grant event
    *
    * @param e
    * @param gestureState
