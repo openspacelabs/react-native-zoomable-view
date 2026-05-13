@@ -1343,6 +1343,9 @@ const ReactNativeZoomableViewInner: ForwardRefRenderFunction<
         longPressFired.value = false;
         multiFingerTouchOccurred.value = false;
         externallyHandled.value = false;
+        // runOnJS-FIFO can re-set these after onTouchesDown cleared them.
+        doubleTapFirstTapReleaseTimestamp.value = undefined;
+        doubleTapFirstTap.value = undefined;
       } else {
         runOnJS(_resolveAndHandleTap)(e);
       }
@@ -1369,6 +1372,9 @@ const ReactNativeZoomableViewInner: ForwardRefRenderFunction<
     // observes `true`, matching SPECS L157 for the other end-callbacks.
     if (isCancellation) {
       runOnJS(_safeOnPanResponderTerminate)(e, _getZoomableViewEventObject());
+      // wasReleased=false skips the suppression branch above; clear here.
+      doubleTapFirstTapReleaseTimestamp.value = undefined;
+      doubleTapFirstTap.value = undefined;
     }
 
     // `onStaticPinPositionChange` fires from the unified settle reaction
