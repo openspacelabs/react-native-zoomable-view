@@ -13,17 +13,18 @@ import { Size2D } from 'src/typings';
 
 export const StaticPin = ({
   staticPinPosition,
-  pinAnim,
   staticPinIcon,
   pinSize,
   onParentMove,
+  onParentRelease,
+  onParentTerminate,
+  longPressDuration,
   onPress,
   onLongPress,
   setPinSize,
   pinProps = {},
 }: {
   staticPinPosition: { x: number; y: number };
-  pinAnim: Animated.ValueXY;
   staticPinIcon: React.ReactNode;
   pinSize: Size2D;
   /** Internal handler for passing move event to parent */
@@ -31,16 +32,30 @@ export const StaticPin = ({
     evt: GestureResponderEvent,
     gestureState: PanResponderGestureState
   ) => boolean | undefined;
+  onParentRelease: (
+    evt: GestureResponderEvent,
+    gestureState: PanResponderGestureState
+  ) => void;
+  onParentTerminate: (
+    evt: GestureResponderEvent,
+    gestureState: PanResponderGestureState
+  ) => void;
+  longPressDuration?: number;
   onPress?: (evt: GestureResponderEvent) => void;
   onLongPress?: (evt: GestureResponderEvent) => void;
   setPinSize: (size: Size2D) => void;
   pinProps?: ViewProps;
 }) => {
   const tapTime = React.useRef(0);
+  const hasDragged = React.useRef(false);
+  const parentNotified = React.useRef(false);
+  const { style: pinStyle, ...restPinProps } = pinProps;
+  const pressDuration = longPressDuration ?? 500;
+  const pressDurationRef = React.useRef(pressDuration);
+  pressDurationRef.current = pressDuration;
   const transform = [
     { translateY: -pinSize.height },
     { translateX: -pinSize.width / 2 },
-    ...pinAnim.getTranslateTransform(),
   ];
 
   const opacity = pinSize.width && pinSize.height ? 1 : 0;
@@ -49,6 +64,8 @@ export const StaticPin = ({
     PanResponder.create({
       onStartShouldSetPanResponder: () => {
         tapTime.current = Date.now();
+        hasDragged.current = false;
+        parentNotified.current = false;
 
         // We want to handle tap on this so set true
         return true;
@@ -56,19 +73,43 @@ export const StaticPin = ({
       onPanResponderMove: (evt, gestureState) => {
         // However if the user moves finger we want to pass this evt to parent
         // to handle panning (tap not recognized)
-        if (Math.abs(gestureState.dx) > 5 && Math.abs(gestureState.dy) > 5)
-          onParentMove(evt, gestureState);
+        if (Math.abs(gestureState.dx) > 5 || Math.abs(gestureState.dy) > 5) {
+          hasDragged.current = true;
+          const accepted = onParentMove(evt, gestureState);
+          if (accepted === undefined) {
+            parentNotified.current = true;
+          } else if (accepted) {
+            // Parent handled it internally (e.g. 3-touch branch) —
+            // clear parentNotified so release doesn't fire a spurious
+            // onParentRelease → _resolveAndHandleTap.
+            parentNotified.current = false;
+          }
+        }
       },
       onPanResponderRelease: (evt, gestureState) => {
-        if (Math.abs(gestureState.dx) > 5 || Math.abs(gestureState.dy) > 5)
+        if (parentNotified.current) {
+          hasDragged.current = false;
+          parentNotified.current = false;
+          onParentRelease(evt, gestureState);
           return;
+        }
+        if (hasDragged.current) {
+          hasDragged.current = false;
+          return;
+        }
         const dt = Date.now() - tapTime.current;
-        if (onPress && dt < 500) {
+        if (onPress && dt < pressDurationRef.current) {
           onPress(evt);
         }
-        if (onLongPress && dt > 500) {
-          // RN long press is 500ms
+        if (onLongPress && dt >= pressDurationRef.current) {
           onLongPress(evt);
+        }
+      },
+      onPanResponderTerminate: (evt, gestureState) => {
+        if (parentNotified.current) {
+          hasDragged.current = false;
+          parentNotified.current = false;
+          onParentTerminate(evt, gestureState);
         }
       },
     })
@@ -83,8 +124,9 @@ export const StaticPin = ({
         },
         styles.pinWrapper,
         { opacity, transform },
+        pinStyle,
       ]}
-      {...pinProps}
+      {...restPinProps}
     >
       <View
         onLayout={({ nativeEvent: { layout } }) => {
