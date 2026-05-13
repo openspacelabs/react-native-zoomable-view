@@ -88,6 +88,7 @@
     "typescript": "^4.9.5"
   },
   "peerDependencies": {
+    "lodash": "^4.17.21",
     "react": ">=16.8.0",
     "react-native": ">=0.79.0"
   },
@@ -155,6 +156,7 @@
         }
       ],
       "react-native/no-color-literals": "off",
+      "react-native/no-inline-styles": "off",
       "simple-import-sort/imports": "error",
       "simple-import-sort/exports": "error"
     },
@@ -181,6 +183,16 @@
             "error",
             {
               "allowNumber": true
+            }
+          ],
+          "@typescript-eslint/no-use-before-define": [
+            "error",
+            {
+              "functions": true,
+              "variables": true,
+              "enums": false,
+              "classes": false,
+              "typedefs": false
             }
           ]
         }

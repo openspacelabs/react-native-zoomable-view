@@ -43,6 +43,7 @@ export const AnimatedTouchFeedback = ({
     <Animated.View
       pointerEvents="none"
       style={[
+        // eslint-disable-next-line @typescript-eslint/no-use-before-define
         styles.animatedTouchFeedback,
         {
           opacity: appearDisappearAnimRef.current.interpolate({
