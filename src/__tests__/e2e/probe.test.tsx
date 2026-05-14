@@ -13,16 +13,12 @@
  *     side effect via attachHandlers, Manual gesture class).
  *   - react-native (REAL via the `react-native` jest preset).
  *
- * What IS mocked (minimum needed to clear unrelated Jest plumbing crashes):
- *   - react-native-reanimated (official `react-native-reanimated/mock`,
- *     already in global jest.setup.ts).
- *   - RNGH's native module bridge (via `react-native-gesture-handler/jestSetup`,
- *     already in global jest.setup.ts).
- *   - react-native/Libraries/Renderer/shims/ReactNative — stubbed because
- *     loading `ReactNativeRenderer-dev` crashes under the jest jsdom-ish
- *     env with `Cannot read properties of undefined (reading 'S')`. This
- *     is the documented Phase A §7a crash, used here only as a load-time
- *     workaround. The renderer is not under test.
+ * What IS mocked (inherited from `jest.setup.ts`):
+ *   - react-native-reanimated (official `react-native-reanimated/mock`).
+ *   - RNGH's native module bridge (`react-native-gesture-handler/jestSetup`).
+ *   - `react-native/Libraries/Renderer/shims/ReactNative` — minimum stub
+ *     to bypass the `ReactNativeRenderer-dev` load crash (Phase A §7a).
+ *     Hoisted to global setup per Phase E probe §6.1.
  */
 import { jest } from '@jest/globals';
 import { render } from '@testing-library/react-native';
@@ -34,34 +30,6 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { getByGestureTestId } from 'react-native-gesture-handler/jest-utils';
 
 import { ReactNativeZoomableView } from '../../ReactNativeZoomableView';
-
-// Stub RN's renderer shim so importing RNGH's utils.js doesn't crash on
-// `ReactNativeRenderer-dev` evaluation. We don't call findHostInstance
-// in this test (no DEV-validation path with Platform.OS !== 'web' kicks
-// in under jest, but utils.js's TOP-LEVEL require still pulls the file).
-jest.mock(
-  'react-native/Libraries/Renderer/shims/ReactNative',
-  () => ({
-    __esModule: true,
-    default: {
-      findHostInstance_DEPRECATED: (ref: unknown) => ref,
-      // findNodeHandle is what RNGH's useViewRefHandler reaches for to
-      // resolve the view tag. We hand back a stable fake tag — the
-      // gesture won't actually be attached to a real native view, but
-      // attachHandlers still completes and registers the testID.
-      findNodeHandle: () => 42,
-      render: () => null,
-      unmountComponentAtNodeAndRemoveContainer: () => null,
-      unstable_batchedUpdates: (fn: () => void) => {
-        fn();
-      },
-      dispatchCommand: () => null,
-      sendAccessibilityEvent: () => null,
-      isChildPublicInstance: () => false,
-    },
-  }),
-  { virtual: false }
-);
 
 const TAP_X = 50;
 const TAP_Y = 50;
