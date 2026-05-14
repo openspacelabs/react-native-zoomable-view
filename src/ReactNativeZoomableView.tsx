@@ -1632,7 +1632,8 @@ const ReactNativeZoomableViewInner: ForwardRefRenderFunction<
     })
     .onFinalize(() => {
       firstTouch.value = undefined;
-    });
+    })
+    .withTestId('canvas-gesture');
 
   const transformStyle = useAnimatedStyle(() => {
     return {
@@ -1653,6 +1654,7 @@ const ReactNativeZoomableViewInner: ForwardRefRenderFunction<
         // eslint-disable-next-line @typescript-eslint/no-use-before-define
         style={styles.container}
         ref={zoomSubjectWrapperRef}
+        testID="zoom-subject-wrapper"
         onLayout={(e) => {
           // Preserve the original measurement path (writes SharedValues
           // consumed by the gesture math). The setState below is purely
