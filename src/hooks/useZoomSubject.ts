@@ -21,26 +21,22 @@ export const useZoomSubject = () => {
    * downstream consumer of `originalWidth/Height` (`_invokeOnTransform`,
    * `onTransformWorklet`, `onStaticPinPositionMoveWorklet`, pinch zoom math).
    *
-   * `onLayout` is the structural fix: it fires natively on every layout pass
-   * (mount + future resize) without relying on a JS-side ref measurement chain.
-   * It also delivers the layout rect synchronously in the event payload, so
-   * we don't need the rAF + setTimeout(0) deferral the old `measure()` chain
-   * required to dodge the iOS post-keyboard-close measurement-zeroing bug.
+   * `onLayout` fires natively on every layout pass (mount + future resize)
+   * and delivers the layout rect synchronously in the event payload, so we
+   * stay clear of iOS's post-keyboard-close measurement-zeroing bug that
+   * affects deferred `measure()` reads.
    *
-   * `event.nativeEvent.layout` provides PARENT-RELATIVE x/y/width/height. The
-   * old imperative chain wrote `pageX/pageY` to `originalX/Y`; consumers
-   * (`onLayoutWorklet`) only treat width/height as load-bearing, so the
-   * coordinate-space shift is a no-op for the gating reactions. The
-   * `_invokeOnTransform` guard, the static-pin guard, and the pinch handler
-   * all key off `originalWidth/Height` exclusively.
+   * `event.nativeEvent.layout` provides PARENT-RELATIVE x/y/width/height.
+   * Consumers (`onLayoutWorklet`, `_invokeOnTransform` guard, static-pin
+   * guard, pinch handler) only treat `originalWidth/Height` as load-bearing,
+   * so the coordinate-space distinction does not affect any gating reaction.
    */
   const measureZoomSubject = useLatestCallback((event: LayoutChangeEvent) => {
     if (!isMounted.current) return;
     const { x, y, width, height } = event.nativeEvent.layout;
     // When the component is off-screen, these become all 0s, so we don't set
     // them to avoid messing up calculations, especially ones that are done
-    // right after the component transitions from hidden to visible. Mirrors
-    // the guard in the previous imperative-measure path.
+    // right after the component transitions from hidden to visible.
     if (!x && !y && !width && !height) return;
     if (
       originalX.value === x &&

@@ -535,10 +535,10 @@ const ReactNativeZoomableViewInner: ForwardRefRenderFunction<
       // Reanimated's internal `useEffect`, which React runs strictly AFTER
       // `useLayoutEffect` in the same commit. A consumer flipping both
       // `zoomEnabled` (true→false) and `initialZoom` in the same render
-      // would otherwise snap to the OLD `initialZoom` here, then never
+      // would otherwise snap to the stale `initialZoom` here, then never
       // correct (the unified transform reaction's selector doesn't watch
-      // `initialZoom`). Same fix shape as the `staticPinPosition`
-      // migration above.
+      // `initialZoom`). Same rationale as the `staticPinPosition`
+      // SharedValue declaration above.
       //
       // Mirror the cancellation contract documented on publicZoomTo's
       // withTiming completion ("Each cancellation path is responsible for
@@ -609,9 +609,10 @@ const ReactNativeZoomableViewInner: ForwardRefRenderFunction<
   //      `_invokeOnTransform` reflects the post-recompute offsets — otherwise
   //      consumers see a chimera state where zoom advanced but offsets haven't.
   //   2. Fire `_invokeOnTransform` (consumer onTransformWorklet etc.).
-  // Splitting into two reactions previously caused the chimera state because
-  // registration order determined which reaction observed the half-applied
-  // tick first.
+  // Splitting these into two reactions would surface the chimera state:
+  // registration order determines which reaction observes the half-applied
+  // tick first, so step 2 could fire on a tick where step 1 had not yet
+  // recomputed.
   useAnimatedReaction(
     _getZoomableViewEventObject,
     (curr, prev) => {
@@ -1524,8 +1525,8 @@ const ReactNativeZoomableViewInner: ForwardRefRenderFunction<
 
       // Use the same 2px threshold as `isShiftGesture` below so we never
       // enter a state where shift-pan is running (view is moving) while
-      // the long-press timer is still armed. The previous 5px threshold
-      // created a 2-5px dead zone in which a finger drifting just past
+      // the long-press timer is still armed. A looser threshold here would
+      // open a dead zone where a finger drifting past `isShiftGesture`'s
       // 2px would pan but still fire `onLongPress` after 500ms — a
       // phantom long-press while the user clearly intended to pan.
       if (longPressTimeout.value && (Math.abs(dx) > 2 || Math.abs(dy) > 2)) {
@@ -1571,11 +1572,10 @@ const ReactNativeZoomableViewInner: ForwardRefRenderFunction<
       // event reports 2+ fingers — covering both the simultaneous case (touch
       // begins with 2 fingers in a single batched UIEvent, `!firstTouch.value`
       // branch above ran) AND the sequential case (2nd finger arrives in a
-      // later event, `firstTouch.value` already set). Centralising here
-      // eliminates the prior mutually-exclusive-branches structure where each
-      // new single-finger invariant (long-press timer, double-tap state,
-      // future additions) had to be re-mirrored into both branches and
-      // reviewers kept finding gaps.
+      // later event, `firstTouch.value` already set). Keep every
+      // single-finger invariant clear (long-press timer, double-tap state,
+      // future additions) in this one block — splitting per-case sites tends
+      // to drop one or more invariants from one branch.
       if (e.numberOfTouches >= 2) {
         // Long-press is a single-finger gesture — disarm any armed timer.
         // Safe no-op if the simultaneous-case long-press gate in

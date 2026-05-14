@@ -15,44 +15,28 @@ export const getNextZoomStep = ({
   initialZoom: number | undefined;
   zoomLevel: number;
 }) => {
-  // `Infinity` is the documented opt-in for unbounded zoom-in (SPECS L58,
-  // L196-200) and is the only TS-clean migration target now that the
-  // `maxZoom?: number | null` typing was narrowed to `maxZoom?: number`.
-  // Treat `Infinity` the same way the legacy code treated `null`: route
-  // through the derived three-step ceiling below, not the finite-clamp path.
-  // (`Infinity != null` is true, so a bare `maxZoom != null` gate would set
-  // `effectiveMax = Infinity` and never engage the cycle.)
-  const isFiniteMax = maxZoom != null && Number.isFinite(maxZoom);
+  const finiteMaxZoom = Number.isFinite(maxZoom) ? maxZoom : undefined;
 
-  // Cycle-back when at a configured maxZoom must be checked BEFORE
-  // the zoomStep guard — otherwise users with zoomStep={null} and
-  // a configured maxZoom lose the reset-to-initialZoom behavior on
-  // double-tap at max zoom.
-  if (isFiniteMax && zoomLevel.toFixed(2) === maxZoom.toFixed(2)) {
+  // Cycle-back at a configured maxZoom must run BEFORE the zoomStep guard —
+  // zoomStep={undefined} + configured maxZoom must still reset on double-tap.
+  if (
+    finiteMaxZoom != null &&
+    zoomLevel.toFixed(2) === finiteMaxZoom.toFixed(2)
+  ) {
     return initialZoom;
   }
 
-  // If no zoomStep is configured, there is no increment to compute.
   if (zoomStep == null) return;
 
-  // Determine the effective ceiling for double-tap cycling.
-  // When maxZoom is non-finite (Infinity / unset), use a default of 3 zoom
-  // steps from initialZoom so double-tap still cycles back — otherwise
-  // every tap would grow zoom indefinitely with no reset path.
-  const effectiveMax = isFiniteMax
-    ? maxZoom
-    : (initialZoom ?? 1) * Math.pow(1 + zoomStep, 3);
+  // No finite ceiling configured → cycle at 3 zoomSteps from initialZoom so
+  // double-tap still resets instead of growing forever.
+  const effectiveMax =
+    finiteMaxZoom ?? (initialZoom ?? 1) * Math.pow(1 + zoomStep, 3);
 
-  // This cycle-back is only reachable when maxZoom is non-finite; when
-  // finite the equivalent check above already returned.
   if (zoomLevel.toFixed(2) === effectiveMax.toFixed(2)) {
     return initialZoom;
   }
 
   const nextZoomStep = zoomLevel * (1 + zoomStep);
-  if (nextZoomStep > effectiveMax) {
-    return effectiveMax;
-  }
-
-  return nextZoomStep;
+  return nextZoomStep > effectiveMax ? effectiveMax : nextZoomStep;
 };

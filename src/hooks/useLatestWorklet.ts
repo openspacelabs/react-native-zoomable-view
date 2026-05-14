@@ -12,7 +12,7 @@ const noopWorklet = () => {
  * Mirrors a UI-thread worklet prop into a SharedValue so worklet call sites
  * always invoke the latest consumer callback (not the first-render closure
  * snapshot). When the consumer hasn't provided a worklet, the SharedValue
- * holds a no-op so call sites can drop the optional chain.
+ * holds a no-op so call sites can invoke without an optional chain.
  *
  * The function is wrapped in `{ fn }` rather than stored bare because
  * Reanimated's SharedValue setter treats raw function values as animation
