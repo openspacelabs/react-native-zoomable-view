@@ -15,8 +15,7 @@ Behavior contract for `ReactNativeZoomableView` and `StaticPin`. This document d
 9. [Static pin](#static-pin)
 10. [Tap handling](#tap-handling)
 11. [Coordinate system](#coordinate-system)
-12. [NonScalingOverlay contract](#nonscalingoverlay-contract)
-13. [Migration from PanResponder/Animated](#migration-from-panresponderanimated)
+12. [Migration from PanResponder/Animated](#migration-from-panresponderanimated)
 
 ---
 
@@ -282,71 +281,6 @@ On release, the gesture-end handler checks the sentinel; if set, it skips tap cl
 ### Zoom centre coordinates
 
 In `zoomTo()` and double-tap, the zoom centre is in subject-relative pixels with the top-left at `(0, 0)`. The visual centre is `{ x: originalWidth/2, y: originalHeight/2 }`. `doubleTapZoomToCenter` substitutes the visual centre for the tap point automatically.
-
----
-
-## NonScalingOverlay contract
-
-`NonScalingOverlay` is a translate-only overlay that tracks the zoomable view's pan/zoom (and optional rotation) but does **not** scale its children. Use it via the `renderOverlay` prop on `ReactNativeZoomableView` (preferred); it can also be mounted directly with explicit numeric `contentWidth`/`contentHeight`/`wrapperWidth`/`wrapperHeight` plus SharedValue `zoom`/`offsetX`/`offsetY` (and optional `rotation`).
-
-### Props
-
-| Prop | Type | Notes |
-|------|------|-------|
-| `contentWidth` | `number` | Intrinsic content width in pt. |
-| `contentHeight` | `number` | Intrinsic content height in pt. |
-| `wrapperWidth` | `number` | Wrapper width from the outer container's `onLayout`. |
-| `wrapperHeight` | `number` | Wrapper height from the outer container's `onLayout`. |
-| `zoom` | `SharedValue<number>` | Current zoom level. |
-| `offsetX` | `SharedValue<number>` | Current pan X. |
-| `offsetY` | `SharedValue<number>` | Current pan Y. |
-| `rotation` | `SharedValue<number>` (optional) | Rotation in radians. Defaults to 0. |
-| `children` | `ReactNode` | Markers to render at 1:1 screen size. |
-
-### Transform formula
-
-The overlay's `Animated.View` applies this 5-element transform, computed on the UI thread per zoom/pan/rotation tick:
-
-```
-width  = contentWidth  * z
-height = contentHeight * z
-transform = [
-  { translateX: wrapperWidth  / 2 - (z * contentWidth ) / 2 },
-  { translateY: wrapperHeight / 2 - (z * contentHeight) / 2 },
-  { rotate: `${rotation}rad` },
-  { translateX: z * offsetX },
-  { translateY: z * offsetY },
-]
-```
-
-The same 5-element list is used with and without rotation (rotation defaults to 0; `rotate(0) = I`). Pan offsets occupy `transform[3..4]` and are applied **in the rotated frame** — they must not be folded into `transform[0..1]`, or pan desyncs from the inner zoom layer when rotation is non-zero.
-
-### Static style and prop rules
-
-- `position: 'absolute'`, `top: 0`, `left: 0` — required to defeat the wrapper's `alignItems: 'center', justifyContent: 'center'`. Without these, Yoga centres the absolutely-positioned child before the transform applies, producing a doubled offset.
-- `overflow: 'visible'` — child markers self-centre with negative margins; iOS clips subviews to parent bounds by default.
-- `pointerEvents="none"` (prop, not style) — markers must not intercept canvas pan/pinch.
-
-### Children pattern
-
-- Position with `left: 'X%' / top: 'Y%'` in content-percentage space.
-- Use fixed pt dimensions (e.g. `width: 16, height: 16`).
-- Self-centre on anchor via `marginLeft: -size/2, marginTop: -size/2`.
-- If rotation may be active, attach per-child counter-rotation via `useAnimatedStyle({ transform: [{ rotate: \`${-rotation.value}rad\` }] })`.
-
-### Mounting rules (in `ReactNativeZoomableView`)
-
-- The overlay is mounted as a **sibling** of `GestureDetector`'s zoom-transformed layer, not under it — both share the wrapper's coordinate frame.
-- The overlay appears **before** `StaticPin` in source order, so RN paints the overlay underneath the pin (last sibling renders on top).
-- When `contentWidth` or `contentHeight` is missing or zero, the overlay returns `null` — no markers render.
-- `renderOverlay` is wired through automatically; the consumer never instantiates `NonScalingOverlay` directly when going through the prop.
-
-### `wrapperSize` state mirror
-
-`ReactNativeZoomableView` exposes the wrapper's measured dimensions to the overlay via a React state mirror updated in `onLayout`. Two rules:
-
-1. **Reject 0×0 measurements** — never overwrite a real measurement with `{0,0}` (off-screen / unmounted measurement).
-2. **Dedup identical sizes** — `setWrapperSize((prev) => prev.w === w && prev.h === h ? prev : {...})` to avoid spurious re-renders of the overlay's marker tree.
 
 ---
 
