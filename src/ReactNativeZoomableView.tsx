@@ -34,6 +34,7 @@ import {
   calcGestureTouchDistance,
   calcNewScaledOffsetForZoomCentering,
 } from './helper';
+import { applyPinchSensitivity } from './helper/applyPinchSensitivity';
 import { calcShiftDelta } from './helper/calcShiftDelta';
 import { viewportPositionToImagePosition } from './helper/coordinateConversion';
 import { getNextZoomStep } from './helper/getNextZoomStep';
@@ -911,8 +912,10 @@ const ReactNativeZoomableViewInner: ForwardRefRenderFunction<
     const deltaGrowth = zoomGrowthFromLastGestureState - 1;
     // 0 - no resistance
     // 10 - 90% resistance
-    const deltaGrowthAdjustedBySensitivity =
-      deltaGrowth * (1 - (pinchToZoomSensitivity * 9) / 100);
+    const deltaGrowthAdjustedBySensitivity = applyPinchSensitivity(
+      deltaGrowth,
+      pinchToZoomSensitivity
+    );
 
     let newZoomLevel = zoom.value * (1 + deltaGrowthAdjustedBySensitivity);
 
