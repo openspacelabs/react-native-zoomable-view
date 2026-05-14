@@ -4,6 +4,8 @@
 
 This repository maintains [`SPECS.md`](./SPECS.md) as the authoritative behavior contract for `ReactNativeZoomableView` and `StaticPin`. SPECS.md is a **consumer contract**, not a source-code transcription. The rule of thumb: "would a consumer writing to the spec get surprised by the new behavior?" If yes → flag. If no → don't.
 
+When writing or expanding SPECS.md, keep entries at the consumer-observable level — what each prop/method/callback does, when it fires, on which thread, and which inputs it requires. Do **not** transcribe internal mechanism (private SharedValue names, `useEffect`/`useAnimatedReaction` structure, internal reset orderings, "why the code is shaped this way"). Internal mechanism belongs in source comments, not in the spec. If a finding asks for more implementation detail in SPECS.md, it is out of scope by the same rule that completeness expansion is out of scope.
+
 ---
 
 ## Reviewing PRs that change code in `src/`

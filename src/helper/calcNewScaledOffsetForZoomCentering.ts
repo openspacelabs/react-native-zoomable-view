@@ -55,6 +55,8 @@ export function calcNewScaledOffsetForZoomCentering(
   newScale: number,
   zoomCenterXOrY: number
 ) {
+  'worklet';
+
   const oldOffSetUnscaled = oldOffsetXOrYScaled * oldScale;
   const growthRate = newScale / oldScale;
 

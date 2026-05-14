@@ -1,9 +1,6 @@
-import { Animated, Easing } from 'react-native';
+import { Easing, WithTimingConfig } from 'react-native-reanimated';
 
-export function getZoomToAnimation(animValue: Animated.Value, toValue: number) {
-  return Animated.timing(animValue, {
-    easing: Easing.out(Easing.ease),
-    toValue,
-    useNativeDriver: true,
-  });
-}
+export const zoomToAnimation: WithTimingConfig = {
+  easing: Easing.out(Easing.ease),
+  duration: 250,
+};
