@@ -34,12 +34,8 @@ import {
   calcGestureTouchDistance,
   calcNewScaledOffsetForZoomCentering,
 } from './helper';
-import { applyPinchSensitivity } from './helper/applyPinchSensitivity';
-import { calcShiftDelta } from './helper/calcShiftDelta';
-import { clampZoom } from './helper/clampZoom';
 import { viewportPositionToImagePosition } from './helper/coordinateConversion';
 import { getNextZoomStep } from './helper/getNextZoomStep';
-import { shouldSkipShift } from './helper/shouldSkipShift';
 import { useDebugPoints } from './hooks/useDebugPoints';
 import { useLatestCallback } from './hooks/useLatestCallback';
 import { useLatestWorklet } from './hooks/useLatestWorklet';
@@ -855,16 +851,12 @@ const ReactNativeZoomableViewInner: ForwardRefRenderFunction<
       const dx = gestureCenterPoint.x - lastGestureCenterPosition.value.x;
       const dy = gestureCenterPoint.y - lastGestureCenterPosition.value.y;
 
-      const { dxShift, dyShift } = calcShiftDelta({
-        dx,
-        dy,
-        zoom: zoom.value,
-        movementSensitivity: movementSensitivity.value,
-      });
+      const shiftX = dx / zoom.value / movementSensitivity.value;
+      const shiftY = dy / zoom.value / movementSensitivity.value;
 
       shift = {
-        x: dxShift,
-        y: dyShift,
+        x: shiftX,
+        y: shiftY,
       };
     }
 
@@ -914,17 +906,19 @@ const ReactNativeZoomableViewInner: ForwardRefRenderFunction<
     const deltaGrowth = zoomGrowthFromLastGestureState - 1;
     // 0 - no resistance
     // 10 - 90% resistance
-    const deltaGrowthAdjustedBySensitivity = applyPinchSensitivity(
-      deltaGrowth,
-      pinchToZoomSensitivity
-    );
+    const deltaGrowthAdjustedBySensitivity =
+      deltaGrowth * (1 - (pinchToZoomSensitivity * 9) / 100);
+
+    let newZoomLevel = zoom.value * (1 + deltaGrowthAdjustedBySensitivity);
 
     // make sure max and min zoom levels are respected
-    const newZoomLevel = clampZoom(
-      zoom.value * (1 + deltaGrowthAdjustedBySensitivity),
-      maxZoom.value,
-      minZoom.value
-    );
+    if (maxZoom.value != null && newZoomLevel > maxZoom.value) {
+      newZoomLevel = maxZoom.value;
+    }
+
+    if (minZoom.value != null && newZoomLevel < minZoom.value) {
+      newZoomLevel = minZoom.value;
+    }
 
     const gestureCenterPoint = calcGestureCenterPoint(e);
 
@@ -1006,12 +1000,8 @@ const ReactNativeZoomableViewInner: ForwardRefRenderFunction<
     'worklet';
     // Skips shifting if panEnabled is false or disablePanOnInitialZoom is true and we're on the initial zoom level
     if (
-      shouldSkipShift({
-        panEnabled: !!panEnabled.value,
-        disablePanOnInitialZoom: !!disablePanOnInitialZoom.value,
-        zoom: zoom.value,
-        initialZoom: initialZoom.value ?? 0,
-      })
+      !panEnabled.value ||
+      (disablePanOnInitialZoom.value && zoom.value === initialZoom.value)
     ) {
       return;
     }
