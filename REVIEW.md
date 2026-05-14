@@ -23,3 +23,9 @@ A PR titled "Convert to functional component" should only touch files needed for
 ## 3. SPECS.md consistency
 
 See [`CLAUDE.md`](./CLAUDE.md) for the full contract. Summary: any change to observable behavior in `src/` must either preserve the contract documented in `SPECS.md` or update `SPECS.md` in the same PR.
+
+## 4. Simplify the guard, not the comment
+
+If a conditional has a clause that needs a multi-line comment to justify it, the clause is probably dead — drop it and the comment goes too. Common shape: `x != null && Number.isFinite(x)` (the null check is redundant; `Number.isFinite` already excludes `null`/`undefined`/`Infinity`). Stale narrowing workarounds (`!= null` left over from a `number | null` type that's now `number | undefined`) are the same smell.
+
+**Reviewer action:** comment "simplify the guard (see REVIEW.md §4)".
