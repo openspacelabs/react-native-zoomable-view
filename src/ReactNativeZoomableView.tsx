@@ -26,6 +26,7 @@ import Animated, {
 
 import { zoomToAnimation } from './animations';
 import { AnimatedTouchFeedback } from './components';
+import { NonScalingOverlay } from './components/NonScalingOverlay';
 import { StaticPin } from './components/StaticPin';
 import { DebugTouchPoint } from './debugHelper';
 import {
@@ -75,6 +76,13 @@ const ReactNativeZoomableViewInner: ForwardRefRenderFunction<
 
   const [pinSize, setPinSize] = useState({ width: 0, height: 0 });
   const [stateTouches, setStateTouches] = useState<TouchPoint[]>([]);
+  // `wrapperSize` is the JS mirror of `originalWidth/Height` (which are
+  // SharedValues). `NonScalingOverlay` needs the wrapper dimensions as
+  // plain numbers because they participate in its `useAnimatedStyle` math
+  // alongside SharedValues — capturing them as worklet-closure constants
+  // is cheaper than tracking another SharedValue, and the values only
+  // change on layout (mount + resize), not per gesture frame.
+  const [wrapperSize, setWrapperSize] = useState({ width: 0, height: 0 });
 
   const { debugPoints, setDebugPoints, setPinchDebugPoints } = useDebugPoints();
 
@@ -158,6 +166,7 @@ const ReactNativeZoomableViewInner: ForwardRefRenderFunction<
     initialZoom: propsInitialZoom,
     zoomStep: propZoomStep,
     pinProps,
+    renderOverlay,
   } = props;
 
   const offsetX = useSharedValue(0);
@@ -169,17 +178,6 @@ const ReactNativeZoomableViewInner: ForwardRefRenderFunction<
   // the worklet must see initialised values.
   const prevZoom = useSharedValue<number>(1);
   const zoomToDestination = useSharedValue<Vec2D | undefined>(undefined);
-  const inverseZoom = useDerivedValue(() => 1 / zoom.value);
-  // Inline-shared-value style: Reanimated subscribes to the SharedValue when
-  // applied to `Animated.View` (no `useAnimatedStyle` needed). The
-  // `inverseZoomStyle` shape advertises `SharedValue<number>` so applying it
-  // to a plain RN `<View>` is a TypeScript error rather than a silent
-  // first-render-snapshot no-op. `useRef` keeps the object identity stable
-  // across renders since `inverseZoom` itself is stable.
-  const inverseZoomStyleRef = useRef({
-    transform: [{ scale: inverseZoom }],
-  });
-  const inverseZoomStyle = inverseZoomStyleRef.current;
 
   const lastGestureCenterPosition = useSharedValue<Vec2D | null>(null);
   const lastGestureTouchDistance = useSharedValue<number | null>(150);
@@ -1650,14 +1648,26 @@ const ReactNativeZoomableViewInner: ForwardRefRenderFunction<
   });
 
   return (
-    <ReactNativeZoomableViewProvider
-      value={{ zoom, inverseZoom, inverseZoomStyle, offsetX, offsetY }}
-    >
+    <ReactNativeZoomableViewProvider value={{ zoom, offsetX, offsetY }}>
       <View
         // eslint-disable-next-line @typescript-eslint/no-use-before-define
         style={styles.container}
         ref={zoomSubjectWrapperRef}
-        onLayout={measureZoomSubject}
+        onLayout={(e) => {
+          // Preserve the original measurement path (writes SharedValues
+          // consumed by the gesture math). The setState below is purely
+          // additive — a JS-thread mirror for `NonScalingOverlay`.
+          measureZoomSubject(e);
+          const { width, height } = e.nativeEvent.layout;
+          // Match `measureZoomSubject`'s off-screen guard so we never
+          // overwrite a real measurement with 0s.
+          if (!width || !height) return;
+          setWrapperSize((prev) =>
+            prev.width === width && prev.height === height
+              ? prev
+              : { width, height }
+          );
+        }}
       >
         {/* GestureDetector is placed as a sibling of StaticPin (not an
             ancestor) so RNGH's gesture-recognizer ancestor walk treats
@@ -1712,6 +1722,27 @@ const ReactNativeZoomableViewInner: ForwardRefRenderFunction<
         {debugPoints.map(({ x, y }, index) => {
           return <DebugTouchPoint key={index} x={x} y={y} />;
         })}
+
+        {renderOverlay && (
+          // Mounted as a sibling of `GestureDetector` inside the wrapper
+          // container so the overlay and the zoom-transformed layer share
+          // the same coordinate frame (both children of the View measured
+          // by `originalWidth/Height`). Mounted ABOVE `StaticPin` so the
+          // pin renders on top — and BEFORE `StaticPin` in source order so
+          // RN paints overlay markers underneath the pin (last sibling
+          // renders on top in RN's z-order without explicit zIndex).
+          <NonScalingOverlay
+            contentWidth={propContentWidth ?? 0}
+            contentHeight={propContentHeight ?? 0}
+            wrapperWidth={wrapperSize.width}
+            wrapperHeight={wrapperSize.height}
+            zoom={zoom}
+            offsetX={offsetX}
+            offsetY={offsetY}
+          >
+            {renderOverlay()}
+          </NonScalingOverlay>
+        )}
 
         {propStaticPinPosition && (
           <StaticPin

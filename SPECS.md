@@ -38,8 +38,8 @@ Exported from `src/index.tsx`:
 - `ReactNativeZoomableViewProps` — prop type
 - `ReactNativeZoomableViewRef` — imperative handle
 - `ZoomableViewEvent` — `{ zoomLevel, offsetX, offsetY, originalWidth, originalHeight }`
-- `useZoomableViewContext()` — hook returning `{ zoom, inverseZoom, inverseZoomStyle, offsetX, offsetY }` for descendants
-- `FixedSize` — wrapper that keeps absolutely-positioned children at constant visual size regardless of zoom
+- `useZoomableViewContext()` — hook returning `{ zoom, offsetX, offsetY }` for descendants
+- `NonScalingOverlay` — translate-only overlay component; markers position via `left: 'X%' / top: 'Y%'` and render at 1:1 screen size at every zoom level. Typically used via the `renderOverlay` prop on `ReactNativeZoomableView`; can also be mounted manually with explicit `contentWidth`/`contentHeight`/`wrapperWidth`/`wrapperHeight` numeric props plus SharedValue `zoom`/`offsetX`/`offsetY` (and optional `rotation`).
 - `applyContainResizeMode`, `getImageOriginOnTransformSubject`, `viewportPositionToImagePosition` — coordinate helpers
 
 ---
@@ -317,7 +317,7 @@ This major replaces the class-component PanResponder/Animated implementation wit
 ### New public exports
 
 - `useZoomableViewContext()`
-- `FixedSize`
+- `NonScalingOverlay` (with `renderOverlay` prop on `ReactNativeZoomableView` as the primary entry point)
 - `ReactNativeZoomableViewRef` typed imperative handle
 - `applyContainResizeMode`, `getImageOriginOnTransformSubject`, `viewportPositionToImagePosition`
 

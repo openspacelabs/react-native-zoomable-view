@@ -40,6 +40,9 @@ android.iml
 #
 example/ios/Pods
 
+# Expo Go is the deploy path; example/ios/ is regenerable prebuild output.
+example/ios/
+
 # node.js
 #
 node_modules/

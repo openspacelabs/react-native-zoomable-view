@@ -1,5 +1,4 @@
 import {
-  FixedSize,
   ReactNativeZoomableView,
   ReactNativeZoomableViewRef,
 } from '@openspacelabs/react-native-zoomable-view';
@@ -27,12 +26,16 @@ import Animated, {
 } from 'react-native-reanimated';
 import { ReText } from 'react-native-redash';
 
-import { applyContainResizeMode } from '../src/helper/coordinateConversion';
 import { styles } from './style';
 
 const kittenSize = 800;
-const uri = `https://placekitten.com/${kittenSize}/${kittenSize}`;
-const imageSize = { width: kittenSize, height: kittenSize };
+// `placekitten.com` has been offline for an extended period. Lorem Picsum
+// is the reliable drop-in (CDN-backed via Cloudflare, accepts the same
+// `/<W>/<H>` URL shape). Loses the cat theme — placecats.com is the
+// cat-themed alternative — but Picsum's reliability matters more for an
+// example app that needs to actually render the image on every fresh
+// install.
+const uri = `https://picsum.photos/${kittenSize}/${kittenSize}`;
 
 const stringifyPoint = (point?: { x: number; y: number }) =>
   point ? `${Math.round(point.x)}, ${Math.round(point.y)}` : 'Off map';
@@ -209,7 +212,22 @@ export default function App() {
   });
 
   const staticPinPosition = { x: size.width / 2, y: size.height / 2 };
-  const { size: contentSize } = applyContainResizeMode(imageSize, size);
+
+  // Capture the source dims via `onLoad` so the contents View can be
+  // sized to match the image's aspect ratio. With matching aspect, RN's
+  // resizeMode 'contain' produces zero letterbox — the rendered-pixel
+  // frame equals the element frame — and the contents View's onLayout
+  // gives `NonScalingOverlay` the exact `contentWidth`/`contentHeight`
+  // it needs (no separate `applyContainResizeMode` step).
+  const [imageSourceSize, setImageSourceSize] = useState<{
+    width: number;
+    height: number;
+  }>({ width: kittenSize, height: kittenSize });
+  const sourceAspect = imageSourceSize.width / imageSourceSize.height;
+  const [contentSize, setContentSize] = useState<{
+    width: number;
+    height: number;
+  }>({ width: 0, height: 0 });
 
   const Wrapper = modal ? PageSheetModal : View;
 
@@ -250,23 +268,102 @@ export default function App() {
             // Give these to the zoomable view so it can apply the boundaries around the actual content.
             // Need to make sure the content is actually centered and the width and height are
             // measured when it's rendered naturally. Not the intrinsic sizes.
-            contentWidth={contentSize?.width ?? 0}
-            contentHeight={contentSize?.height ?? 0}
+            contentWidth={contentSize.width}
+            contentHeight={contentSize.height}
+            renderOverlay={
+              showMarkers
+                ? () => {
+                    // Wrapper ≈ box minus its 5pt border each side. The
+                    // lib doesn't expose its `wrapperSize` directly, but
+                    // `box.width/height - 10` reproduces it on this
+                    // example. Used only for the debug HUD.
+                    const wrapperApproxW = Math.max(0, size.width - 10);
+                    const wrapperApproxH = Math.max(0, size.height - 10);
+                    return (
+                      <>
+                        {/* DEBUG: visualize the overlay's bounding box.
+                            Sized 100% × 100% of the overlay so it tracks
+                            contentSize × zoom and reveals where the
+                            translate-only overlay is actually painting on
+                            screen. Example-only — remove for production. */}
+                        <View style={styles.overlayDebugBox} />
+                        {/* DEBUG HUD pinned to overlay's top-left so it
+                            tracks the overlay's transform and provides
+                            the live numbers used by the translate math
+                            (translateX/Y at z=1, ox=oy=0). */}
+                        <Text style={styles.overlayDebugHud}>
+                          NSOL wW≈{Math.round(wrapperApproxW)} wH≈
+                          {Math.round(wrapperApproxH)} cW=
+                          {Math.round(contentSize.width)} cH=
+                          {Math.round(contentSize.height)} tXjs=
+                          {Math.round(
+                            wrapperApproxW / 2 - contentSize.width / 2
+                          )}{' '}
+                          tYjs=
+                          {Math.round(
+                            wrapperApproxH / 2 - contentSize.height / 2
+                          )}
+                        </Text>
+                        {[20, 40, 60, 80].map((left) =>
+                          [20, 40, 60, 80].map((top) => (
+                            <View
+                              key={`${left}x${top}`}
+                              style={[
+                                styles.marker,
+                                {
+                                  left: `${left}%`,
+                                  top: `${top}%`,
+                                },
+                              ]}
+                            />
+                          ))
+                        )}
+                      </>
+                    );
+                  }
+                : undefined
+            }
           >
-            <View style={styles.contents}>
-              <Image style={styles.img} source={{ uri }} />
-
-              {showMarkers &&
-                [20, 40, 60, 80].map((left) =>
-                  [20, 40, 60, 80].map((top) => (
-                    <FixedSize left={left} top={top} key={`${left}x${top}`}>
-                      <View style={styles.marker} />
-                    </FixedSize>
-                  ))
-                )}
+            <View
+              // `aspectRatio` constrains the contents View to the
+              // source's aspect, so resizeMode:contain produces zero
+              // letterbox — the element frame == the rendered-pixel
+              // frame. Combined with `maxWidth/maxHeight: '100%'` and
+              // `alignSelf: 'center'`, the element fits within the
+              // wrapper on whichever axis is binding (width on a tall
+              // wrapper, height on a wide wrapper) without overflow.
+              // `onLayout` then gives `NonScalingOverlay` the exact
+              // contentSize directly — no extra contain math required.
+              style={[styles.contents, { aspectRatio: sourceAspect }]}
+              onLayout={(e) => {
+                const { width, height } = e.nativeEvent.layout;
+                setContentSize((prev) =>
+                  prev.width === width && prev.height === height
+                    ? prev
+                    : { width, height }
+                );
+              }}
+            >
+              <Image
+                style={styles.img}
+                source={{ uri }}
+                onLoad={(e) => {
+                  const src = e.nativeEvent.source;
+                  setImageSourceSize((prev) =>
+                    prev.width === src.width && prev.height === src.height
+                      ? prev
+                      : { width: src.width, height: src.height }
+                  );
+                }}
+              />
             </View>
           </ReactNativeZoomableView>
         </View>
+        <Text>
+          DBG contentSize: {Math.round(contentSize.width)}×
+          {Math.round(contentSize.height)} box: {Math.round(size.width)}×
+          {Math.round(size.height)}
+        </Text>
         <Text>onStaticPinPositionChange: {stringifyPoint(pin)}</Text>
         <ReText text={movePinText} style={{ color: 'black' }} />
         <Button

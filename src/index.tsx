@@ -1,4 +1,5 @@
-import FixedSize from './components/FixedSize';
+import type { NonScalingOverlayProps } from './components/NonScalingOverlay';
+import { NonScalingOverlay } from './components/NonScalingOverlay';
 import {
   applyContainResizeMode,
   getImageOriginOnTransformSubject,
@@ -17,8 +18,9 @@ import type {
 export {
   // Helper functions for coordinate conversion
   applyContainResizeMode,
-  FixedSize,
   getImageOriginOnTransformSubject,
+  NonScalingOverlay,
+  NonScalingOverlayProps,
   ReactNativeZoomableView,
   ReactNativeZoomableViewProps,
   ReactNativeZoomableViewRef,
