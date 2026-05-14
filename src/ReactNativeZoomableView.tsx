@@ -36,6 +36,7 @@ import {
 } from './helper';
 import { applyPinchSensitivity } from './helper/applyPinchSensitivity';
 import { calcShiftDelta } from './helper/calcShiftDelta';
+import { clampZoom } from './helper/clampZoom';
 import { viewportPositionToImagePosition } from './helper/coordinateConversion';
 import { getNextZoomStep } from './helper/getNextZoomStep';
 import { useDebugPoints } from './hooks/useDebugPoints';
@@ -917,16 +918,12 @@ const ReactNativeZoomableViewInner: ForwardRefRenderFunction<
       pinchToZoomSensitivity
     );
 
-    let newZoomLevel = zoom.value * (1 + deltaGrowthAdjustedBySensitivity);
-
     // make sure max and min zoom levels are respected
-    if (maxZoom.value != null && newZoomLevel > maxZoom.value) {
-      newZoomLevel = maxZoom.value;
-    }
-
-    if (minZoom.value != null && newZoomLevel < minZoom.value) {
-      newZoomLevel = minZoom.value;
-    }
+    const newZoomLevel = clampZoom(
+      zoom.value * (1 + deltaGrowthAdjustedBySensitivity),
+      maxZoom.value,
+      minZoom.value
+    );
 
     const gestureCenterPoint = calcGestureCenterPoint(e);
 
