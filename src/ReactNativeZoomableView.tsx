@@ -1642,7 +1642,8 @@ const ReactNativeZoomableViewInner: ForwardRefRenderFunction<
     })
     .onFinalize(() => {
       firstTouch.value = undefined;
-    });
+    })
+    .withTestId('canvas-gesture');
 
   const transformStyle = useAnimatedStyle(() => {
     return {
