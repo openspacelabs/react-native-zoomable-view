@@ -34,6 +34,7 @@ import {
   calcGestureTouchDistance,
   calcNewScaledOffsetForZoomCentering,
 } from './helper';
+import { calcShiftDelta } from './helper/calcShiftDelta';
 import { viewportPositionToImagePosition } from './helper/coordinateConversion';
 import { getNextZoomStep } from './helper/getNextZoomStep';
 import { useDebugPoints } from './hooks/useDebugPoints';
@@ -851,12 +852,16 @@ const ReactNativeZoomableViewInner: ForwardRefRenderFunction<
       const dx = gestureCenterPoint.x - lastGestureCenterPosition.value.x;
       const dy = gestureCenterPoint.y - lastGestureCenterPosition.value.y;
 
-      const shiftX = dx / zoom.value / movementSensitivity.value;
-      const shiftY = dy / zoom.value / movementSensitivity.value;
+      const { dxShift, dyShift } = calcShiftDelta({
+        dx,
+        dy,
+        zoom: zoom.value,
+        movementSensitivity: movementSensitivity.value,
+      });
 
       shift = {
-        x: shiftX,
-        y: shiftY,
+        x: dxShift,
+        y: dyShift,
       };
     }
 
