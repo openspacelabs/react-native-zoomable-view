@@ -1,157 +1,31 @@
 /* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-return, @typescript-eslint/no-explicit-any */
 
-// RNGH mock for Phase C gesture tests — captures `Gesture.Manual()` handlers
-// and exposes them via `getByGestureTestId(testId)`. Replaces the
-// pass-through Proxy mock used in Phase B (which dropped `withTestId`).
+// Uses the REAL react-native-gesture-handler module (no per-file
+// jest.mock) — `Gesture.Manual()` builder, registry, and `withTestId`
+// resolve through RNGH's actual code. Per Phase E probe finding §2:
+// the renderer-shim stub needed to bypass the `ReactNativeRenderer-dev`
+// load crash lives in `jest.setup.ts`; `getByGestureTestId` is imported
+// from the `react-native-gesture-handler/jest-utils` subpath (the only
+// place RNGH 2.20.2 exports it).
 //
-// Rationale: `react-native-gesture-handler/jest-utils#fireGestureHandler`
-// does NOT support `Gesture.Manual()` (handlersDefaultEvents covers only
-// Pan/Pinch/Tap/etc — see RNGH 2.20.2 jest-utils/jestUtils.ts:103-164).
-// The only way to drive RNZV's `onTouchesDown/Move/Up/Cancelled` is to
-// invoke those handlers directly. Importing the real RNGH module
-// transitively loads `react-native/Libraries/Renderer/implementations/
-// ReactNativeRenderer-dev` which crashes the Jest jsdom env, so we
-// synthesise a builder that mirrors the real `Gesture.Manual()` shape
-// (`.handlers.onTouchesDown` etc, see RNGH gesture.ts:235-281) and records
-// the testId so test code can retrieve the handlers from a registry.
+// Touch-event dispatch is still direct-handler invocation
+// (`gesture.handlers.onTouchesDown(...)`) — `fireGestureHandler` doesn't
+// support `Manual` gestures in RNGH 2.20.2 (per probe §6.5 + the
+// `AllGestures` union in `jest-utils/jestUtils.d.ts` omits ManualGesture).
 //
-// Note: tests pass `visualTouchFeedbackEnabled={false}` to skip the
+// Tests still pass `visualTouchFeedbackEnabled={false}` to skip the
 // `AnimatedTouchFeedback` mount path on tap — that component uses RN
 // `Animated` which loads `ReactNativeRenderer-dev` on unmount and crashes
-// the same way as the real RNGH import would.
-jest.mock('react-native-gesture-handler', () => {
-  // eslint-disable-next-line @typescript-eslint/no-require-imports, @typescript-eslint/no-var-requires
-  const ReactLocal = require('react');
-
-  const registry: Map<string, { handlers: Record<string, unknown> }> =
-    new Map();
-
-  const createManualGesture = () => {
-    const handlers: Record<string, unknown> = {};
-    let testId: string | undefined;
-    const builder: any = {
-      handlers,
-      onTouchesDown(cb: unknown) {
-        handlers.onTouchesDown = cb;
-        return builder;
-      },
-      onTouchesMove(cb: unknown) {
-        handlers.onTouchesMove = cb;
-        return builder;
-      },
-      onTouchesUp(cb: unknown) {
-        handlers.onTouchesUp = cb;
-        return builder;
-      },
-      onTouchesCancelled(cb: unknown) {
-        handlers.onTouchesCancelled = cb;
-        return builder;
-      },
-      onFinalize(cb: unknown) {
-        handlers.onFinalize = cb;
-        return builder;
-      },
-      withTestId(id: string) {
-        testId = id;
-        registry.set(id, { handlers });
-        return builder;
-      },
-      toJSON() {
-        return { type: 'ManualGesture', testId };
-      },
-    };
-    return builder;
-  };
-
-  const makeChainable = (): unknown => {
-    const proxy: unknown = new Proxy(
-      {},
-      {
-        get: (_t, prop) => {
-          if (prop === 'toJSON') return () => ({});
-          return () => proxy;
-        },
-      }
-    );
-    return proxy;
-  };
-
-  const Gesture = new Proxy(
-    {},
-    {
-      get: (_t, prop) => {
-        if (prop === 'Manual') return () => createManualGesture();
-        return () => makeChainable();
-      },
-    }
-  );
-
-  const GestureDetector = ({ children }: { children: unknown }) => children;
-  const GestureHandlerRootView = (props: { children?: unknown }) =>
-    ReactLocal.createElement(
-      'View',
-      { ...props, children: undefined },
-      props.children
-    );
-
-  return {
-    Gesture,
-    GestureDetector,
-    GestureHandlerRootView,
-    State: {
-      UNDETERMINED: 0,
-      FAILED: 1,
-      BEGAN: 2,
-      CANCELLED: 3,
-      ACTIVE: 4,
-      END: 5,
-    },
-    Directions: {},
-    TouchEventType: {
-      UNDETERMINED: 0,
-      TOUCHES_DOWN: 1,
-      TOUCHES_MOVE: 2,
-      TOUCHES_UP: 3,
-      TOUCHES_CANCELLED: 4,
-    },
-    getByGestureTestId(id: string) {
-      const entry = registry.get(id);
-      if (!entry) {
-        throw new Error(
-          `getByGestureTestId: no gesture registered for testId '${id}'. ` +
-            `Known ids: ${[...registry.keys()].join(', ') || '(none)'}`
-        );
-      }
-      return entry;
-    },
-    __gestureRegistry: {
-      reset: () => {
-        registry.clear();
-      },
-    },
-  };
-});
+// (this is independent of the RNGH mock decision).
 
 import { render } from '@testing-library/react-native';
 import React, { createRef } from 'react';
 import type { GestureTouchEvent } from 'react-native-gesture-handler';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import { getByGestureTestId } from 'react-native-gesture-handler/jest-utils';
 
 import { ReactNativeZoomableView } from '../../ReactNativeZoomableView';
 import type { ReactNativeZoomableViewRef } from '../../typings';
-
-// eslint-disable-next-line @typescript-eslint/no-require-imports, @typescript-eslint/no-var-requires
-const RNGHMock = require('react-native-gesture-handler') as {
-  getByGestureTestId: (id: string) => {
-    handlers: {
-      onTouchesDown: (e: GestureTouchEvent, sm: StateManagerStub) => void;
-      onTouchesMove: (e: GestureTouchEvent, sm: StateManagerStub) => void;
-      onTouchesUp: (e: GestureTouchEvent, sm: StateManagerStub) => void;
-      onTouchesCancelled: (e: GestureTouchEvent, sm: StateManagerStub) => void;
-      onFinalize?: () => void;
-    };
-  };
-  __gestureRegistry: { reset: () => void };
-};
 
 type StateManagerStub = {
   begin: jest.Mock;
@@ -205,7 +79,6 @@ const TOUCHES_MOVE = 2;
 const TOUCHES_UP = 3;
 
 beforeEach(() => {
-  RNGHMock.__gestureRegistry.reset();
   jest.useFakeTimers();
 });
 
@@ -217,10 +90,25 @@ const renderRNZV = (
   props: Parameters<typeof ReactNativeZoomableView>[0] = {}
 ) =>
   render(
-    <ReactNativeZoomableView visualTouchFeedbackEnabled={false} {...props} />
+    <GestureHandlerRootView>
+      <ReactNativeZoomableView visualTouchFeedbackEnabled={false} {...props} />
+    </GestureHandlerRootView>
   );
 
-const getGesture = () => RNGHMock.getByGestureTestId('canvas-gesture');
+// Shape returned by the real `getByGestureTestId` is the underlying
+// `ManualGesture` instance — `.handlers` exposes the RNZV-supplied
+// onTouches* closures (private API, hence the `any` cast).
+type GestureWithHandlers = {
+  handlers: {
+    onTouchesDown: (e: GestureTouchEvent, sm: StateManagerStub) => void;
+    onTouchesMove: (e: GestureTouchEvent, sm: StateManagerStub) => void;
+    onTouchesUp: (e: GestureTouchEvent, sm: StateManagerStub) => void;
+    onTouchesCancelled: (e: GestureTouchEvent, sm: StateManagerStub) => void;
+    onFinalize?: () => void;
+  };
+};
+const getGesture = (): GestureWithHandlers =>
+  getByGestureTestId('canvas-gesture') as unknown as GestureWithHandlers;
 
 // Convenience: drive a complete single-touch tap (down then up).
 const tap = (
