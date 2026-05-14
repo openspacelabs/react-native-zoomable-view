@@ -402,3 +402,7 @@ Tap classification now requires a genuine touch release. The previous stack ran 
 ### Settle-based `onStaticPinPositionChange`
 
 The previous stack fired `onStaticPinPositionChange` via `lodash.debounce` plus explicit synchronous flushes at gesture end / animation completion. The new stack fires once per logical settle event (~100 ms after motion stops) with epsilon-equality dedup. Natural `zoomTo` completion is observed by the same settle path — there is no separate explicit flush.
+
+---
+
+> **Test fidelity note (for contributors).** The gesture-test layer (`src/__tests__/gestures/*.test.tsx` and `src/__tests__/e2e/probe.test.tsx`) runs against the **real `react-native-gesture-handler`** module — actual `Gesture.Manual()` builder, `handlersRegistry`, and `withTestId` resolution — paired with the official `react-native-reanimated/mock`. Touch events are dispatched by invoking `gesture.handlers.onTouchesDown/Move/Up/Cancelled(event, stateManager)` directly, because RNGH 2.20.2's `fireGestureHandler` jest-utils helper does not support `Manual` gestures (the `AllGestures` union in `jest-utils/jestUtils.d.ts` omits `ManualGesture`). The only RN-internal mock is a minimum-surface stub of `react-native/Libraries/Renderer/shims/ReactNative` (in `jest.setup.ts`) that bypasses a `ReactNativeRenderer-dev` jest-env load crash; the renderer is not under test.
