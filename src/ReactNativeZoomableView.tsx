@@ -39,6 +39,7 @@ import { calcShiftDelta } from './helper/calcShiftDelta';
 import { clampZoom } from './helper/clampZoom';
 import { viewportPositionToImagePosition } from './helper/coordinateConversion';
 import { getNextZoomStep } from './helper/getNextZoomStep';
+import { shouldSkipShift } from './helper/shouldSkipShift';
 import { useDebugPoints } from './hooks/useDebugPoints';
 import { useLatestCallback } from './hooks/useLatestCallback';
 import { useLatestWorklet } from './hooks/useLatestWorklet';
@@ -1005,8 +1006,12 @@ const ReactNativeZoomableViewInner: ForwardRefRenderFunction<
     'worklet';
     // Skips shifting if panEnabled is false or disablePanOnInitialZoom is true and we're on the initial zoom level
     if (
-      !panEnabled.value ||
-      (disablePanOnInitialZoom.value && zoom.value === initialZoom.value)
+      shouldSkipShift({
+        panEnabled: !!panEnabled.value,
+        disablePanOnInitialZoom: !!disablePanOnInitialZoom.value,
+        zoom: zoom.value,
+        initialZoom: initialZoom.value ?? 0,
+      })
     ) {
       return;
     }
