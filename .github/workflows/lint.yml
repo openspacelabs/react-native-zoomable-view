@@ -23,3 +23,5 @@ jobs:
       run: yarn run lint
     - name: Build
       run: yarn build
+    - name: Run unit tests
+      run: yarn test --ci --runInBand
