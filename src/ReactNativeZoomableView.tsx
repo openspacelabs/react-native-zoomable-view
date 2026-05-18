@@ -344,11 +344,12 @@ const ReactNativeZoomableViewInner: ForwardRefRenderFunction<
    * @private
    */
   const _getZoomableViewEventObject = (
-    overwriteObj: Partial<ZoomableViewEvent> = {}
+    overwriteObj: Partial<ZoomableViewEvent> = {},
+    gestureEvent?: GestureTouchEvent
   ): ZoomableViewEvent => {
     'worklet';
 
-    return Object.assign(
+    const event: ZoomableViewEvent = Object.assign(
       {
         zoomLevel: zoom.value,
         offsetX: offsetX.value,
@@ -358,6 +359,30 @@ const ReactNativeZoomableViewInner: ForwardRefRenderFunction<
       },
       overwriteObj
     );
+
+    // Populate content (bitmap) coordinates of the first touch when caller
+    // supplied a gesture event AND content dimensions are known.
+    // `viewportPositionToImagePosition` divides by container size and image
+    // size, so it returns null pre-measurement or with no content size set —
+    // leave `contentX`/`contentY` undefined in that case rather than emit
+    // NaN/Infinity to consumers.
+    const touch = gestureEvent?.allTouches[0];
+    if (touch && contentWidth.value && contentHeight.value) {
+      const contentPos = viewportPositionToImagePosition({
+        viewportPosition: { x: touch.x, y: touch.y },
+        imageSize: {
+          width: contentWidth.value,
+          height: contentHeight.value,
+        },
+        zoomableEvent: event,
+      });
+      if (contentPos) {
+        event.contentX = contentPos.x;
+        event.contentY = contentPos.y;
+      }
+    }
+
+    return event;
   };
 
   const _staticPinPosition = () => {
@@ -768,7 +793,7 @@ const ReactNativeZoomableViewInner: ForwardRefRenderFunction<
         // `props.onLongPress` — the closure was captured at schedule time
         // and would fire a stale callback if the parent re-rendered during
         // the timer window.
-        onLongPress(e, _getZoomableViewEventObject());
+        onLongPress(e, _getZoomableViewEventObject({}, e));
       }, props.longPressDuration);
     }
   });
@@ -828,7 +853,7 @@ const ReactNativeZoomableViewInner: ForwardRefRenderFunction<
     // the resumed gesture.
     runOnJS(setGestureStartedJS)(true);
     if (!isRecovery) {
-      runOnJS(_safeOnPanResponderGrant)(e, _getZoomableViewEventObject());
+      runOnJS(_safeOnPanResponderGrant)(e, _getZoomableViewEventObject({}, e));
     }
 
     cancelAnimation(zoom);
@@ -1077,7 +1102,7 @@ const ReactNativeZoomableViewInner: ForwardRefRenderFunction<
     const { onDoubleTapBefore, onDoubleTapAfter, doubleTapZoomToCenter } =
       props;
 
-    onDoubleTapBefore?.(e, _getZoomableViewEventObject());
+    onDoubleTapBefore?.(e, _getZoomableViewEventObject({}, e));
 
     const nextZoomStep = getNextZoomStep({
       zoomLevel: zoom.value,
@@ -1106,7 +1131,7 @@ const ReactNativeZoomableViewInner: ForwardRefRenderFunction<
 
     onDoubleTapAfter?.(
       e,
-      _getZoomableViewEventObject({ zoomLevel: nextZoomStep })
+      _getZoomableViewEventObject({ zoomLevel: nextZoomStep }, e)
     );
   });
 
@@ -1187,7 +1212,7 @@ const ReactNativeZoomableViewInner: ForwardRefRenderFunction<
 
         // Invoke the stable `onSingleTap` wrapper rather than the captured
         // `props.onSingleTap` — same staleness reasoning as `onLongPress`.
-        onSingleTap(e, _getZoomableViewEventObject());
+        onSingleTap(e, _getZoomableViewEventObject({}, e));
       }, props.doubleTapDelay);
     }
   };
@@ -1358,12 +1383,12 @@ const ReactNativeZoomableViewInner: ForwardRefRenderFunction<
 
     runOnJS(clearLongPressTimeout)();
 
-    runOnJS(_safeOnPanResponderEnd)(e, _getZoomableViewEventObject());
+    runOnJS(_safeOnPanResponderEnd)(e, _getZoomableViewEventObject({}, e));
 
     if (gestureType.value === 'pinch') {
-      runOnJS(_safeOnZoomEnd)(e, _getZoomableViewEventObject());
+      runOnJS(_safeOnZoomEnd)(e, _getZoomableViewEventObject({}, e));
     } else if (gestureType.value === 'shift') {
-      runOnJS(_safeOnShiftingEnd)(e, _getZoomableViewEventObject());
+      runOnJS(_safeOnShiftingEnd)(e, _getZoomableViewEventObject({}, e));
     }
 
     // RNGH cancellation: queue `onPanResponderTerminate` HERE — inside the
@@ -1372,7 +1397,10 @@ const ReactNativeZoomableViewInner: ForwardRefRenderFunction<
     // `ref.current.gestureStarted` from inside `onPanResponderTerminate`
     // observes `true`, matching SPECS L157 for the other end-callbacks.
     if (isCancellation) {
-      runOnJS(_safeOnPanResponderTerminate)(e, _getZoomableViewEventObject());
+      runOnJS(_safeOnPanResponderTerminate)(
+        e,
+        _getZoomableViewEventObject({}, e)
+      );
       // wasReleased=false skips the suppression branch above; clear here.
       doubleTapFirstTapReleaseTimestamp.value = undefined;
       doubleTapFirstTap.value = undefined;
@@ -1414,7 +1442,10 @@ const ReactNativeZoomableViewInner: ForwardRefRenderFunction<
     'worklet';
 
     if (
-      onPanResponderMoveWorkletShared.value.fn(e, _getZoomableViewEventObject())
+      onPanResponderMoveWorkletShared.value.fn(
+        e,
+        _getZoomableViewEventObject({}, e)
+      )
     ) {
       // Consumer intercepted this move. The early-return below skips the
       // gesture-classification branches that would otherwise assign

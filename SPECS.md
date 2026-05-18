@@ -37,7 +37,7 @@ Exported from `src/index.tsx`:
 - `ReactNativeZoomableView` — main component
 - `ReactNativeZoomableViewProps` — prop type
 - `ReactNativeZoomableViewRef` — imperative handle
-- `ZoomableViewEvent` — `{ zoomLevel, offsetX, offsetY, originalWidth, originalHeight }`
+- `ZoomableViewEvent` — `{ zoomLevel, offsetX, offsetY, originalWidth, originalHeight, contentX?, contentY? }`
 - `useZoomableViewContext()` — hook returning `{ zoom, inverseZoom, inverseZoomStyle, offsetX, offsetY }` for descendants
 - `FixedSize` — wrapper that keeps absolutely-positioned children at constant visual size regardless of zoom
 - `applyContainResizeMode`, `getImageOriginOnTransformSubject`, `viewportPositionToImagePosition` — coordinate helpers
@@ -95,6 +95,8 @@ Exported from `src/index.tsx`:
 ### Callbacks
 
 All event-receiving callbacks accept `(event: GestureTouchEvent, zoomableViewEventObject: ZoomableViewEvent)`. `onZoomEnd`'s `event` is `GestureTouchEvent | undefined` (it's `undefined` on natural completion of a programmatic `zoomTo()`).
+
+The `contentX` / `contentY` fields on `ZoomableViewEvent` carry the first touch's position in content (bitmap) coordinates — populated when the callback has an associated gesture event AND both `contentWidth` and `contentHeight` props are set. Undefined for `onTransformWorklet` (no gesture event) and for `onZoomEnd` after a programmatic `zoomTo()` completes naturally (its `event` is `undefined`). Computed under the same `contain` resize-mode assumption as `viewportPositionToImagePosition` — see [Coordinate system](#coordinate-system).
 
 | Callback | Thread | When |
 |----------|--------|------|
