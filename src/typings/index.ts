@@ -8,6 +8,15 @@ export interface ZoomableViewEvent {
   offsetY: number;
   originalHeight: number;
   originalWidth: number;
+  /**
+   * Position of the gesture's first touch in content (bitmap) coordinates.
+   * Populated only when the callback has an associated gesture event AND
+   * both `contentWidth` and `contentHeight` props are set. Undefined for
+   * non-gesture call sites (`onTransformWorklet`, `onZoomEnd` after a
+   * programmatic `zoomTo()`) and when content dimensions are unknown.
+   */
+  contentX?: number;
+  contentY?: number;
 }
 
 export type ReactNativeZoomableViewRef = {
