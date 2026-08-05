@@ -413,7 +413,7 @@ const ReactNativeZoomableViewInner: ForwardRefRenderFunction<
     // `AnimatedTouchFeedback.onAnimationDone`, which never mounts when the
     // render gate fails.
     if (!visualTouchFeedbackEnabled || !doubleTapDelay) return;
-    touches.value.push(touch);
+    touches.value = [...touches.value, touch];
     setStateTouches([...touches.value]);
   });
 
