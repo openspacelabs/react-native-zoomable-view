@@ -236,7 +236,6 @@ const ReactNativeZoomableViewInner: ForwardRefRenderFunction<
   // that drains AFTER cleanup would otherwise register a fresh
   // `onLongPress`/`onSingleTap` timer on a disposed component.
   const isMounted = useRef(true);
-  const touches = useSharedValue<TouchPoint[]>([]);
   const doubleTapFirstTap = useSharedValue<TouchPoint | undefined>(undefined);
   const gestureType = useSharedValue<'shift' | 'pinch' | undefined>(undefined);
 
@@ -408,18 +407,19 @@ const ReactNativeZoomableViewInner: ForwardRefRenderFunction<
 
   const _addTouch = useLatestCallback((touch: TouchPoint) => {
     // Symmetric to the render-path gate (`visualTouchFeedbackEnabled &&
-    // !!doubleTapDelay`). Skipping either case prevents `touches.value` from
+    // !!doubleTapDelay`). Skipping either case prevents `stateTouches` from
     // growing monotonically — `_removeTouch` only fires from
     // `AnimatedTouchFeedback.onAnimationDone`, which never mounts when the
     // render gate fails.
     if (!visualTouchFeedbackEnabled || !doubleTapDelay) return;
-    touches.value = [...touches.value, touch];
-    setStateTouches([...touches.value]);
+    setStateTouches((prev) => [...prev, touch]);
   });
 
   const _removeTouch = useLatestCallback((touch: TouchPoint) => {
-    touches.value.splice(touches.value.indexOf(touch), 1);
-    setStateTouches([...touches.value]);
+    // `filter` on an identity miss is a no-op, where the previous
+    // `splice(indexOf(touch), 1)` degraded to `splice(-1, 1)` and dropped an
+    // unrelated touch.
+    setStateTouches((prev) => prev.filter((t) => t !== touch));
   });
 
   const onStaticPinPositionChange = useLatestCallback(
@@ -1160,12 +1160,21 @@ const ReactNativeZoomableViewInner: ForwardRefRenderFunction<
       _handleDoubleTap(e);
     } else {
       doubleTapFirstTapReleaseTimestamp.value = now;
-      doubleTapFirstTap.value = {
+      // Hold the tap locally and pass THAT to `_addTouch`. Reading
+      // `doubleTapFirstTap.value` back after assigning it is not safe from the
+      // JS thread: Reanimated 4 makes the JS-thread setter asynchronous (it
+      // schedules the write onto the UI runtime) while the getter serves a
+      // cached value until the UI side flags it dirty. The read-back therefore
+      // returns the PREVIOUS value, which is `undefined` after any of the
+      // reset sites below — and `_addTouch(undefined)` puts an `undefined`
+      // into `stateTouches`, crashing the render that reads `touch.x`.
+      const firstTap: TouchPoint = {
         id: now.toString(),
         x: e.allTouches[0].x,
         y: e.allTouches[0].y,
       };
-      _addTouch(doubleTapFirstTap.value);
+      doubleTapFirstTap.value = firstTap;
+      _addTouch(firstTap);
 
       singleTapTimeoutId.current = setTimeout(() => {
         doubleTapFirstTapReleaseTimestamp.value = undefined;
@@ -1177,8 +1186,15 @@ const ReactNativeZoomableViewInner: ForwardRefRenderFunction<
         // consumer moved the pin during the timer window.
         const currentStaticPinPosition = staticPinPosition.value;
 
+        // Read once into a local, for the same reason `staticPinPosition` is
+        // read once above. Each `.value` read can block on the UI runtime to
+        // refresh its cache, so the UI thread can run between the guard below
+        // and a later deref — and the worklet reset sites clear this to
+        // `undefined`. Three separate reads would let `.x` land on `undefined`.
+        const firstTap = doubleTapFirstTap.value;
+
         // Pan to the tapped location
-        if (currentStaticPinPosition && doubleTapFirstTap.value) {
+        if (currentStaticPinPosition && firstTap) {
           // Cancel any in-flight zoomTo() so its zoom-centering reaction
           // doesn't fight the pan we're about to apply — without this, a
           // concurrent zoomTo's per-tick offset recompute would clobber our
@@ -1188,8 +1204,8 @@ const ReactNativeZoomableViewInner: ForwardRefRenderFunction<
           cancelAnimation(zoom);
           zoomToDestination.value = undefined;
 
-          const tapX = currentStaticPinPosition.x - doubleTapFirstTap.value.x;
-          const tapY = currentStaticPinPosition.y - doubleTapFirstTap.value.y;
+          const tapX = currentStaticPinPosition.x - firstTap.x;
+          const tapY = currentStaticPinPosition.y - firstTap.y;
 
           const toX = offsetX.value + tapX / zoom.value;
           const toY = offsetY.value + tapY / zoom.value;
