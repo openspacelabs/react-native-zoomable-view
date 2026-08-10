@@ -1186,8 +1186,15 @@ const ReactNativeZoomableViewInner: ForwardRefRenderFunction<
         // consumer moved the pin during the timer window.
         const currentStaticPinPosition = staticPinPosition.value;
 
+        // Read once into a local, for the same reason `staticPinPosition` is
+        // read once above. Each `.value` read can block on the UI runtime to
+        // refresh its cache, so the UI thread can run between the guard below
+        // and a later deref — and the worklet reset sites clear this to
+        // `undefined`. Three separate reads would let `.x` land on `undefined`.
+        const firstTap = doubleTapFirstTap.value;
+
         // Pan to the tapped location
-        if (currentStaticPinPosition && doubleTapFirstTap.value) {
+        if (currentStaticPinPosition && firstTap) {
           // Cancel any in-flight zoomTo() so its zoom-centering reaction
           // doesn't fight the pan we're about to apply — without this, a
           // concurrent zoomTo's per-tick offset recompute would clobber our
@@ -1197,8 +1204,8 @@ const ReactNativeZoomableViewInner: ForwardRefRenderFunction<
           cancelAnimation(zoom);
           zoomToDestination.value = undefined;
 
-          const tapX = currentStaticPinPosition.x - doubleTapFirstTap.value.x;
-          const tapY = currentStaticPinPosition.y - doubleTapFirstTap.value.y;
+          const tapX = currentStaticPinPosition.x - firstTap.x;
+          const tapY = currentStaticPinPosition.y - firstTap.y;
 
           const toX = offsetX.value + tapX / zoom.value;
           const toY = offsetY.value + tapY / zoom.value;
